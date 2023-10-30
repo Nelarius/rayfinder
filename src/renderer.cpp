@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
 #include <tuple>
 

@@ -6,6 +6,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <format>
 #include <stdexcept>
 
@@ -21,11 +22,10 @@ const char* WGPUDeviceLostReasonToStr(WGPUDeviceLostReason reason)
         return "Undefined";
     case WGPUDeviceLostReason_Destroyed:
         return "Destroyed";
+    default:
+        assert(!"Unknown WGPUDeviceLostReason");
+        return nullptr;
     }
-
-    assert(!"Unknown WGPUDeviceLostReason");
-
-    return nullptr;
 }
 
 const char* WGPUErrorTypeToStr(const WGPUErrorType type)
@@ -44,11 +44,10 @@ const char* WGPUErrorTypeToStr(const WGPUErrorType type)
         return "Unknown";
     case WGPUErrorType_DeviceLost:
         return "DeviceLost";
+    default:
+        assert(!"Unknown WGPUErrorType");
+        return nullptr;
     }
-
-    assert(!"Unknown WGPUErrorType");
-
-    return nullptr;
 }
 
 void onDeviceLost(WGPUDeviceLostReason reason, const char* const message, void* /*userdata*/)
@@ -81,11 +80,10 @@ const char* WGPUQueueWorkDoneStatusToStr(const WGPUQueueWorkDoneStatus status)
         return "Unknown";
     case WGPUQueueWorkDoneStatus_DeviceLost:
         return "DeviceLost";
+    default:
+        assert(!"Unknown WGPUQueueWorkDoneStatus");
+        return nullptr;
     }
-
-    assert(!"Unknown WGPUQueueWorkDoneStatus");
-
-    return nullptr;
 }
 
 void onQueueWorkDone(WGPUQueueWorkDoneStatus status, void* /*userdata*/)
