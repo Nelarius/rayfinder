@@ -257,7 +257,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     queue = wgpuDeviceGetQueue(device);
     wgpuQueueOnSubmittedWorkDone(queue, 0, onQueueWorkDone, nullptr);
 
-    swapChain = createSwapChain(device, surface, WGPUTextureFormat_BGRA8Unorm, framebufferSize);
+    swapChain = createSwapChain(device, surface, swapChainFormat, framebufferSize);
 }
 
 GpuContext::~GpuContext()
@@ -278,6 +278,6 @@ void GpuContext::resizeFramebuffer(const FramebufferSize& newSize)
     }
 
     swapChainSafeRelease(swapChain);
-    swapChain = createSwapChain(device, surface, WGPUTextureFormat_BGRA8Unorm, newSize);
+    swapChain = createSwapChain(device, surface, swapChainFormat, newSize);
 }
 } // namespace pt

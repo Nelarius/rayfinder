@@ -1,5 +1,6 @@
 #include "common/framebuffer_size.hpp"
 #include "gpu_context.hpp"
+#include "renderer.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -73,10 +74,11 @@ int main()
     };
 
     {
-        pt::GpuContext gpuContext(window, requiredLimits);
-
         pt::FramebufferSize framebufferSize;
         glfwGetFramebufferSize(window, &framebufferSize.width, &framebufferSize.height);
+
+        pt::GpuContext gpuContext(window, requiredLimits);
+        pt::Renderer   renderer(gpuContext);
 
         {
             glfwMakeContextCurrent(window);
@@ -112,59 +114,7 @@ int main()
                 // Render
 
                 {
-                    const WGPUTextureView nextTexture =
-                        wgpuSwapChainGetCurrentTextureView(gpuContext.swapChain);
-                    if (!nextTexture)
-                    {
-                        // Getting the next texture can fail, if e.g. the window has been resized.
-                        std::fprintf(stderr, "Failed to get texture view from swap chain\n");
-                        continue;
-                    }
-
-                    const WGPUCommandEncoder encoder = [&gpuContext]() {
-                        const WGPUCommandEncoderDescriptor cmdEncoderDesc{
-                            .nextInChain = nullptr,
-                            .label = "Command encoder",
-                        };
-                        return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
-                    }();
-
-                    const WGPURenderPassEncoder renderPass =
-                        [encoder, nextTexture]() -> WGPURenderPassEncoder {
-                        const WGPURenderPassColorAttachment renderPassColorAttachment{
-                            .nextInChain = nullptr,
-                            .view = nextTexture,
-                            .resolveTarget = nullptr,
-                            .loadOp = WGPULoadOp_Clear,
-                            .storeOp = WGPUStoreOp_Store,
-                            .clearValue = WGPUColor{0.9, 0.1, 0.8, 1.0},
-                        };
-
-                        const WGPURenderPassDescriptor renderPassDesc = {
-                            .nextInChain = nullptr,
-                            .label = "Render pass encoder",
-                            .colorAttachmentCount = 1,
-                            .colorAttachments = &renderPassColorAttachment,
-                            .depthStencilAttachment = nullptr,
-                            .occlusionQuerySet = nullptr,
-                            .timestampWriteCount = 0,
-                            .timestampWrites = nullptr,
-                        };
-
-                        return wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
-                    }();
-                    wgpuRenderPassEncoderEnd(renderPass);
-
-                    const WGPUCommandBuffer cmdBuffer = [encoder]() {
-                        const WGPUCommandBufferDescriptor cmdBufferDesc{
-                            .nextInChain = nullptr,
-                            .label = "Command buffer",
-                        };
-                        return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
-                    }();
-                    wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
-
-                    wgpuTextureViewRelease(nextTexture);
+                    renderer.render(gpuContext);
                 }
 
                 wgpuSwapChainPresent(gpuContext.swapChain);

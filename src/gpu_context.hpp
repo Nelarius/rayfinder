@@ -21,5 +21,7 @@ struct GpuContext
     ~GpuContext();
 
     void resizeFramebuffer(const FramebufferSize&);
+
+    constexpr static WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 };
 } // namespace pt

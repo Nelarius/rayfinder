@@ -9,7 +9,8 @@ add_subdirectory(external)
 
 add_executable(pt
     src/main.cpp
-    src/gpu_context.cpp)
+    src/gpu_context.cpp
+    src/renderer.cpp)
 target_link_libraries(pt PRIVATE glfw glfw3webgpu glm::glm webgpu)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 
