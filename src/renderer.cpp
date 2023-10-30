@@ -197,18 +197,6 @@ Renderer::Renderer(const GpuContext& gpuContext)
 
         // Vertex layout
 
-        const WGPUVertexAttribute positionAttribute{
-            .format = WGPUVertexFormat_Float32x2,
-            .offset = 0,
-            .shaderLocation = 0,
-        };
-
-        const WGPUVertexAttribute texCoordAttribute{
-            .format = WGPUVertexFormat_Float32x2,
-            .offset = 2 * sizeof(float),
-            .shaderLocation = 1,
-        };
-
         std::array<WGPUVertexAttribute, 2> vertexAttributes{
             WGPUVertexAttribute{
                 // position
