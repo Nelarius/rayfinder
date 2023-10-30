@@ -87,7 +87,22 @@ Renderer::Renderer(const GpuContext& gpuContext)
             .size = sizeof(glm::mat4),
             .mappedAtCreation = false,
         };
-        return wgpuDeviceCreateBuffer(gpuContext.device, &uniformDesc);
+        const WGPUBuffer buffer = wgpuDeviceCreateBuffer(gpuContext.device, &uniformDesc);
+
+        {
+            // DirectX, Metal, wgpu share the same left-handed coordinate system
+            // for their normalized device coordinates:
+            // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
+            glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
+            wgpuQueueWriteBuffer(
+                gpuContext.queue,
+                buffer,
+                0,
+                &viewProjectionMatrix[0],
+                sizeof(viewProjectionMatrix));
+        }
+
+        return buffer;
     }();
 
     auto [bindGroup, pipeline] = [&gpuContext,
@@ -386,16 +401,6 @@ void Renderer::render(const GpuContext& gpuContext)
     }();
 
     {
-        // DirectX, Metal, wgpu share the same left-handed coordinate system
-        // for their normalized device coordinates:
-        // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
-        glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
-        wgpuQueueWriteBuffer(
-            gpuContext.queue,
-            uniformsBuffer,
-            0,
-            &viewProjectionMatrix[0],
-            sizeof(viewProjectionMatrix));
         wgpuRenderPassEncoderSetPipeline(renderPass, renderPipeline);
         wgpuRenderPassEncoderSetBindGroup(renderPass, 0, uniformsBindGroup, 0, nullptr);
         wgpuRenderPassEncoderSetVertexBuffer(renderPass, 0, vertexBuffer, 0, vertexBufferByteSize);
