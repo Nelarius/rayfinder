@@ -2,7 +2,6 @@
 #include "gpu_context.hpp"
 
 #include <GLFW/glfw3.h>
-#include <glfw3webgpu.h>
 
 #include <cassert>
 #include <cstdint>
@@ -160,14 +159,13 @@ void swapChainSafeRelease(const WGPUSwapChain swapChain)
 }
 } // namespace
 
-GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requiredLimits)
+GpuContext::GpuContext(
+    const WindowDescriptor    windowDescriptor,
+    const WGPURequiredLimits& requiredLimits)
     : instance(nullptr), surface(nullptr), adapter(nullptr), device(nullptr), queue(nullptr),
       swapChain(nullptr)
 {
-    assert(window != nullptr);
-
-    FramebufferSize framebufferSize;
-    glfwGetFramebufferSize(window, &framebufferSize.width, &framebufferSize.height);
+    auto [surfaceDescriptor, framebufferSize] = windowDescriptor;
 
     instance = []() -> WGPUInstance {
         const WGPUInstanceDescriptor instanceDesc{
@@ -181,10 +179,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
         throw std::runtime_error("Failed to create WGPUInstance instance.");
     }
 
-    // TODO: passing in `WGPUSurfaceDescriptor` instance would be a way to not require a GLFW window
-    // pointer. `glfwGetWGPUSurface` creates that instance under the hood using platform-specific
-    // code.
-    surface = glfwGetWGPUSurface(instance, window);
+    surface = wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
 
     adapter = [this]() -> WGPUAdapter {
         const WGPURequestAdapterOptions adapterOptions = {};

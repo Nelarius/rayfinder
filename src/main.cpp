@@ -1,13 +1,14 @@
 #include "common/framebuffer_size.hpp"
 #include "gpu_context.hpp"
 
+#include <wgpusurface.h>
+
 #include <cassert>
 #include <chrono>
 #include <cstdio>
 #include <thread>
 
 #include <GLFW/glfw3.h>
-#include <glfw3webgpu.h>
 #include <webgpu/webgpu.h>
 
 const char* WGPUDeviceLostReasonToStr(WGPUDeviceLostReason reason)
@@ -152,11 +153,15 @@ int main()
             },
     };
 
-    {
-        pt::GpuContext gpuContext(window, requiredLimits);
+    pt::FramebufferSize framebufferSize;
+    glfwGetFramebufferSize(window, &framebufferSize.width, &framebufferSize.height);
 
-        pt::FramebufferSize framebufferSize;
-        glfwGetFramebufferSize(window, &framebufferSize.width, &framebufferSize.height);
+    {
+        pt::GpuContext gpuContext(
+            pt::WindowDescriptor{
+                .surfaceDescriptor = glfwGetWGPUSurfaceDescriptor(window),
+                .framebufferSize = framebufferSize},
+            requiredLimits);
 
         {
             glfwMakeContextCurrent(window);

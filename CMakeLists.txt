@@ -7,8 +7,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(external)
 
+add_library(wgpusurface
+    src/wgpusurface/wgpusurface.c)
+target_link_libraries(wgpusurface PRIVATE glfw webgpu)
+target_include_directories(wgpusurface PUBLIC src/wgpusurface)
+
 add_executable(pt
     src/main.cpp
     src/gpu_context.cpp)
-target_link_libraries(pt PRIVATE glfw glfw3webgpu webgpu)
+target_link_libraries(pt PRIVATE glfw wgpusurface webgpu)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)

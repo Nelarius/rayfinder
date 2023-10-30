@@ -1,11 +1,19 @@
 #pragma once
 
+#include "common/framebuffer_size.hpp"
+
 #include <webgpu/webgpu.h>
 
 struct GLFWwindow;
 
 namespace pt
 {
+struct WindowDescriptor
+{
+    WGPUSurfaceDescriptor surfaceDescriptor;
+    FramebufferSize       framebufferSize;
+};
+
 struct GpuContext
 {
     WGPUInstance  instance;
@@ -15,7 +23,7 @@ struct GpuContext
     WGPUQueue     queue;
     WGPUSwapChain swapChain;
 
-    GpuContext(GLFWwindow*, const WGPURequiredLimits&);
+    GpuContext(WindowDescriptor, const WGPURequiredLimits&);
     ~GpuContext();
 
     void resizeFramebuffer(const FramebufferSize&);
