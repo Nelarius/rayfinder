@@ -1,13 +1,13 @@
 #pragma once
 
+#include "common/extent.hpp"
+
 #include <webgpu/webgpu.h>
 
 struct GLFWwindow;
 
 namespace pt
 {
-struct FramebufferSize;
-
 struct GpuContext
 {
     WGPUInstance  instance;
@@ -20,7 +20,7 @@ struct GpuContext
     GpuContext(GLFWwindow*, const WGPURequiredLimits&);
     ~GpuContext();
 
-    void resizeFramebuffer(const FramebufferSize&);
+    void resizeFramebuffer(const Extent2i&);
 
     constexpr static WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 };
