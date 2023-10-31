@@ -1,6 +1,10 @@
 include(FetchContent)
 
 # Declare
+FetchContent_Declare(Catch2
+    GIT_REPOSITORY "https://github.com/catchorg/Catch2"
+    GIT_TAG 6e79e682b726f524310d55dec8ddac4e9c52fb5f) # v.3.4.0
+
 FetchContent_Declare(glfw
     GIT_REPOSITORY "https://github.com/glfw/glfw"
     GIT_TAG 7482de6) # 3.3.8
@@ -17,6 +21,9 @@ FetchContent_Declare(webgpu
     GIT_TAG dawn)
 
 # Fetch
+message(STATUS "Fetching Catch2...")
+FetchContent_MakeAvailable(Catch2)
+
 message(STATUS "Fetching glfw...")
 FetchContent_MakeAvailable(glfw)
 
