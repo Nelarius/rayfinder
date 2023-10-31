@@ -5,8 +5,8 @@ namespace pt
 template<typename T>
 struct Extent2
 {
-    T x;
-    T y;
+    T x = T(0);
+    T y = T(0);
 };
 
 using Extent2i = Extent2<int>;
