@@ -20,6 +20,13 @@ struct Vertex
     float uv[2];
 };
 
+struct FrameDataBuffer
+{
+    Extent2u      dimensions;
+    std::uint32_t frameCount;
+    std::uint32_t padding;
+};
+
 void bufferSafeRelease(const WGPUBuffer buffer)
 {
     if (buffer)
@@ -55,62 +62,94 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 } // namespace
 
 Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpuContext)
-    : imageDimensionsBuffer(nullptr), imageBuffer(nullptr), computeImagesBindGroup(nullptr),
+    : frameDataBuffer(nullptr), pixelBuffer(nullptr), computeImagesBindGroup(nullptr),
       vertexBuffer(nullptr), vertexBufferByteSize(0), uniformsBuffer(nullptr),
       uniformsBindGroup(nullptr), renderImagesBindGroup(nullptr), computePipeline(nullptr),
-      renderPipeline(nullptr), currentFramebufferSize(rendererDesc.currentFramebufferSize)
+      renderPipeline(nullptr), currentFramebufferSize(rendererDesc.currentFramebufferSize),
+      frameCount(0)
 {
     const Extent2i    largestResolution = rendererDesc.maxFramebufferSize;
     const std::size_t numPixels =
         static_cast<std::size_t>(largestResolution.x * largestResolution.y);
-    const std::size_t imageBufferNumBytes = sizeof(glm::vec2) * numPixels;
+    const std::size_t pixelBufferNumBytes = sizeof(glm::vec3) * numPixels;
 
     {
-        const WGPUBufferDescriptor imageDimensionsBufferDesc{
+        const WGPUBufferDescriptor frameDataBufferDesc{
             .nextInChain = nullptr,
             .label = "Image dimensions buffer",
             .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-            .size = sizeof(Extent2i),
+            .size = sizeof(FrameDataBuffer),
             .mappedAtCreation = false,
         };
-        imageDimensionsBuffer =
-            wgpuDeviceCreateBuffer(gpuContext.device, &imageDimensionsBufferDesc);
+        frameDataBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &frameDataBufferDesc);
 
-        const WGPUBufferDescriptor imageBufferDesc{
+        const WGPUBufferDescriptor pixelBufferDesc{
             .nextInChain = nullptr,
             .label = "Image buffer",
             .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-            .size = static_cast<std::uint64_t>(numPixels * sizeof(glm::vec2)),
+            .size = pixelBufferNumBytes,
             .mappedAtCreation = false,
         };
-        imageBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &imageBufferDesc);
-
-        // TODO: investigate how to write data which is mapped at creation
-        wgpuQueueWriteBuffer(
-            gpuContext.queue,
-            imageDimensionsBuffer,
-            0,
-            &currentFramebufferSize.x,
-            sizeof(Extent2i));
+        pixelBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &pixelBufferDesc);
     }
 
     {
         // Shader module
         const char* const computeSource = R"(
-        @group(0) @binding(0) var<uniform> imageDimensions: vec2<u32>;
-        @group(0) @binding(1) var<storage, read_write> pixelBuffer: array<vec2<f32>>;
+        struct FrameData {
+            dimensions: vec2<u32>,
+            frameCount: u32,
+        }
+
+        @group(0) @binding(0) var<uniform> frameData: FrameData;
+        @group(0) @binding(1) var<storage, read_write> pixelBuffer: array<vec3<f32>>;
 
         @compute @workgroup_size(8,8)
         fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
             let j = globalId.x;
             let i = globalId.y;
-            let r = f32(j) / f32(imageDimensions.x);
-            let g = f32(i) / f32(imageDimensions.y);
 
-            if j < imageDimensions.x && i < imageDimensions.y {
-                let idx = imageDimensions.x * i + j;
-                pixelBuffer[idx] = vec2(r, g);
+            var rngState = initRng(vec2(j, i), frameData.dimensions, frameData.frameCount);
+            let v = rngNextFloat(&rngState);
+
+            let r = rngNextFloat(&rngState);
+            let g = rngNextFloat(&rngState);
+            let b = rngNextFloat(&rngState);
+
+            if j < frameData.dimensions.x && i < frameData.dimensions[1] {
+                let idx = frameData.dimensions.x * i + j;
+                pixelBuffer[idx] = vec3(r, g, b);
             }
+        }
+
+        fn initRng(pixel: vec2<u32>, resolution: vec2<u32>, frame: u32) -> u32 {
+            // Adapted from https://github.com/boksajak/referencePT
+            let seed = dot(pixel, vec2<u32>(1u, resolution.x)) ^ jenkinsHash(frame);
+            return jenkinsHash(seed);
+        }
+
+        fn jenkinsHash(input: u32) -> u32 {
+            var x = input;
+            x += x << 10u;
+            x ^= x >> 6u;
+            x += x << 3u;
+            x ^= x >> 11u;
+            x += x << 15u;
+            return x;
+        }
+
+        fn rngNextFloat(state: ptr<function, u32>) -> f32 {
+            rngNextInt(state);
+            return f32(*state) / f32(0xffffffffu);
+        }
+
+        fn rngNextInt(state: ptr<function, u32>) {
+            // PCG random number generator
+            // Based on https://www.shadertoy.com/view/XlGcRh
+
+            let oldState = *state + 747796405u + 2891336453u;
+            let word = ((oldState >> ((oldState >> 28u) + 4u)) ^ oldState) * 277803737u;
+            *state = (word >> 22u) ^ word;
         }
         )";
 
@@ -133,7 +172,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // Image bind group layout
 
-        assert(imageBufferNumBytes < std::numeric_limits<std::uint64_t>::max());
+        assert(pixelBufferNumBytes < std::numeric_limits<std::uint64_t>::max());
 
         std::array<WGPUBindGroupLayoutEntry, 2> imagesGroupLayoutEntries{
             WGPUBindGroupLayoutEntry{
@@ -145,7 +184,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
                         .nextInChain = nullptr,
                         .type = WGPUBufferBindingType_Uniform,
                         .hasDynamicOffset = false,
-                        .minBindingSize = static_cast<std::uint64_t>(sizeof(Extent2i))},
+                        .minBindingSize = static_cast<std::uint64_t>(sizeof(FrameDataBuffer))},
                 .sampler =
                     WGPUSamplerBindingLayout{
                         .nextInChain = nullptr,
@@ -176,7 +215,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
                             .nextInChain = nullptr,
                             .type = WGPUBufferBindingType_Storage,
                             .hasDynamicOffset = false,
-                            .minBindingSize = static_cast<std::uint64_t>(imageBufferNumBytes)},
+                            .minBindingSize = static_cast<std::uint64_t>(pixelBufferNumBytes)},
                     .sampler =
                         WGPUSamplerBindingLayout{
                             .nextInChain = nullptr,
@@ -215,18 +254,18 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
             WGPUBindGroupEntry{
                 .nextInChain = nullptr,
                 .binding = 0,
-                .buffer = imageDimensionsBuffer,
+                .buffer = frameDataBuffer,
                 .offset = 0,
-                .size = sizeof(Extent2i),
+                .size = sizeof(FrameDataBuffer),
                 .sampler = nullptr,
                 .textureView = nullptr,
             },
             WGPUBindGroupEntry{
                 .nextInChain = nullptr,
                 .binding = 1,
-                .buffer = imageBuffer,
+                .buffer = pixelBuffer,
                 .offset = 0,
-                .size = static_cast<std::uint64_t>(imageBufferNumBytes),
+                .size = static_cast<std::uint64_t>(pixelBufferNumBytes),
                 .sampler = nullptr,
                 .textureView = nullptr,
             },
@@ -361,8 +400,13 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
-        @group(1) @binding(0) var<uniform> imageDimensions: vec2<u32>;
-        @group(1) @binding(1) var<storage, read_write> pixelBuffer: array<vec2<f32>>;
+        struct FrameData {
+            dimensions: vec2<u32>,
+            frameCount: u32,
+        }
+
+        @group(1) @binding(0) var<uniform> frameData: FrameData;
+        @group(1) @binding(1) var<storage, read_write> pixelBuffer: array<vec3<f32>>;
 
         struct VertexInput {
             @location(0) position: vec2f,
@@ -388,12 +432,12 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
             let u = in.texCoord.x;
             let v = in.texCoord.y;
 
-            let j =  u32(u * f32(imageDimensions.x));
-            let i =  u32(v * f32(imageDimensions.y));
-            let idx = imageDimensions.x * i + j;
-            let rg = pixelBuffer[idx];
+            let j =  u32(u * f32(frameData.dimensions.x));
+            let i =  u32(v * f32(frameData.dimensions.y));
+            let idx = frameData.dimensions.x * i + j;
+            let rgb = pixelBuffer[idx];
 
-            return vec4f(rg, 0.0, 1.0);
+            return vec4f(rgb, 1.0);
         }
         )";
 
@@ -502,7 +546,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
                         .nextInChain = nullptr,
                         .type = WGPUBufferBindingType_Uniform,
                         .hasDynamicOffset = false,
-                        .minBindingSize = static_cast<std::uint64_t>(sizeof(Extent2i))},
+                        .minBindingSize = static_cast<std::uint64_t>(sizeof(FrameDataBuffer))},
                 .sampler =
                     WGPUSamplerBindingLayout{
                         .nextInChain = nullptr,
@@ -533,7 +577,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
                             .nextInChain = nullptr,
                             .type = WGPUBufferBindingType_Storage,
                             .hasDynamicOffset = false,
-                            .minBindingSize = static_cast<std::uint64_t>(imageBufferNumBytes)},
+                            .minBindingSize = static_cast<std::uint64_t>(pixelBufferNumBytes)},
                     .sampler =
                         WGPUSamplerBindingLayout{
                             .nextInChain = nullptr,
@@ -605,18 +649,18 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
             WGPUBindGroupEntry{
                 .nextInChain = nullptr,
                 .binding = 0,
-                .buffer = imageDimensionsBuffer,
+                .buffer = frameDataBuffer,
                 .offset = 0,
-                .size = sizeof(Extent2i),
+                .size = sizeof(FrameDataBuffer),
                 .sampler = nullptr,
                 .textureView = nullptr,
             },
             WGPUBindGroupEntry{
                 .nextInChain = nullptr,
                 .binding = 1,
-                .buffer = imageBuffer,
+                .buffer = pixelBuffer,
                 .offset = 0,
-                .size = static_cast<std::uint64_t>(imageBufferNumBytes),
+                .size = static_cast<std::uint64_t>(pixelBufferNumBytes),
                 .sampler = nullptr,
                 .textureView = nullptr,
             },
@@ -689,10 +733,10 @@ Renderer::~Renderer()
     vertexBuffer = nullptr;
     bindGroupSafeRelease(computeImagesBindGroup);
     computeImagesBindGroup = nullptr;
-    bufferSafeRelease(imageBuffer);
-    imageBuffer = nullptr;
-    bufferSafeRelease(imageDimensionsBuffer);
-    imageDimensionsBuffer = nullptr;
+    bufferSafeRelease(pixelBuffer);
+    pixelBuffer = nullptr;
+    bufferSafeRelease(frameDataBuffer);
+    frameDataBuffer = nullptr;
 }
 
 void Renderer::render(const GpuContext& gpuContext)
@@ -703,6 +747,19 @@ void Renderer::render(const GpuContext& gpuContext)
         // Getting the next texture can fail, if e.g. the window has been resized.
         std::fprintf(stderr, "Failed to get texture view from swap chain\n");
         return;
+    }
+
+    {
+        const FrameDataBuffer frameData{
+            .dimensions =
+                Extent2u{
+                    .x = static_cast<std::uint32_t>(currentFramebufferSize.x),
+                    .y = static_cast<std::uint32_t>(currentFramebufferSize.y)},
+            .frameCount = frameCount++,
+            .padding = 0,
+        };
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, frameDataBuffer, 0, &frameData, sizeof(FrameDataBuffer));
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {

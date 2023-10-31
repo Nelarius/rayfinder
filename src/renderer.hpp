@@ -3,6 +3,7 @@
 #include "common/extent.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <webgpu/webgpu.h>
 
 namespace pt
@@ -17,8 +18,8 @@ struct RendererDescriptor
 
 struct Renderer
 {
-    WGPUBuffer          imageDimensionsBuffer;
-    WGPUBuffer          imageBuffer;
+    WGPUBuffer          frameDataBuffer;
+    WGPUBuffer          pixelBuffer;
     WGPUBindGroup       computeImagesBindGroup;
     WGPUBuffer          vertexBuffer;
     std::size_t         vertexBufferByteSize;
@@ -28,7 +29,8 @@ struct Renderer
     WGPUComputePipeline computePipeline;
     WGPURenderPipeline  renderPipeline;
 
-    Extent2i currentFramebufferSize; // TODO: needs to be updated in resize
+    Extent2i      currentFramebufferSize; // TODO: needs to be updated in resize
+    std::uint32_t frameCount;
 
     Renderer(const RendererDescriptor&, const GpuContext&);
     ~Renderer();
