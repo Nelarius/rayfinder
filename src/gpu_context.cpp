@@ -216,7 +216,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     device = [this, &requiredLimits]() -> WGPUDevice {
         const WGPUDeviceDescriptor deviceDesc{
             .nextInChain = nullptr,
-            .label = "Learn WebGPU device",
+            .label = "Device",
             .requiredFeaturesCount = 0,
             .requiredFeatures = nullptr,
             .requiredLimits = &requiredLimits,
