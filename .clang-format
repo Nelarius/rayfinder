@@ -27,6 +27,7 @@ Cpp11BracedListStyle: 'true'
 DerivePointerAlignment: 'false'
 IndentCaseLabels: 'false'
 IndentWidth: 4
+PackConstructorInitializers: Never
 PenaltyExcessCharacter: 100000000
 PenaltyReturnTypeOnItsOwnLine: 100000000
 PointerAlignment: Left

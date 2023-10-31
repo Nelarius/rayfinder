@@ -10,7 +10,8 @@ namespace pt
 {
 int Window::glfwRefCount = 0;
 
-Window::Window(const WindowDescriptor& windowDesc) : mWindow(nullptr)
+Window::Window(const WindowDescriptor& windowDesc)
+    : mWindow(nullptr)
 {
     if (glfwRefCount++ == 0)
     {

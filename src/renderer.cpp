@@ -62,10 +62,17 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 } // namespace
 
 Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpuContext)
-    : frameDataBuffer(nullptr), pixelBuffer(nullptr), computeImagesBindGroup(nullptr),
-      vertexBuffer(nullptr), vertexBufferByteSize(0), uniformsBuffer(nullptr),
-      uniformsBindGroup(nullptr), renderImagesBindGroup(nullptr), computePipeline(nullptr),
-      renderPipeline(nullptr), currentFramebufferSize(rendererDesc.currentFramebufferSize),
+    : frameDataBuffer(nullptr),
+      pixelBuffer(nullptr),
+      computeImagesBindGroup(nullptr),
+      vertexBuffer(nullptr),
+      vertexBufferByteSize(0),
+      uniformsBuffer(nullptr),
+      uniformsBindGroup(nullptr),
+      renderImagesBindGroup(nullptr),
+      computePipeline(nullptr),
+      renderPipeline(nullptr),
+      currentFramebufferSize(rendererDesc.currentFramebufferSize),
       frameCount(0)
 {
     const Extent2i    largestResolution = rendererDesc.maxFramebufferSize;

@@ -158,7 +158,11 @@ void swapChainSafeRelease(const WGPUSwapChain swapChain)
 } // namespace
 
 GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requiredLimits)
-    : instance(nullptr), surface(nullptr), adapter(nullptr), device(nullptr), queue(nullptr),
+    : instance(nullptr),
+      surface(nullptr),
+      adapter(nullptr),
+      device(nullptr),
+      queue(nullptr),
       swapChain(nullptr)
 {
     assert(window != nullptr);
