@@ -23,7 +23,12 @@ int main()
 
     {
         pt::GpuContext gpuContext(window.ptr(), pt::Renderer::wgpuRequiredLimits);
-        pt::Renderer   renderer(gpuContext);
+        pt::Renderer   renderer(
+            pt::RendererDescriptor{
+                  .currentFramebufferSize = window.resolution(),
+                  .maxFramebufferSize = window.largestMonitorResolution(),
+            },
+            gpuContext);
 
         {
             pt::Extent2i curFramebufferSize = window.resolution();
