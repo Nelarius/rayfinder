@@ -261,11 +261,17 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
 GpuContext::~GpuContext()
 {
     swapChainSafeRelease(swapChain);
+    swapChain = nullptr;
     queueSafeRelease(queue);
+    queue = nullptr;
     deviceSafeRelease(device);
+    device = nullptr;
     adapterSafeRelease(adapter);
+    adapter = nullptr;
     surfaceSafeRelease(surface);
+    surface = nullptr;
     instanceSafeRelease(instance);
+    instance = nullptr;
 }
 
 void GpuContext::resizeFramebuffer(const FramebufferSize& newSize)

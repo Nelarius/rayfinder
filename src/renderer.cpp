@@ -342,9 +342,13 @@ Renderer::Renderer(const GpuContext& gpuContext)
 Renderer::~Renderer()
 {
     pipelineSafeRelease(renderPipeline);
+    renderPipeline = nullptr;
     bindGroupSafeRelease(uniformsBindGroup);
+    uniformsBindGroup = nullptr;
     bufferSafeRelease(uniformsBuffer);
+    uniformsBuffer = nullptr;
     bufferSafeRelease(vertexBuffer);
+    vertexBuffer = nullptr;
 }
 
 void Renderer::render(const GpuContext& gpuContext)
