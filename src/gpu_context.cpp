@@ -1,4 +1,3 @@
-#include "common/framebuffer_size.hpp"
 #include "gpu_context.hpp"
 
 #include <GLFW/glfw3.h>
@@ -95,15 +94,15 @@ WGPUSwapChain createSwapChain(
     const WGPUDevice        device,
     const WGPUSurface       surface,
     const WGPUTextureFormat swapChainFormat,
-    const FramebufferSize   framebufferSize)
+    const Extent2i          framebufferSize)
 {
     const WGPUSwapChainDescriptor swapChainDesc{
         .nextInChain = nullptr,
         .label = "Swap chain",
         .usage = WGPUTextureUsage_RenderAttachment,
         .format = swapChainFormat,
-        .width = static_cast<std::uint32_t>(framebufferSize.width),
-        .height = static_cast<std::uint32_t>(framebufferSize.height),
+        .width = static_cast<std::uint32_t>(framebufferSize.x),
+        .height = static_cast<std::uint32_t>(framebufferSize.y),
         .presentMode = WGPUPresentMode_Fifo,
     };
     return wgpuDeviceCreateSwapChain(device, surface, &swapChainDesc);
@@ -164,8 +163,8 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
 {
     assert(window != nullptr);
 
-    FramebufferSize framebufferSize;
-    glfwGetFramebufferSize(window, &framebufferSize.width, &framebufferSize.height);
+    Extent2i framebufferSize;
+    glfwGetFramebufferSize(window, &framebufferSize.x, &framebufferSize.y);
 
     instance = []() -> WGPUInstance {
         const WGPUInstanceDescriptor instanceDesc{
@@ -268,9 +267,9 @@ GpuContext::~GpuContext()
     instanceSafeRelease(instance);
 }
 
-void GpuContext::resizeFramebuffer(const FramebufferSize& newSize)
+void GpuContext::resizeFramebuffer(const Extent2i& newSize)
 {
-    if (newSize.width == 0 || newSize.height == 0)
+    if (newSize.x == 0 || newSize.y == 0)
     {
         return;
     }

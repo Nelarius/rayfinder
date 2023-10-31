@@ -1,4 +1,3 @@
-#include "common/framebuffer_size.hpp"
 #include "gpu_context.hpp"
 #include "renderer.hpp"
 
