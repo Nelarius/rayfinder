@@ -20,22 +20,24 @@ struct Renderer
 {
     WGPUBuffer          frameDataBuffer;
     WGPUBuffer          pixelBuffer;
-    WGPUBindGroup       computeImagesBindGroup;
-    WGPUBuffer          vertexBuffer;
-    std::size_t         vertexBufferByteSize;
-    WGPUBuffer          uniformsBuffer;
-    WGPUBindGroup       uniformsBindGroup;
-    WGPUBindGroup       renderImagesBindGroup;
+    WGPUBindGroup       computePixelsBindGroup;
     WGPUComputePipeline computePipeline;
-    WGPURenderPipeline  renderPipeline;
 
-    Extent2i      currentFramebufferSize; // TODO: needs to be updated in resize
+    WGPUBuffer         vertexBuffer;
+    std::size_t        vertexBufferByteSize;
+    WGPUBuffer         uniformsBuffer;
+    WGPUBindGroup      uniformsBindGroup;
+    WGPUBindGroup      renderPixelsBindGroup;
+    WGPURenderPipeline renderPipeline;
+
+    Extent2i      currentFramebufferSize;
     std::uint32_t frameCount;
 
     Renderer(const RendererDescriptor&, const GpuContext&);
     ~Renderer();
 
     void render(const GpuContext&);
+    void resizeFramebuffer(const Extent2i&);
 
     static constexpr WGPURequiredLimits wgpuRequiredLimits{
         .nextInChain = nullptr,

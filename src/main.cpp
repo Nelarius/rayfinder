@@ -46,6 +46,7 @@ int main()
                     {
                         curFramebufferSize = newFramebufferSize;
                         gpuContext.resizeFramebuffer(curFramebufferSize);
+                        renderer.resizeFramebuffer(curFramebufferSize);
                     }
                 }
 
