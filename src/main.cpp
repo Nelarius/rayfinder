@@ -26,7 +26,7 @@ int main()
         pt::Renderer   renderer(gpuContext);
 
         {
-            pt::Extent2i curFramebufferSize = window.framebufferSize();
+            pt::Extent2i curFramebufferSize = window.resolution();
             while (!glfwWindowShouldClose(window.ptr()))
             {
                 // Non-standard Dawn way to ensure that Dawn checks that whether the async operation
@@ -36,7 +36,7 @@ int main()
 
                 // Resize
                 {
-                    const pt::Extent2i newFramebufferSize = window.framebufferSize();
+                    const pt::Extent2i newFramebufferSize = window.resolution();
                     if (newFramebufferSize != curFramebufferSize)
                     {
                         curFramebufferSize = newFramebufferSize;

@@ -20,7 +20,17 @@ public:
     explicit Window(const WindowDescriptor&);
     ~Window();
 
-    Extent2i    framebufferSize() const;
+    // Size accessors
+
+    // Returns the size of the window in screen coordinates.
+    Extent2i size() const;
+    // Returns the size of the window in pixels.
+    Extent2i resolution() const;
+    // Returns the largest monitor, in pixels, by pixel count.
+    Extent2i largestMonitorResolution() const;
+
+    // Raw access
+
     GLFWwindow* ptr() const { return mWindow; }
 
 private:
