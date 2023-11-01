@@ -57,18 +57,18 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
     : frameDataBuffer(
           gpuContext.device,
           "frame data buffer",
-          sizeof(FrameDataBuffer),
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform),
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+          sizeof(FrameDataBuffer)),
       pixelBuffer(
           gpuContext.device,
           "pixel buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           [&rendererDesc]() -> std::size_t {
               const Extent2i    largestResolution = rendererDesc.maxFramebufferSize;
               const std::size_t numPixels =
                   static_cast<std::size_t>(largestResolution.x * largestResolution.y);
               return sizeof(glm::vec3) * numPixels;
-          }(),
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage),
+          }()),
       computePixelsBindGroup(nullptr),
       computePipeline(nullptr),
       vertexBuffer(),

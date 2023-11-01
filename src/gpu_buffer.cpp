@@ -67,10 +67,10 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other)
 }
 
 GpuBuffer::GpuBuffer(
-    WGPUDevice           device,
-    const char*          label,
-    std::size_t          byteSize,
-    WGPUBufferUsageFlags usage)
+    const WGPUDevice           device,
+    const char* const          label,
+    const WGPUBufferUsageFlags usage,
+    const std::size_t          byteSize)
     : mBuffer(nullptr),
       mByteSize(byteSize),
       mUsage(usage)

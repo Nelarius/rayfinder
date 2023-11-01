@@ -27,8 +27,8 @@ public:
     GpuBuffer(
         WGPUDevice           device,
         const char*          label,
-        std::size_t          byteSize,
-        WGPUBufferUsageFlags usage);
+        WGPUBufferUsageFlags usage,
+        std::size_t          byteSize);
 
     template<typename T>
     GpuBuffer(
