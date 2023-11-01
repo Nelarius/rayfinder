@@ -81,14 +81,14 @@ GpuBuffer::GpuBuffer(
 {
     assert(device != nullptr);
 
-    const WGPUBufferDescriptor vertexBufferDesc{
+    const WGPUBufferDescriptor bufferDesc{
         .nextInChain = nullptr,
         .label = label,
         .usage = mUsage,
         .size = mByteSize,
         .mappedAtCreation = false,
     };
-    mBuffer = wgpuDeviceCreateBuffer(device, &vertexBufferDesc);
+    mBuffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
 
     if (!mBuffer)
     {
