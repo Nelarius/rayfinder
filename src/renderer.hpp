@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/extent.hpp"
+#include "gpu_buffer.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -18,14 +19,13 @@ struct RendererDescriptor
 
 struct Renderer
 {
-    WGPUBuffer          frameDataBuffer;
-    WGPUBuffer          pixelBuffer;
+    GpuBuffer           frameDataBuffer;
+    GpuBuffer           pixelBuffer;
     WGPUBindGroup       computePixelsBindGroup;
     WGPUComputePipeline computePipeline;
 
-    WGPUBuffer         vertexBuffer;
-    std::size_t        vertexBufferByteSize;
-    WGPUBuffer         uniformsBuffer;
+    GpuBuffer          vertexBuffer;
+    GpuBuffer          uniformsBuffer;
     WGPUBindGroup      uniformsBindGroup;
     WGPUBindGroup      renderPixelsBindGroup;
     WGPURenderPipeline renderPipeline;

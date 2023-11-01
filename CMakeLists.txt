@@ -9,6 +9,7 @@ add_subdirectory(external)
 
 add_executable(pt
     src/main.cpp
+    src/gpu_buffer.cpp
     src/gpu_context.cpp
     src/renderer.cpp
     src/window.cpp)

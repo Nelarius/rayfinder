@@ -27,15 +27,6 @@ struct FrameDataBuffer
     std::uint32_t padding;
 };
 
-void bufferSafeRelease(const WGPUBuffer buffer)
-{
-    if (buffer)
-    {
-        wgpuBufferDestroy(buffer);
-        wgpuBufferRelease(buffer);
-    }
-}
-
 void bindGroupSafeRelease(const WGPUBindGroup bindGroup)
 {
     if (bindGroup)
@@ -62,44 +53,31 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 } // namespace
 
 Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpuContext)
-    : frameDataBuffer(nullptr),
-      pixelBuffer(nullptr),
+    : frameDataBuffer(
+          gpuContext.device,
+          "frame data buffer",
+          sizeof(FrameDataBuffer),
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform),
+      pixelBuffer(
+          gpuContext.device,
+          "pixel buffer",
+          [&rendererDesc]() -> std::size_t {
+              const Extent2i    largestResolution = rendererDesc.maxFramebufferSize;
+              const std::size_t numPixels =
+                  static_cast<std::size_t>(largestResolution.x * largestResolution.y);
+              return sizeof(glm::vec3) * numPixels;
+          }(),
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage),
       computePixelsBindGroup(nullptr),
       computePipeline(nullptr),
-      vertexBuffer(nullptr),
-      vertexBufferByteSize(0),
-      uniformsBuffer(nullptr),
+      vertexBuffer(),
+      uniformsBuffer(),
       uniformsBindGroup(nullptr),
       renderPixelsBindGroup(nullptr),
       renderPipeline(nullptr),
       currentFramebufferSize(rendererDesc.currentFramebufferSize),
       frameCount(0)
 {
-    const Extent2i    largestResolution = rendererDesc.maxFramebufferSize;
-    const std::size_t numPixels =
-        static_cast<std::size_t>(largestResolution.x * largestResolution.y);
-    const std::size_t pixelBufferNumBytes = sizeof(glm::vec3) * numPixels;
-
-    {
-        const WGPUBufferDescriptor frameDataBufferDesc{
-            .nextInChain = nullptr,
-            .label = "Image dimensions buffer",
-            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-            .size = sizeof(FrameDataBuffer),
-            .mappedAtCreation = false,
-        };
-        frameDataBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &frameDataBufferDesc);
-
-        const WGPUBufferDescriptor pixelBufferDesc{
-            .nextInChain = nullptr,
-            .label = "Image buffer",
-            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-            .size = pixelBufferNumBytes,
-            .mappedAtCreation = false,
-        };
-        pixelBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &pixelBufferDesc);
-    }
-
     {
         // Shader module
 
@@ -180,71 +158,9 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // pixels bind group layout
 
-        assert(pixelBufferNumBytes < std::numeric_limits<std::uint64_t>::max());
-
         std::array<WGPUBindGroupLayoutEntry, 2> pixelsBindGroupLayoutEntries{
-            WGPUBindGroupLayoutEntry{
-                .nextInChain = nullptr,
-                .binding = 0,
-                .visibility = WGPUShaderStage_Compute,
-                .buffer =
-                    WGPUBufferBindingLayout{
-                        .nextInChain = nullptr,
-                        .type = WGPUBufferBindingType_Uniform,
-                        .hasDynamicOffset = false,
-                        .minBindingSize = static_cast<std::uint64_t>(sizeof(FrameDataBuffer))},
-                .sampler =
-                    WGPUSamplerBindingLayout{
-                        .nextInChain = nullptr,
-                        .type = WGPUSamplerBindingType_Undefined,
-                    },
-                .texture =
-                    WGPUTextureBindingLayout{
-                        .nextInChain = nullptr,
-                        .sampleType = WGPUTextureSampleType_Undefined,
-                        .viewDimension = WGPUTextureViewDimension_Undefined,
-                        .multisampled = false,
-                    },
-                .storageTexture =
-                    WGPUStorageTextureBindingLayout{
-                        .nextInChain = nullptr,
-                        .access = WGPUStorageTextureAccess_Undefined,
-                        .format = WGPUTextureFormat_Undefined,
-                        .viewDimension = WGPUTextureViewDimension_Undefined,
-                    },
-            },
-            WGPUBindGroupLayoutEntry{
-                WGPUBindGroupLayoutEntry{
-                    .nextInChain = nullptr,
-                    .binding = 1, // binding index used in the @binding attribute
-                    .visibility = WGPUShaderStage_Compute,
-                    .buffer =
-                        WGPUBufferBindingLayout{
-                            .nextInChain = nullptr,
-                            .type = WGPUBufferBindingType_Storage,
-                            .hasDynamicOffset = false,
-                            .minBindingSize = static_cast<std::uint64_t>(pixelBufferNumBytes)},
-                    .sampler =
-                        WGPUSamplerBindingLayout{
-                            .nextInChain = nullptr,
-                            .type = WGPUSamplerBindingType_Undefined,
-                        },
-                    .texture =
-                        WGPUTextureBindingLayout{
-                            .nextInChain = nullptr,
-                            .sampleType = WGPUTextureSampleType_Undefined,
-                            .viewDimension = WGPUTextureViewDimension_Undefined,
-                            .multisampled = false,
-                        },
-                    .storageTexture =
-                        WGPUStorageTextureBindingLayout{
-                            .nextInChain = nullptr,
-                            .access = WGPUStorageTextureAccess_Undefined,
-                            .format = WGPUTextureFormat_Undefined,
-                            .viewDimension = WGPUTextureViewDimension_Undefined,
-                        },
-                },
-            },
+            frameDataBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Compute),
+            pixelBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Compute),
         };
 
         const WGPUBindGroupLayoutDescriptor pixelsBindGroupLayoutDesc{
@@ -259,24 +175,8 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         // Bind group
 
         std::array<WGPUBindGroupEntry, 2> pixelsBindGroupEntries{
-            WGPUBindGroupEntry{
-                .nextInChain = nullptr,
-                .binding = 0,
-                .buffer = frameDataBuffer,
-                .offset = 0,
-                .size = sizeof(FrameDataBuffer),
-                .sampler = nullptr,
-                .textureView = nullptr,
-            },
-            WGPUBindGroupEntry{
-                .nextInChain = nullptr,
-                .binding = 1,
-                .buffer = pixelBuffer,
-                .offset = 0,
-                .size = static_cast<std::uint64_t>(pixelBufferNumBytes),
-                .sampler = nullptr,
-                .textureView = nullptr,
-            },
+            frameDataBuffer.bindGroupEntry(0),
+            pixelBuffer.bindGroupEntry(1),
         };
 
         const WGPUBindGroupDescriptor pixelsBindGroupDesc{
@@ -324,30 +224,24 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
             Vertex{{-0.5f, 0.5f}, {0.0f, 1.0f}},
             Vertex{{-0.5f, -0.5f}, {0.0f, 0.0f}},
         };
-        vertexBufferByteSize = sizeof(Vertex) * vertexData.size();
-        assert(vertexBufferByteSize <= std::numeric_limits<std::uint64_t>::max());
+        const std::size_t vertexDataNumBytes = sizeof(Vertex) * vertexData.size();
 
-        const WGPUBufferDescriptor vertexBufferDesc{
-            .nextInChain = nullptr,
-            .label = "Vertex buffer",
-            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
-            .size = static_cast<std::uint64_t>(vertexBufferByteSize),
-            .mappedAtCreation = false,
-        };
-        vertexBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &vertexBufferDesc);
+        // TODO: figure out a way to do memory-mapped buffers
+        vertexBuffer = GpuBuffer(
+            gpuContext.device,
+            "Vertex buffer",
+            vertexDataNumBytes,
+            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex);
         wgpuQueueWriteBuffer(
-            gpuContext.queue, vertexBuffer, 0, vertexData.data(), vertexBufferByteSize);
+            gpuContext.queue, vertexBuffer.handle(), 0, vertexData.data(), vertexDataNumBytes);
     }
 
     {
-        const WGPUBufferDescriptor uniformDesc{
-            .nextInChain = nullptr,
-            .label = "Uniform buffer",
-            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-            .size = sizeof(glm::mat4),
-            .mappedAtCreation = false,
-        };
-        uniformsBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &uniformDesc);
+        uniformsBuffer = GpuBuffer(
+            gpuContext.device,
+            "uniforms buffer",
+            sizeof(glm::mat4),
+            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform);
 
         {
             // DirectX, Metal, wgpu share the same left-handed coordinate system
@@ -356,7 +250,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
             glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
             wgpuQueueWriteBuffer(
                 gpuContext.queue,
-                uniformsBuffer,
+                uniformsBuffer.handle(),
                 0,
                 &viewProjectionMatrix[0],
                 sizeof(viewProjectionMatrix));
@@ -494,36 +388,8 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // uniforms bind group layout
 
-        const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry{
-            .nextInChain = nullptr,
-            .binding = 0, // binding index used in the @binding attribute
-            .visibility = WGPUShaderStage_Vertex,
-            .buffer =
-                WGPUBufferBindingLayout{
-                    .nextInChain = nullptr,
-                    .type = WGPUBufferBindingType_Uniform,
-                    .hasDynamicOffset = false,
-                    .minBindingSize = static_cast<std::uint64_t>(sizeof(glm::mat4))},
-            .sampler =
-                WGPUSamplerBindingLayout{
-                    .nextInChain = nullptr,
-                    .type = WGPUSamplerBindingType_Undefined,
-                },
-            .texture =
-                WGPUTextureBindingLayout{
-                    .nextInChain = nullptr,
-                    .sampleType = WGPUTextureSampleType_Undefined,
-                    .viewDimension = WGPUTextureViewDimension_Undefined,
-                    .multisampled = false,
-                },
-            .storageTexture =
-                WGPUStorageTextureBindingLayout{
-                    .nextInChain = nullptr,
-                    .access = WGPUStorageTextureAccess_Undefined,
-                    .format = WGPUTextureFormat_Undefined,
-                    .viewDimension = WGPUTextureViewDimension_Undefined,
-                },
-        };
+        const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
+            uniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
 
         const WGPUBindGroupLayoutDescriptor uniformsBindGroupLayoutDesc{
             .nextInChain = nullptr,
@@ -537,68 +403,8 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         // images bind group layout
 
         std::array<WGPUBindGroupLayoutEntry, 2> pixelsBindGroupLayoutEntries{
-            WGPUBindGroupLayoutEntry{
-                .nextInChain = nullptr,
-                .binding = 0,
-                .visibility = WGPUShaderStage_Fragment,
-                .buffer =
-                    WGPUBufferBindingLayout{
-                        .nextInChain = nullptr,
-                        .type = WGPUBufferBindingType_Uniform,
-                        .hasDynamicOffset = false,
-                        .minBindingSize = static_cast<std::uint64_t>(sizeof(FrameDataBuffer))},
-                .sampler =
-                    WGPUSamplerBindingLayout{
-                        .nextInChain = nullptr,
-                        .type = WGPUSamplerBindingType_Undefined,
-                    },
-                .texture =
-                    WGPUTextureBindingLayout{
-                        .nextInChain = nullptr,
-                        .sampleType = WGPUTextureSampleType_Undefined,
-                        .viewDimension = WGPUTextureViewDimension_Undefined,
-                        .multisampled = false,
-                    },
-                .storageTexture =
-                    WGPUStorageTextureBindingLayout{
-                        .nextInChain = nullptr,
-                        .access = WGPUStorageTextureAccess_Undefined,
-                        .format = WGPUTextureFormat_Undefined,
-                        .viewDimension = WGPUTextureViewDimension_Undefined,
-                    },
-            },
-            WGPUBindGroupLayoutEntry{
-                WGPUBindGroupLayoutEntry{
-                    .nextInChain = nullptr,
-                    .binding = 1,
-                    .visibility = WGPUShaderStage_Fragment,
-                    .buffer =
-                        WGPUBufferBindingLayout{
-                            .nextInChain = nullptr,
-                            .type = WGPUBufferBindingType_Storage,
-                            .hasDynamicOffset = false,
-                            .minBindingSize = static_cast<std::uint64_t>(pixelBufferNumBytes)},
-                    .sampler =
-                        WGPUSamplerBindingLayout{
-                            .nextInChain = nullptr,
-                            .type = WGPUSamplerBindingType_Undefined,
-                        },
-                    .texture =
-                        WGPUTextureBindingLayout{
-                            .nextInChain = nullptr,
-                            .sampleType = WGPUTextureSampleType_Undefined,
-                            .viewDimension = WGPUTextureViewDimension_Undefined,
-                            .multisampled = false,
-                        },
-                    .storageTexture =
-                        WGPUStorageTextureBindingLayout{
-                            .nextInChain = nullptr,
-                            .access = WGPUStorageTextureAccess_Undefined,
-                            .format = WGPUTextureFormat_Undefined,
-                            .viewDimension = WGPUTextureViewDimension_Undefined,
-                        },
-                },
-            },
+            frameDataBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            pixelBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
         };
 
         const WGPUBindGroupLayoutDescriptor pixelsBindGroupLayoutDesc{
@@ -626,15 +432,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // uniforms bind group
 
-        const WGPUBindGroupEntry uniformsBindGroupEntry{
-            .nextInChain = nullptr,
-            .binding = 0,
-            .buffer = uniformsBuffer,
-            .offset = 0,
-            .size = static_cast<std::uint64_t>(sizeof(glm::mat4)),
-            .sampler = nullptr,
-            .textureView = nullptr,
-        };
+        const WGPUBindGroupEntry uniformsBindGroupEntry = uniformsBuffer.bindGroupEntry(0);
 
         const WGPUBindGroupDescriptor uniformsBindGroupDesc{
             .nextInChain = nullptr,
@@ -646,24 +444,8 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         uniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
 
         std::array<WGPUBindGroupEntry, 2> pixelsBindGroupEntries{
-            WGPUBindGroupEntry{
-                .nextInChain = nullptr,
-                .binding = 0,
-                .buffer = frameDataBuffer,
-                .offset = 0,
-                .size = sizeof(FrameDataBuffer),
-                .sampler = nullptr,
-                .textureView = nullptr,
-            },
-            WGPUBindGroupEntry{
-                .nextInChain = nullptr,
-                .binding = 1,
-                .buffer = pixelBuffer,
-                .offset = 0,
-                .size = static_cast<std::uint64_t>(pixelBufferNumBytes),
-                .sampler = nullptr,
-                .textureView = nullptr,
-            },
+            frameDataBuffer.bindGroupEntry(0),
+            pixelBuffer.bindGroupEntry(1),
         };
 
         const WGPUBindGroupDescriptor pixelsBindGroupDesc{
@@ -724,18 +506,10 @@ Renderer::~Renderer()
     renderPixelsBindGroup = nullptr;
     bindGroupSafeRelease(uniformsBindGroup);
     uniformsBindGroup = nullptr;
-    bufferSafeRelease(uniformsBuffer);
-    uniformsBuffer = nullptr;
-    bufferSafeRelease(vertexBuffer);
-    vertexBuffer = nullptr;
     computePipelineSafeRelease(computePipeline);
     computePipeline = nullptr;
     bindGroupSafeRelease(computePixelsBindGroup);
     computePixelsBindGroup = nullptr;
-    bufferSafeRelease(pixelBuffer);
-    pixelBuffer = nullptr;
-    bufferSafeRelease(frameDataBuffer);
-    frameDataBuffer = nullptr;
 }
 
 void Renderer::render(const GpuContext& gpuContext)
@@ -758,7 +532,7 @@ void Renderer::render(const GpuContext& gpuContext)
             .padding = 0,
         };
         wgpuQueueWriteBuffer(
-            gpuContext.queue, frameDataBuffer, 0, &frameData, sizeof(FrameDataBuffer));
+            gpuContext.queue, frameDataBuffer.handle(), 0, &frameData, frameDataBuffer.byteSize());
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {
@@ -829,7 +603,7 @@ void Renderer::render(const GpuContext& gpuContext)
             wgpuRenderPassEncoderSetBindGroup(
                 renderPassEncoder, 1, renderPixelsBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
-                renderPassEncoder, 0, vertexBuffer, 0, vertexBufferByteSize);
+                renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
         }
 
