@@ -110,7 +110,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         }
 
         @group(0) @binding(0) var<uniform> frameData: FrameData;
-        @group(0) @binding(1) var<storage, read_write> pixelBuffer: array<vec3<f32>>;
+        @group(0) @binding(1) var<storage, read_write> pixelBuffer: array<array<f32, 3>>;
 
         @compute @workgroup_size(8,8)
         fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
@@ -126,7 +126,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
             if j < frameData.dimensions.x && i < frameData.dimensions[1] {
                 let idx = frameData.dimensions.x * i + j;
-                pixelBuffer[idx] = vec3(r, g, b);
+                pixelBuffer[idx] = array(r, g, b);
             }
         }
 
@@ -406,7 +406,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         }
 
         @group(1) @binding(0) var<uniform> frameData: FrameData;
-        @group(1) @binding(1) var<storage, read_write> pixelBuffer: array<vec3<f32>>;
+        @group(1) @binding(1) var<storage, read_write> pixelBuffer: array<array<f32, 3>>;
 
         struct VertexInput {
             @location(0) position: vec2f,
@@ -435,9 +435,9 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
             let j =  u32(u * f32(frameData.dimensions.x));
             let i =  u32(v * f32(frameData.dimensions.y));
             let idx = frameData.dimensions.x * i + j;
-            let rgb = pixelBuffer[idx];
+            let p = pixelBuffer[idx];
 
-            return vec4f(rgb, 1.0);
+            return vec4f(p[0], p[1], p[2], 1.0);
         }
         )";
 
