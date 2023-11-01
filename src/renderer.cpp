@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <limits>
+#include <span>
 #include <tuple>
 
 namespace pt
@@ -224,37 +225,27 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
             Vertex{{-0.5f, 0.5f}, {0.0f, 1.0f}},
             Vertex{{-0.5f, -0.5f}, {0.0f, 0.0f}},
         };
-        const std::size_t vertexDataNumBytes = sizeof(Vertex) * vertexData.size();
 
-        // TODO: figure out a way to do memory-mapped buffers
         vertexBuffer = GpuBuffer(
             gpuContext.device,
             "Vertex buffer",
-            vertexDataNumBytes,
-            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex);
-        wgpuQueueWriteBuffer(
-            gpuContext.queue, vertexBuffer.handle(), 0, vertexData.data(), vertexDataNumBytes);
+            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
+            std::span<const Vertex>(vertexData));
     }
 
     {
+        // DirectX, Metal, wgpu share the same left-handed coordinate system
+        // for their normalized device coordinates:
+        // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
+        const glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
+
         uniformsBuffer = GpuBuffer(
             gpuContext.device,
             "uniforms buffer",
-            sizeof(glm::mat4),
-            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform);
-
-        {
-            // DirectX, Metal, wgpu share the same left-handed coordinate system
-            // for their normalized device coordinates:
-            // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
-            glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
-            wgpuQueueWriteBuffer(
-                gpuContext.queue,
-                uniformsBuffer.handle(),
-                0,
-                &viewProjectionMatrix[0],
-                sizeof(viewProjectionMatrix));
-        }
+            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+            std::span<const std::uint8_t>(
+                reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
+                sizeof(glm::mat4)));
     }
 
     {

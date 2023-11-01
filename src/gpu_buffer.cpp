@@ -1,9 +1,5 @@
 #include "gpu_buffer.hpp"
 
-#include <cassert>
-#include <format>
-#include <stdexcept>
-
 namespace pt
 {
 namespace
