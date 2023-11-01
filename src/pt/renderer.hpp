@@ -1,7 +1,8 @@
 #pragma once
 
-#include "common/extent.hpp"
 #include "gpu_buffer.hpp"
+
+#include <common/extent.hpp>
 
 #include <cstddef>
 #include <cstdint>

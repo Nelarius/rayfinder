@@ -7,13 +7,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(external)
 
-add_executable(pt
-    src/main.cpp
-    src/gpu_buffer.cpp
-    src/gpu_context.cpp
-    src/renderer.cpp
-    src/window.cpp)
+set(PT_SOURCE_FILES
+    main.cpp
+    gpu_buffer.cpp
+    gpu_context.cpp
+    renderer.cpp
+    window.cpp)
+list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
+
+add_executable(pt ${PT_SOURCE_FILES})
 target_link_libraries(pt PRIVATE glfw glfw3webgpu glm::glm webgpu)
+# TODO: replace src/ with common once there is source
+target_include_directories(pt PRIVATE ${CMAKE_SOURCE_DIR}/src)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 
 if(MSVC)
