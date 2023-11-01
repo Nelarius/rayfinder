@@ -7,6 +7,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(external)
 
+set(COMMON_SOURCE_FILES
+    ray_intersection.cpp)
+list(TRANSFORM COMMON_SOURCE_FILES PREPEND src/common/)
+
+add_library(common ${COMMON_SOURCE_FILES})
+target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(common PRIVATE glm::glm)
+
 set(PT_SOURCE_FILES
     main.cpp
     gpu_buffer.cpp
@@ -16,9 +24,7 @@ set(PT_SOURCE_FILES
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 
 add_executable(pt ${PT_SOURCE_FILES})
-target_link_libraries(pt PRIVATE glfw glfw3webgpu glm::glm webgpu)
-# TODO: replace src/ with common once there is source
-target_include_directories(pt PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(pt PRIVATE common glfw glfw3webgpu glm::glm webgpu)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 
 if(MSVC)
@@ -29,3 +35,12 @@ else()
     # -Wno-deprecated silences warnings about deprecated use of volatile qualifier by GLM.
     target_compile_options(pt PRIVATE -W -Wall -Wextra -pedantic -Werror -Wno-deprecated)
 endif()
+
+# tests
+set(TESTS_SOURCE_FILES
+    aabb.cpp
+    intersection.cpp)
+list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
+
+add_executable(tests ${TESTS_SOURCE_FILES})
+target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common glm::glm)
