@@ -8,11 +8,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(external)
 
 set(COMMON_SOURCE_FILES
+    cgltf.c
     ray_intersection.cpp)
 list(TRANSFORM COMMON_SOURCE_FILES PREPEND src/common/)
 
 add_library(common ${COMMON_SOURCE_FILES})
-target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE_DIR})
 target_link_libraries(common PRIVATE glm::glm)
 
 set(PT_SOURCE_FILES
