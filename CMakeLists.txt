@@ -9,6 +9,7 @@ add_subdirectory(external)
 
 set(COMMON_SOURCE_FILES
     cgltf.c
+    gltf_model.cpp
     ray_intersection.cpp)
 list(TRANSFORM COMMON_SOURCE_FILES PREPEND src/common/)
 

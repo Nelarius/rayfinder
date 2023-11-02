@@ -68,6 +68,11 @@ inline float surfaceArea(const Aabb& aabb)
     return 2.0f * (d.x * d.y + d.x * d.z + d.y * d.z);
 }
 
+inline float surfaceArea(const Triangle& t)
+{
+    return 0.5f * glm::length(glm::cross(t.v1 - t.v0, t.v2 - t.v0));
+}
+
 inline Aabb aabb(const Triangle& triangle)
 {
     return Aabb(
