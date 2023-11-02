@@ -13,3 +13,21 @@ $ export CC=/opt/homebrew/opt/llvm@17/bin/clang
 $ cmake -B build-debug -S . -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build build-debug --target pt -- -j 32
 ```
+
+## Run
+
+### `bvh-visualizer`
+
+This executable loads a glTF file, builds a bounding volume hierarchy (BVH), and produces an image where each pixel is colored by the number of nodes visited for the pixel's primary ray. The image is printed in the PPM format to stdout.
+
+```sh
+$ (cd build-release && ./bvh-visualizer) > duck.ppm
+```
+
+### `tests`
+
+To run the tests, the working directory has to be in the build folder, as some sample assets are copied there and used for tests.
+
+```sh
+$ (cd build-debug && ./tests)
+```
