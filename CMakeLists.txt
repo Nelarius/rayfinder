@@ -42,6 +42,10 @@ add_executable(pt ${PT_SOURCE_FILES})
 target_link_libraries(pt PRIVATE common glfw glfw3webgpu glm::glm webgpu)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 
+# bvh-visualizer
+add_executable(bvh-visualizer src/bvh-visualizer/main.cpp)
+target_link_libraries(bvh-visualizer PRIVATE common glm::glm)
+
 # tests
 set(TESTS_SOURCE_FILES
     aabb.cpp
