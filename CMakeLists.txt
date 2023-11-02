@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(external)
 
 set(COMMON_SOURCE_FILES
+    bvh.cpp
     cgltf.c
     gltf_model.cpp
     ray_intersection.cpp)

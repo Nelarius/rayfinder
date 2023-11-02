@@ -1,5 +1,8 @@
+#include "bvh.hpp"
 #include "geometry.hpp"
 #include "ray_intersection.hpp"
+
+#include <algorithm>
 
 namespace pt
 {
@@ -53,5 +56,124 @@ bool rayIntersectTriangle(
     {
         return false;
     }
+}
+
+RayAabbIntersector::RayAabbIntersector(const Ray& ray)
+{
+    origin = ray.origin;
+    invDir = 1.0f / ray.direction;
+    dirNeg[0] = static_cast<uint32_t>(invDir.x < 0.0f);
+    dirNeg[1] = static_cast<uint32_t>(invDir.y < 0.0f);
+    dirNeg[2] = static_cast<uint32_t>(invDir.z < 0.0f);
+}
+
+bool rayIntersectAabb(const RayAabbIntersector& intersector, const Aabb& aabb, const float rayTMax)
+{
+    const glm::vec3 bounds[2] = {aabb.min, aabb.max};
+
+    float tmin = (bounds[intersector.dirNeg[0]].x - intersector.origin.x) * intersector.invDir.x;
+    float tmax =
+        (bounds[1 - intersector.dirNeg[0]].x - intersector.origin.x) * intersector.invDir.x;
+
+    const float tymin =
+        (bounds[intersector.dirNeg[1]].y - intersector.origin.y) * intersector.invDir.y;
+    const float tymax =
+        (bounds[1 - intersector.dirNeg[1]].y - intersector.origin.y) * intersector.invDir.y;
+
+    if ((tmin > tymax) || (tymin > tmax))
+    {
+        return false;
+    }
+
+    tmin = std::max(tymin, tmin);
+    tmax = std::min(tymax, tmax);
+
+    const float tzmin =
+        (bounds[intersector.dirNeg[2]].z - intersector.origin.z) * intersector.invDir.z;
+    const float tzmax =
+        (bounds[1 - intersector.dirNeg[2]].z - intersector.origin.z) * intersector.invDir.z;
+
+    if ((tmin > tzmax) || (tzmin > tmax))
+    {
+        return false;
+    }
+
+    tmin = std::max(tzmin, tmin);
+    tmax = std::min(tzmax, tmax);
+
+    return (tmin < rayTMax) && (tmax > 0.0f);
+}
+
+bool rayIntersectBvh(
+    const Ray&    ray,
+    const Bvh&    bvh,
+    float         rayTMax,
+    Intersection& intersect,
+    BvhStats*     stats)
+{
+    const RayAabbIntersector intersector(ray);
+
+    uint32_t nodesVisited = 0;
+    size_t   toVisitOffset = 0;
+    size_t   currentNodeIdx = 0;
+    size_t   nodesToVisit[64];
+    bool     didIntersect = false;
+
+    while (true)
+    {
+        ++nodesVisited;
+        const BvhNode& node = bvh.nodes[currentNodeIdx];
+
+        // Check ray against BVH node
+        if (rayIntersectAabb(intersector, node.aabb, rayTMax))
+        {
+            if (node.triangleCount > 0)
+            {
+                // Check for intersection with primitives in BVH node
+                for (size_t idx = 0; idx < node.triangleCount; ++idx)
+                {
+                    const Triangle& triangle = bvh.triangles[node.trianglesOffset + idx];
+                    if (rayIntersectTriangle(ray, triangle, rayTMax, intersect))
+                    {
+                        rayTMax = intersect.t;
+                        didIntersect = true;
+                    }
+                }
+                if (toVisitOffset == 0)
+                {
+                    break;
+                }
+                currentNodeIdx = nodesToVisit[--toVisitOffset];
+            }
+            else
+            {
+                if (intersector.dirNeg[node.splitAxis])
+                {
+                    nodesToVisit[toVisitOffset++] = currentNodeIdx + 1;
+                    currentNodeIdx = node.secondChildOffset;
+                }
+                else
+                {
+                    nodesToVisit[toVisitOffset++] = node.secondChildOffset;
+                    currentNodeIdx = currentNodeIdx + 1;
+                }
+            }
+        }
+        else
+        {
+            if (toVisitOffset == 0)
+            {
+                break;
+            }
+            currentNodeIdx = nodesToVisit[--toVisitOffset];
+        }
+    }
+
+    if (stats != nullptr)
+    {
+        stats->nodesVisited = nodesVisited;
+    }
+
+    return didIntersect;
 }
 } // namespace pt
