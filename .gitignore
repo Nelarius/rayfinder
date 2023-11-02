@@ -1,5 +1,7 @@
 ### Project ###
 build
+build-debug
+build-release
 
 ### CMake ###
 CMakeLists.txt.user
