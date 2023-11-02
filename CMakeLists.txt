@@ -45,6 +45,11 @@ set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 # bvh-visualizer
 add_executable(bvh-visualizer src/bvh-visualizer/main.cpp)
 target_link_libraries(bvh-visualizer PRIVATE common glm::glm)
+add_custom_command(
+    TARGET tests POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_SOURCE_DIR}/assets/Duck.glb
+    ${CMAKE_CURRENT_BINARY_DIR}/Duck.glb)
 
 # tests
 set(TESTS_SOURCE_FILES
@@ -56,7 +61,6 @@ list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
 
 add_executable(tests ${TESTS_SOURCE_FILES})
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common glm::glm)
-
 add_custom_command(
     TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
