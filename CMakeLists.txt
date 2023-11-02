@@ -19,6 +19,7 @@ endif()
 # common
 set(COMMON_SOURCE_FILES
     bvh.cpp
+    camera.cpp
     cgltf.c
     gltf_model.cpp
     ray_intersection.cpp)
@@ -44,6 +45,7 @@ set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 # tests
 set(TESTS_SOURCE_FILES
     aabb.cpp
+    bvh.cpp
     gltf.cpp
     intersection.cpp)
 list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)

@@ -1,4 +1,5 @@
 #include <common/geometry.hpp>
+#include <common/ray_intersection.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
@@ -50,4 +51,77 @@ TEST_CASE("Aabb surface area", "[aabb]")
     const float    surfaceArea = pt::surfaceArea(aabb);
 
     REQUIRE(surfaceArea == Catch::Approx(24.0f));
+}
+
+TEST_CASE("Ray-Aabb intersection test", "[bvh]")
+{
+    SECTION("Ray intersects x slab")
+    {
+        const pt::Ray ray{
+            .origin = glm::vec3{-2.0f, 0.0f, 0.0f},
+            .direction = glm::vec3{1.0f, 0.0f, 0.0f},
+        };
+        const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
+
+        const pt::RayAabbIntersector intersector(ray);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+
+        REQUIRE(intersects);
+    }
+
+    SECTION("Ray intersects y slab")
+    {
+        const pt::Ray ray{
+            .origin = glm::vec3{0.0f, -1.0f, 0.0f},
+            .direction = glm::vec3{0.0f, 1.0f, 0.0f},
+        };
+        const pt::Aabb aabb(glm::vec3{-1.0f, 0.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
+
+        const pt::RayAabbIntersector intersector(ray);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+
+        REQUIRE(intersects);
+    }
+
+    SECTION("Ray intersects z slab")
+    {
+        const pt::Ray ray{
+            .origin = glm::vec3{0.0f, 0.0f, -1.0f},
+            .direction = glm::vec3{0.0f, 0.0f, 1.0f},
+        };
+        const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, 0.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
+
+        const pt::RayAabbIntersector intersector(ray);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+
+        REQUIRE(intersects);
+    }
+
+    SECTION("Ray intersects corner")
+    {
+        const pt::Ray ray{
+            .origin = glm::vec3{-1.0f, -1.0f, -1.0f},
+            .direction = glm::vec3{1.0f, 1.0f, 1.0f},
+        };
+        const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
+
+        const pt::RayAabbIntersector intersector(ray);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+
+        REQUIRE(intersects);
+    }
+
+    SECTION("Ray misses aabb")
+    {
+        const pt::Ray ray{
+            .origin = glm::vec3{-2.0f, 0.0f, -1.0f},
+            .direction = glm::vec3{0.0f, 1.0f, 0.0f},
+        };
+        const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
+
+        const pt::RayAabbIntersector intersector(ray);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+
+        REQUIRE_FALSE(intersects);
+    }
 }
