@@ -68,6 +68,7 @@ add_custom_command(
 # tests
 set(TESTS_SOURCE_FILES
     aabb.cpp
+    angle.cpp
     bvh.cpp
     gltf.cpp
     intersection.cpp)
