@@ -20,15 +20,11 @@ struct RendererDescriptor
 
 struct Renderer
 {
-    GpuBuffer           frameDataBuffer;
-    GpuBuffer           pixelBuffer;
-    WGPUBindGroup       computePixelsBindGroup;
-    WGPUComputePipeline computePipeline;
-
     GpuBuffer          vertexBuffer;
     GpuBuffer          uniformsBuffer;
     WGPUBindGroup      uniformsBindGroup;
-    WGPUBindGroup      renderPixelsBindGroup;
+    GpuBuffer          frameDataBuffer;
+    WGPUBindGroup      frameDataBindGroup;
     WGPURenderPipeline renderPipeline;
 
     Extent2i      currentFramebufferSize;

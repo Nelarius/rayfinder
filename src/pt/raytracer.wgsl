@@ -1,27 +1,49 @@
+struct Uniforms {
+    viewProjectionMatrix: mat4x4<f32>,
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+struct VertexInput {
+    @location(0) position: vec2f,
+    @location(1) texCoord: vec2f,
+}
+
+struct VertexOutput {
+    @builtin(position) position: vec4f,
+    @location(0) texCoord: vec2f,
+}
+
+@vertex
+fn vsMain(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.position = uniforms.viewProjectionMatrix * vec4f(in.position, 0.0, 1.0);
+    out.texCoord = in.texCoord;
+
+    return out;
+}
+
 struct FrameData {
     dimensions: vec2u,
     frameCount: u32,
 }
 
-@group(0) @binding(0) var<uniform> frameData: FrameData;
-@group(0) @binding(1) var<storage, read_write> pixelBuffer: array<array<f32, 3>>;
+@group(1) @binding(0) var<uniform> frameData: FrameData;
 
-@compute @workgroup_size(8,8)
-fn main(@builtin(global_invocation_id) globalId: vec3u) {
-    let j = globalId.x;
-    let i = globalId.y;
+@fragment
+fn fsMain(in: VertexOutput) -> @location(0) vec4f {
+    let u = in.texCoord.x;
+    let v = in.texCoord.y;
+
+    let j =  u32(u * f32(frameData.dimensions.x));
+    let i =  u32(v * f32(frameData.dimensions.y));
 
     var rngState = initRng(vec2(j, i), frameData.dimensions, frameData.frameCount);
-    let v = rngNextFloat(&rngState);
-
     let r = rngNextFloat(&rngState);
     let g = rngNextFloat(&rngState);
     let b = rngNextFloat(&rngState);
 
-    if j < frameData.dimensions.x && i < frameData.dimensions[1] {
-        let idx = frameData.dimensions.x * i + j;
-        pixelBuffer[idx] = array<f32, 3>(r, g, b);
-    }
+    return vec4f(r, g, b, 1f);
 }
 
 fn initRng(pixel: vec2<u32>, resolution: vec2<u32>, frame: u32) -> u32 {

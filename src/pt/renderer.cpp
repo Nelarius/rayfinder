@@ -42,14 +42,6 @@ void bindGroupSafeRelease(const WGPUBindGroup bindGroup)
     }
 }
 
-void computePipelineSafeRelease(const WGPUComputePipeline pipeline)
-{
-    if (pipeline)
-    {
-        wgpuComputePipelineRelease(pipeline);
-    }
-}
-
 void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 {
     if (pipeline)
@@ -60,121 +52,19 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 } // namespace
 
 Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpuContext)
-    : frameDataBuffer(
+    : vertexBuffer(),
+      uniformsBuffer(),
+      uniformsBindGroup(nullptr),
+      frameDataBuffer(
           gpuContext.device,
           "frame data buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(FrameDataBuffer)),
-      pixelBuffer(
-          gpuContext.device,
-          "pixel buffer",
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          [&rendererDesc]() -> std::size_t {
-              const Extent2i    largestResolution = rendererDesc.maxFramebufferSize;
-              const std::size_t numPixels =
-                  static_cast<std::size_t>(largestResolution.x * largestResolution.y);
-              return sizeof(glm::vec3) * numPixels;
-          }()),
-      computePixelsBindGroup(nullptr),
-      computePipeline(nullptr),
-      vertexBuffer(),
-      uniformsBuffer(),
-      uniformsBindGroup(nullptr),
-      renderPixelsBindGroup(nullptr),
+      frameDataBindGroup(nullptr),
       renderPipeline(nullptr),
       currentFramebufferSize(rendererDesc.currentFramebufferSize),
       frameCount(0)
 {
-    auto loadShaderSource = [](std::string_view path) -> std::string {
-        std::ifstream file(path);
-        if (!file)
-        {
-            throw std::runtime_error(std::format("Error opening file: {}.", path));
-        }
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        return buffer.str();
-    };
-
-    {
-        const std::string raytracerSource = loadShaderSource("raytracer.wgsl");
-
-        const WGPUShaderModuleWGSLDescriptor shaderWgslDesc = {
-            .chain =
-                WGPUChainedStruct{
-                    .next = nullptr,
-                    .sType = WGPUSType_ShaderModuleWGSLDescriptor,
-                },
-            .code = raytracerSource.c_str(),
-        };
-
-        const WGPUShaderModuleDescriptor shaderDesc{
-            .nextInChain = &shaderWgslDesc.chain,
-            .label = "Compute shader module",
-        };
-
-        const WGPUShaderModule computeModule =
-            wgpuDeviceCreateShaderModule(gpuContext.device, &shaderDesc);
-
-        // pixels bind group layout
-
-        std::array<WGPUBindGroupLayoutEntry, 2> pixelsBindGroupLayoutEntries{
-            frameDataBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Compute),
-            pixelBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Compute),
-        };
-
-        const WGPUBindGroupLayoutDescriptor pixelsBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "images group layout (compute pipeline)",
-            .entryCount = pixelsBindGroupLayoutEntries.size(),
-            .entries = pixelsBindGroupLayoutEntries.data(),
-        };
-        const WGPUBindGroupLayout pixelsBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &pixelsBindGroupLayoutDesc);
-
-        // Bind group
-
-        std::array<WGPUBindGroupEntry, 2> pixelsBindGroupEntries{
-            frameDataBuffer.bindGroupEntry(0),
-            pixelBuffer.bindGroupEntry(1),
-        };
-
-        const WGPUBindGroupDescriptor pixelsBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "image bind group",
-            .layout = pixelsBindGroupLayout,
-            .entryCount = pixelsBindGroupEntries.size(),
-            .entries = pixelsBindGroupEntries.data(),
-        };
-        computePixelsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &pixelsBindGroupDesc);
-
-        // Pipeline layout
-
-        const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "Compute pipeline layout",
-            .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &pixelsBindGroupLayout,
-        };
-        const WGPUPipelineLayout pipelineLayout =
-            wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
-
-        const WGPUComputePipelineDescriptor computeDesc{
-            .nextInChain = nullptr,
-            .label = "Compute pipeline",
-            .layout = pipelineLayout,
-            .compute =
-                WGPUProgrammableStageDescriptor{
-                    .nextInChain = nullptr,
-                    .module = computeModule,
-                    .entryPoint = "main",
-                    .constantCount = 0,
-                    .constants = nullptr,
-                },
-        };
-        computePipeline = wgpuDeviceCreateComputePipeline(gpuContext.device, &computeDesc);
-    }
-
     {
         const std::array<Vertex, 6> vertexData{
             Vertex{{-0.5f, -0.5f}, {0.0f, 0.0f}},
@@ -237,7 +127,18 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // Shader modules
 
-        const std::string displaySource = loadShaderSource("display.wgsl");
+        auto loadShaderSource = [](std::string_view path) -> std::string {
+            std::ifstream file(path);
+            if (!file)
+            {
+                throw std::runtime_error(std::format("Error opening file: {}.", path));
+            }
+            std::stringstream buffer;
+            buffer << file.rdbuf();
+            return buffer.str();
+        };
+
+        const std::string shaderSource = loadShaderSource("raytracer.wgsl");
 
         const WGPUShaderModuleWGSLDescriptor shaderCodeDesc = {
             .chain =
@@ -245,7 +146,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
                     .next = nullptr,
                     .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                 },
-            .code = displaySource.c_str(),
+            .code = shaderSource.c_str(),
         };
 
         const WGPUShaderModuleDescriptor shaderDesc{
@@ -306,23 +207,21 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // images bind group layout
 
-        std::array<WGPUBindGroupLayoutEntry, 2> pixelsBindGroupLayoutEntries{
-            frameDataBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            pixelBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
-        };
+        const WGPUBindGroupLayoutEntry frameDataBindGroupLayoutEntry =
+            frameDataBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
 
-        const WGPUBindGroupLayoutDescriptor pixelsBindGroupLayoutDesc{
+        const WGPUBindGroupLayoutDescriptor frameDataBindGroupLayoutDesc{
             .nextInChain = nullptr,
-            .label = "images group layout (render pipeline)",
-            .entryCount = pixelsBindGroupLayoutEntries.size(),
-            .entries = pixelsBindGroupLayoutEntries.data(),
+            .label = "frame data bind group layout",
+            .entryCount = 1,
+            .entries = &frameDataBindGroupLayoutEntry,
         };
-        const WGPUBindGroupLayout pixelsBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &pixelsBindGroupLayoutDesc);
+        const WGPUBindGroupLayout frameDataBindGroupLayout =
+            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &frameDataBindGroupLayoutDesc);
 
         std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
             uniformsBindGroupLayout,
-            pixelsBindGroupLayout,
+            frameDataBindGroupLayout,
         };
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
@@ -347,19 +246,18 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         };
         uniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
 
-        std::array<WGPUBindGroupEntry, 2> pixelsBindGroupEntries{
-            frameDataBuffer.bindGroupEntry(0),
-            pixelBuffer.bindGroupEntry(1),
-        };
+        // frame data bind group
 
-        const WGPUBindGroupDescriptor pixelsBindGroupDesc{
+        const WGPUBindGroupEntry frameDataBindGroupEntry = frameDataBuffer.bindGroupEntry(0);
+
+        const WGPUBindGroupDescriptor frameDataBindGroupDesc{
             .nextInChain = nullptr,
             .label = "image bind group",
-            .layout = pixelsBindGroupLayout,
-            .entryCount = pixelsBindGroupEntries.size(),
-            .entries = pixelsBindGroupEntries.data(),
+            .layout = frameDataBindGroupLayout,
+            .entryCount = 1,
+            .entries = &frameDataBindGroupEntry,
         };
-        renderPixelsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &pixelsBindGroupDesc);
+        frameDataBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &frameDataBindGroupDesc);
 
         const WGPURenderPipelineDescriptor pipelineDesc{
             .nextInChain = nullptr,
@@ -406,14 +304,10 @@ Renderer::~Renderer()
 {
     renderPipelineSafeRelease(renderPipeline);
     renderPipeline = nullptr;
-    bindGroupSafeRelease(renderPixelsBindGroup);
-    renderPixelsBindGroup = nullptr;
+    bindGroupSafeRelease(frameDataBindGroup);
+    frameDataBindGroup = nullptr;
     bindGroupSafeRelease(uniformsBindGroup);
     uniformsBindGroup = nullptr;
-    computePipelineSafeRelease(computePipeline);
-    computePipeline = nullptr;
-    bindGroupSafeRelease(computePixelsBindGroup);
-    computePixelsBindGroup = nullptr;
 }
 
 void Renderer::render(const GpuContext& gpuContext)
@@ -448,34 +342,6 @@ void Renderer::render(const GpuContext& gpuContext)
     }();
 
     {
-        const WGPUComputePassEncoder computePassEncoder = [encoder]() -> WGPUComputePassEncoder {
-            const WGPUComputePassDescriptor computePassDesc{
-                .nextInChain = nullptr,
-                .label = "Compute pass encoder",
-                .timestampWriteCount = 0,
-                .timestampWrites = nullptr,
-            };
-
-            return wgpuCommandEncoderBeginComputePass(encoder, &computePassDesc);
-        }();
-
-        wgpuComputePassEncoderSetPipeline(computePassEncoder, computePipeline);
-        wgpuComputePassEncoderSetBindGroup(
-            computePassEncoder, 0, computePixelsBindGroup, 0, nullptr);
-
-        const Extent2u workgroupSize{.x = 8, .y = 8};
-        const Extent2u numWorkgroups{
-            .x = (currentFramebufferSize.x + workgroupSize.x - 1) / workgroupSize.x,
-            .y = (currentFramebufferSize.y + workgroupSize.y - 1) / workgroupSize.y,
-        };
-
-        wgpuComputePassEncoderDispatchWorkgroups(
-            computePassEncoder, numWorkgroups.x, numWorkgroups.y, 1);
-
-        wgpuComputePassEncoderEnd(computePassEncoder);
-    }
-
-    {
         const WGPURenderPassEncoder renderPassEncoder = [encoder,
                                                          nextTexture]() -> WGPURenderPassEncoder {
             const WGPURenderPassColorAttachment renderPassColorAttachment{
@@ -504,8 +370,7 @@ void Renderer::render(const GpuContext& gpuContext)
         {
             wgpuRenderPassEncoderSetPipeline(renderPassEncoder, renderPipeline);
             wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, uniformsBindGroup, 0, nullptr);
-            wgpuRenderPassEncoderSetBindGroup(
-                renderPassEncoder, 1, renderPixelsBindGroup, 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 1, frameDataBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
