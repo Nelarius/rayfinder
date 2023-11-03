@@ -46,7 +46,7 @@ set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 add_executable(bvh-visualizer src/bvh-visualizer/main.cpp)
 target_link_libraries(bvh-visualizer PRIVATE common glm::glm)
 add_custom_command(
-    TARGET tests POST_BUILD
+    TARGET bvh-visualizer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
     ${CMAKE_SOURCE_DIR}/assets/Duck.glb
     ${CMAKE_CURRENT_BINARY_DIR}/Duck.glb)
