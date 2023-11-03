@@ -3,17 +3,17 @@
 namespace pt
 {
 Camera createCamera(
-    const int       viewportWidth,
-    const int       viewportHeight,
-    const float     vfov,
     const glm::vec3 origin,
-    const glm::vec3 lookAt)
+    const glm::vec3 lookAt,
+    const float     aperture,
+    const float     focusDistance,
+    const Angle     vfov,
+    const int       viewportWidth,
+    const int       viewportHeight)
 {
-    // TODO: pass focusDistance in as a parameter.
-    const float focusDistance = 1.0f;
     const float aspectRatio =
         static_cast<float>(viewportWidth) / static_cast<float>(viewportHeight);
-    const float theta = glm::radians(vfov);
+    const float theta = vfov.as_radians();
     const float halfHeight = glm::tan(0.5f * theta);
     const float halfWidth = aspectRatio * halfHeight;
 
@@ -27,11 +27,21 @@ Camera createCamera(
         .origin = origin,
         .lowerLeftCorner = lowerLeftCorner,
         .horizontal = 2.0f * halfWidth * u,
-        .vertical = 2.0f * halfHeight * v};
+        .vertical = 2.0f * halfHeight * v,
+        .lensRadius = 0.5f * aperture,
+    };
 }
 
 Ray generateCameraRay(const Camera& camera, const float u, const float v)
 {
+    // TODO: this does not implement lens offsets using the lens radius. It is not needed for tests
+    // at the moment. CPU-raytracing would need it for depth of field effects. Here is a quick
+    // sketch of what it could look like (WGSL code):
+    // ````
+    // let randomPointInLens = camera.lensRadius * rngNextVec3InUnitDisk(rngState);
+    // let lensOffset = randomPointInLens.x * camera.u + randomPointInLens.y * camera.v;
+    // let origin = camera.origin + lensOffset;
+    // ```
     const glm::vec3 origin = camera.origin;
     const glm::vec3 direction =
         camera.lowerLeftCorner + camera.horizontal * u + camera.vertical * v - origin;

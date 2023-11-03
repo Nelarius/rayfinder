@@ -3,6 +3,7 @@
 #include <common/geometry.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
+#include <common/units/angle.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -26,13 +27,19 @@ int main()
         const glm::vec3 rootCentroid = centroid(rootAabb);
         const int       maxDim = maxDimension(rootAabb);
 
+        const float aperture = 0.0f;
+        const float focusDistance = 1.0f;
+        const Angle vfov = Angle::degrees(70.0f);
+
         return createCamera(
-            imageWidth,
-            imageHeight,
-            70.0f,
             rootCentroid -
                 glm::vec3(-0.8 * rootDiagonal[maxDim], 0.0f, 0.8f * rootDiagonal[maxDim]),
-            rootCentroid);
+            rootCentroid,
+            aperture,
+            focusDistance,
+            vfov,
+            imageWidth,
+            imageHeight);
     }();
 
     // Outputs binary PPM image format, https://netpbm.sourceforge.net/doc/ppm.html

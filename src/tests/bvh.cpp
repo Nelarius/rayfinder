@@ -2,6 +2,7 @@
 #include <common/camera.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
+#include <common/units/angle.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
@@ -47,19 +48,26 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
             }
             return aabb;
         }();
+
         const glm::vec3 rootDiagonal = diagonal(modelAabb);
         const glm::vec3 rootCentroid = centroid(modelAabb);
         const int       maxDim = maxDimension(modelAabb);
 
-        const int viewportWidth = 1;
-        const int viewportHeight = 1;
+        const float aperture = 0.0f;
+        const float focusDistance = 1.0f;
+        const Angle vfov = Angle::degrees(70.0f);
+        const int   viewportWidth = 1;
+        const int   viewportHeight = 1;
+
         return createCamera(
-            viewportWidth,
-            viewportHeight,
-            70.0f,
             rootCentroid -
                 glm::vec3(-0.8f * rootDiagonal[maxDim], 0.0f, 0.8f * rootDiagonal[maxDim]),
-            rootCentroid);
+            rootCentroid,
+            aperture,
+            focusDistance,
+            vfov,
+            viewportWidth,
+            viewportHeight);
     }();
 
     const float rayTMax = 1000.0f;
