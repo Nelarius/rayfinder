@@ -1,32 +1,145 @@
-struct FrameData {
-    dimensions: vec2u,
-    frameCount: u32,
-}
-
 @group(0) @binding(0) var<uniform> frameData: FrameData;
 @group(0) @binding(1) var<storage, read_write> pixelBuffer: array<array<f32, 3>>;
+
+@group(1) @binding(0) var<uniform> camera: Camera;
 
 @compute @workgroup_size(8,8)
 fn main(@builtin(global_invocation_id) globalId: vec3u) {
     let j = globalId.x;
     let i = globalId.y;
 
+    let u = f32(j) / f32(frameData.dimensions.x);
+    let v = f32(i) / f32(frameData.dimensions.y);
+
     var rngState = initRng(vec2(j, i), frameData.dimensions, frameData.frameCount);
-    let v = rngNextFloat(&rngState);
 
-    let r = rngNextFloat(&rngState);
-    let g = rngNextFloat(&rngState);
-    let b = rngNextFloat(&rngState);
+    let primaryRay = generateCameraRay(camera, &rngState, u, v);
+    let rgb = rayColor(primaryRay, &rngState);
 
-    if j < frameData.dimensions.x && i < frameData.dimensions[1] {
+    if j < frameData.dimensions.x && i < frameData.dimensions.y {
         let idx = frameData.dimensions.x * i + j;
-        pixelBuffer[idx] = array<f32, 3>(r, g, b);
+        pixelBuffer[idx] = array<f32, 3>(rgb.r, rgb.g, rgb.b);
     }
 }
 
-fn initRng(pixel: vec2<u32>, resolution: vec2<u32>, frame: u32) -> u32 {
+const PI = 3.1415927f;
+
+const T_MIN = 0.001f;
+const T_MAX = 1000f;
+
+struct FrameData {
+    dimensions: vec2u,
+    frameCount: u32,
+}
+
+struct Camera {
+    eye: vec3f,
+    horizontal: vec3f,
+    vertical: vec3f,
+    lowerLeftCorner: vec3f,
+    lensRadius: f32,
+}
+
+struct Sphere {
+    center: vec3f,
+    radius: f32,
+}
+
+struct Ray {
+    origin: vec3f,
+    direction: vec3f
+}
+
+struct Intersection {
+    p: vec3f,
+    n: vec3f,
+    t: f32,
+}
+
+fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
+    var ray = primaryRay;
+    var color = vec3f(0f, 0f, 0f);
+    var closestIntersect = Intersection();
+
+    let spheres = array<Sphere, 4>(
+        Sphere(vec3f(0.0, -500.0, -1.0), 500.0),
+        Sphere(vec3f(0.0, 1.0, 0.0), 1.0),
+        Sphere(vec3f(-5.0, 1.0, 0.0), 1.0),
+        Sphere(vec3f(5.0, 1.0, 0.0), 1.0)
+    );
+
+    var tClosest = T_MAX;
+    var testIntersect = Intersection();
+    var hit = false;
+    for (var idx = 0u; idx < 4u; idx = idx + 1u) {
+        let sphere = spheres[idx];
+        if rayIntersectSphere(ray, sphere, T_MIN, T_MAX, &testIntersect) {
+            if testIntersect.t < tClosest {
+                tClosest = testIntersect.t;
+                closestIntersect = testIntersect;
+                hit = true;
+            }
+        }
+    }
+
+    if hit {
+        color = 0.5f * (vec3f(1f, 1f, 1f) + closestIntersect.n);
+    } else {
+        let unitDirection = normalize(ray.direction);
+        let t = 0.5f * (unitDirection.y + 1f);
+        color = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
+    }
+
+    return color;
+}
+
+fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
+    let origin = camera.eye;
+    let direction = camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin;
+
+    return Ray(origin, direction);
+}
+
+fn rayIntersectSphere(ray: Ray, sphere: Sphere, tmin: f32, tmax: f32, hit: ptr<function, Intersection>) -> bool {
+    let oc = ray.origin - sphere.center;
+    let a = dot(ray.direction, ray.direction);
+    let b = dot(oc, ray.direction);
+    let c = dot(oc, oc) - sphere.radius * sphere.radius;
+    let discriminant = b * b - a * c;
+
+    if discriminant > 0f {
+        var t = (-b - sqrt(b * b - a * c)) / a;
+        if t < tmax && t > tmin {
+            *hit = sphereIntersection(ray, sphere, t);
+            return true;
+        }
+
+        t = (-b + sqrt(b * b - a * c)) / a;
+        if t < tmax && t > tmin {
+            *hit = sphereIntersection(ray, sphere, t);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+fn sphereIntersection(ray: Ray, sphere: Sphere, t: f32) -> Intersection {
+    let p = rayPointAtParameter(ray, t);
+    let n = (1f / sphere.radius) * (p - sphere.center);
+    let theta = acos(-n.y);
+    let phi = atan2(-n.z, n.x) + PI;
+
+    return Intersection(p, n, t);
+}
+
+fn rayPointAtParameter(ray: Ray, t: f32) -> vec3f {
+    return ray.origin + t * ray.direction;
+}
+
+fn initRng(pixel: vec2u, resolution: vec2u, frame: u32) -> u32 {
     // Adapted from https://github.com/boksajak/referencePT
-    let seed = dot(pixel, vec2<u32>(1u, resolution.x)) ^ jenkinsHash(frame);
+    let seed = dot(pixel, vec2u(1u, resolution.x)) ^ jenkinsHash(frame);
     return jenkinsHash(seed);
 }
 

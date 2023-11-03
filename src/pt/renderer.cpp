@@ -34,6 +34,31 @@ struct FrameDataBuffer
     std::uint32_t padding;
 };
 
+// Camera's uniform buffer layout
+struct CameraUniformLayout
+{
+    glm::vec3 origin;
+    float     padding0;
+    glm::vec3 lowerLeftCorner;
+    float     padding1;
+    glm::vec3 horizontal;
+    float     padding2;
+    glm::vec3 vertical;
+    float     lensRadius;
+
+    CameraUniformLayout(const Camera& c)
+        : origin(c.origin),
+          padding0(0.0f),
+          lowerLeftCorner(c.lowerLeftCorner),
+          padding1(0.0f),
+          horizontal(c.horizontal),
+          padding2(0.0f),
+          vertical(c.vertical),
+          lensRadius(c.lensRadius)
+    {
+    }
+};
+
 void bindGroupSafeRelease(const WGPUBindGroup bindGroup)
 {
     if (bindGroup)
@@ -75,6 +100,11 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
                   static_cast<std::size_t>(largestResolution.x * largestResolution.y);
               return sizeof(glm::vec3) * numPixels;
           }()),
+      renderParamsBuffer(
+          gpuContext.device,
+          "render params buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+          sizeof(CameraUniformLayout)),
       computePixelsBindGroup(nullptr),
       computePipeline(nullptr),
       vertexBuffer(),
@@ -118,7 +148,8 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // pixels bind group layout
 
-        std::array<WGPUBindGroupLayoutEntry, 2> pixelsBindGroupLayoutEntries{
+        // TODO: make sure all std::arrays are const!
+        const std::array<WGPUBindGroupLayoutEntry, 2> pixelsBindGroupLayoutEntries{
             frameDataBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Compute),
             pixelBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Compute),
         };
@@ -131,6 +162,21 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         };
         const WGPUBindGroupLayout pixelsBindGroupLayout =
             wgpuDeviceCreateBindGroupLayout(gpuContext.device, &pixelsBindGroupLayoutDesc);
+
+        // render params bind group layout
+
+        const WGPUBindGroupLayoutEntry renderParamsBindGroupLayoutEntry =
+            renderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Compute);
+
+        const WGPUBindGroupLayoutDescriptor renderParamsBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "render params group layout",
+            .entryCount = 1,
+            .entries = &renderParamsBindGroupLayoutEntry,
+        };
+
+        const WGPUBindGroupLayout renderParamsBindGroupLayout =
+            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &renderParamsBindGroupLayoutDesc);
 
         // Bind group
 
@@ -148,13 +194,30 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         };
         computePixelsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &pixelsBindGroupDesc);
 
+        const WGPUBindGroupEntry renderParamsBindGroupEntry = renderParamsBuffer.bindGroupEntry(0);
+
+        const WGPUBindGroupDescriptor renderParamsBindGroupDesc{
+            .nextInChain = nullptr,
+            .label = "render params bind group",
+            .layout = renderParamsBindGroupLayout,
+            .entryCount = 1,
+            .entries = &renderParamsBindGroupEntry,
+        };
+        renderParamsBindGroup =
+            wgpuDeviceCreateBindGroup(gpuContext.device, &renderParamsBindGroupDesc);
+
         // Pipeline layout
+
+        const std::array<WGPUBindGroupLayout, 2> pipelineBindGroupLayouts{
+            pixelsBindGroupLayout,
+            renderParamsBindGroupLayout,
+        };
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
             .label = "Compute pipeline layout",
-            .bindGroupLayoutCount = 1,
-            .bindGroupLayouts = &pixelsBindGroupLayout,
+            .bindGroupLayoutCount = pipelineBindGroupLayouts.size(),
+            .bindGroupLayouts = pipelineBindGroupLayouts.data(),
         };
         const WGPUPipelineLayout pipelineLayout =
             wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
@@ -412,8 +475,23 @@ Renderer::~Renderer()
     uniformsBindGroup = nullptr;
     computePipelineSafeRelease(computePipeline);
     computePipeline = nullptr;
+    bindGroupSafeRelease(renderParamsBindGroup);
+    renderParamsBindGroup = nullptr;
     bindGroupSafeRelease(computePixelsBindGroup);
     computePixelsBindGroup = nullptr;
+}
+
+void Renderer::setRenderParameters(
+    const GpuContext&       gpuContext,
+    const RenderParameters& renderParams)
+{
+    const CameraUniformLayout cameraUniformLayout(renderParams.camera);
+    wgpuQueueWriteBuffer(
+        gpuContext.queue,
+        renderParamsBuffer.handle(),
+        0,
+        &cameraUniformLayout,
+        sizeof(CameraUniformLayout));
 }
 
 void Renderer::render(const GpuContext& gpuContext)
@@ -462,6 +540,8 @@ void Renderer::render(const GpuContext& gpuContext)
         wgpuComputePassEncoderSetPipeline(computePassEncoder, computePipeline);
         wgpuComputePassEncoderSetBindGroup(
             computePassEncoder, 0, computePixelsBindGroup, 0, nullptr);
+        wgpuComputePassEncoderSetBindGroup(
+            computePassEncoder, 1, renderParamsBindGroup, 0, nullptr);
 
         const Extent2u workgroupSize{.x = 8, .y = 8};
         const Extent2u numWorkgroups{

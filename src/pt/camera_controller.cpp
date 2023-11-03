@@ -28,4 +28,15 @@ Camera CameraController::getCamera(const Extent2i& windowSize) const
         windowSize.x,
         windowSize.y);
 }
+
+void CameraController::update(const float dt)
+{
+    const Orientation orientation = cameraOrientation();
+    const glm::vec3   translation = glm::vec3(
+        (rightPressed - leftPressed) * speed * dt,
+        (upPressed - downPressed) * speed * dt,
+        (backwardPressed - forwardPressed) * speed * dt);
+    position += orientation.right * translation.x + orientation.up * translation.y +
+                orientation.forward * translation.z;
+}
 } // namespace pt

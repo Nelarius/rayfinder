@@ -1,3 +1,4 @@
+#include "camera_controller.hpp"
 #include "gpu_context.hpp"
 #include "renderer.hpp"
 #include "window.hpp"
@@ -30,6 +31,8 @@ int main()
             },
             gpuContext);
 
+        pt::CameraController cameraController;
+
         {
             pt::Extent2i curFramebufferSize = window.resolution();
             while (!glfwWindowShouldClose(window.ptr()))
@@ -57,11 +60,28 @@ int main()
                     {
                         glfwSetWindowShouldClose(window.ptr(), GLFW_TRUE);
                     }
+
+                    cameraController.leftPressed =
+                        glfwGetKey(window.ptr(), GLFW_KEY_A) == GLFW_PRESS;
+                    cameraController.rightPressed =
+                        glfwGetKey(window.ptr(), GLFW_KEY_D) == GLFW_PRESS;
+                    cameraController.forwardPressed =
+                        glfwGetKey(window.ptr(), GLFW_KEY_W) == GLFW_PRESS;
+                    cameraController.backwardPressed =
+                        glfwGetKey(window.ptr(), GLFW_KEY_S) == GLFW_PRESS;
+                    cameraController.upPressed = glfwGetKey(window.ptr(), GLFW_KEY_E) == GLFW_PRESS;
+                    cameraController.downPressed =
+                        glfwGetKey(window.ptr(), GLFW_KEY_Q) == GLFW_PRESS;
+                    cameraController.update(0.0167f);
                 }
 
                 // Render
 
                 {
+                    const pt::RenderParameters renderParams{
+                        .camera = cameraController.getCamera(curFramebufferSize),
+                    };
+                    renderer.setRenderParameters(gpuContext, renderParams);
                     renderer.render(gpuContext);
                 }
 

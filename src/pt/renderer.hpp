@@ -2,6 +2,7 @@
 
 #include "gpu_buffer.hpp"
 
+#include <common/camera.hpp>
 #include <common/extent.hpp>
 
 #include <cstddef>
@@ -18,11 +19,18 @@ struct RendererDescriptor
     Extent2i maxFramebufferSize;
 };
 
+struct RenderParameters
+{
+    Camera camera;
+};
+
 struct Renderer
 {
     GpuBuffer           frameDataBuffer;
     GpuBuffer           pixelBuffer;
+    GpuBuffer           renderParamsBuffer;
     WGPUBindGroup       computePixelsBindGroup;
+    WGPUBindGroup       renderParamsBindGroup;
     WGPUComputePipeline computePipeline;
 
     GpuBuffer          vertexBuffer;
@@ -37,6 +45,7 @@ struct Renderer
     Renderer(const RendererDescriptor&, const GpuContext&);
     ~Renderer();
 
+    void setRenderParameters(const GpuContext&, const RenderParameters&);
     void render(const GpuContext&);
     void resizeFramebuffer(const Extent2i&);
 
