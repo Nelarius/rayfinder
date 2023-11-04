@@ -44,17 +44,10 @@ target_link_libraries(pt PRIVATE common glfw glfw3webgpu glm::glm webgpu)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 add_custom_command(
     TARGET pt POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${CMAKE_SOURCE_DIR}/src/pt/raytracer.wgsl
     ${CMAKE_CURRENT_BINARY_DIR}/raytracer.wgsl
     COMMENT "Copying raytracer.wgsl to the build folder"
-)
-add_custom_command(
-    TARGET pt POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${CMAKE_SOURCE_DIR}/src/pt/display.wgsl
-    ${CMAKE_CURRENT_BINARY_DIR}/display.wgsl
-    COMMENT "Copying display.wgsl to the build folder"
 )
 
 # bvh-visualizer

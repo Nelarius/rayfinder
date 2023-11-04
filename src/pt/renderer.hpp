@@ -26,17 +26,13 @@ struct RenderParameters
 
 struct Renderer
 {
-    GpuBuffer           frameDataBuffer;
-    GpuBuffer           pixelBuffer;
-    GpuBuffer           renderParamsBuffer;
-    WGPUBindGroup       computePixelsBindGroup;
-    WGPUBindGroup       renderParamsBindGroup;
-    WGPUComputePipeline computePipeline;
-
-    GpuBuffer          vertexBuffer;
-    GpuBuffer          uniformsBuffer;
-    WGPUBindGroup      uniformsBindGroup;
-    WGPUBindGroup      renderPixelsBindGroup;
+    GpuBuffer     vertexBuffer;
+    GpuBuffer     uniformsBuffer;
+    WGPUBindGroup uniformsBindGroup;
+    // TODO: merge these into one buffer
+    GpuBuffer          frameDataBuffer;
+    GpuBuffer          renderParamsBuffer;
+    WGPUBindGroup      renderParamsBindGroup;
     WGPURenderPipeline renderPipeline;
 
     Extent2i      currentFramebufferSize;

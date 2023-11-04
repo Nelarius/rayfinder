@@ -1,25 +1,45 @@
-@group(0) @binding(0) var<uniform> frameData: FrameData;
-@group(0) @binding(1) var<storage, read_write> pixelBuffer: array<array<f32, 3>>;
+struct Uniforms {
+    viewProjectionMatrix: mat4x4<f32>,
+}
 
-@group(1) @binding(0) var<uniform> camera: Camera;
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
-@compute @workgroup_size(8,8)
-fn main(@builtin(global_invocation_id) globalId: vec3u) {
-    let j = globalId.x;
-    let i = globalId.y;
+struct VertexInput {
+    @location(0) position: vec2f,
+    @location(1) texCoord: vec2f,
+}
 
-    let u = f32(j) / f32(frameData.dimensions.x);
-    let v = f32(i) / f32(frameData.dimensions.y);
+struct VertexOutput {
+    @builtin(position) position: vec4f,
+    @location(0) texCoord: vec2f,
+}
+
+@vertex
+fn vsMain(in: VertexInput) -> VertexOutput {
+    var out: VertexOutput;
+    out.position = uniforms.viewProjectionMatrix * vec4f(in.position, 0.0, 1.0);
+    out.texCoord = in.texCoord;
+
+    return out;
+}
+
+@group(1) @binding(0) var<uniform> frameData: FrameData;
+@group(1) @binding(1) var<uniform> camera: Camera;
+
+@fragment
+fn fsMain(in: VertexOutput) -> @location(0) vec4f {
+    let u = in.texCoord.x;
+    let v = in.texCoord.y;
+
+    let j =  u32(u * f32(frameData.dimensions.x));
+    let i =  u32(v * f32(frameData.dimensions.y));
 
     var rngState = initRng(vec2(j, i), frameData.dimensions, frameData.frameCount);
 
     let primaryRay = generateCameraRay(camera, &rngState, u, v);
     let rgb = rayColor(primaryRay, &rngState);
 
-    if j < frameData.dimensions.x && i < frameData.dimensions.y {
-        let idx = frameData.dimensions.x * i + j;
-        pixelBuffer[idx] = array<f32, 3>(rgb.r, rgb.g, rgb.b);
-    }
+    return vec4f(rgb, 1f);
 }
 
 const PI = 3.1415927f;
@@ -34,9 +54,9 @@ struct FrameData {
 
 struct Camera {
     eye: vec3f,
+    lowerLeftCorner: vec3f,
     horizontal: vec3f,
     vertical: vec3f,
-    lowerLeftCorner: vec3f,
     lensRadius: f32,
 }
 
