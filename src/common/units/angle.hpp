@@ -11,10 +11,10 @@ public:
     {
         return Angle(degrees * std::numbers::pi_v<float> / 180.0f);
     }
-    static Angle radians(float radians) { return Angle(radians); }
+    static inline Angle radians(float radians) { return Angle(radians); }
 
-    float as_degrees() const { return mRadians * 180.0f / std::numbers::pi_v<float>; }
-    float as_radians() const { return mRadians; }
+    inline float as_degrees() const { return mRadians * 180.0f / std::numbers::pi_v<float>; }
+    inline float as_radians() const { return mRadians; }
 
     Angle operator+(const Angle& rhs) const { return Angle(mRadians + rhs.mRadians); }
 
