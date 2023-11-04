@@ -26,9 +26,9 @@ public:
     bool  downPressed = false;
 
 private:
-    glm::vec3 position = glm::vec3(-10.0f, 2.0f, -4.0f);
+    glm::vec3 position = glm::vec3(-19.0f, 2.0f, -8.0f);
     Angle     yaw = Angle::degrees(25.0f);
-    Angle     pitch = Angle::degrees(-10.0f);
+    Angle     pitch = Angle::degrees(-5.0f);
     Angle     vfov = Angle::degrees(80.0f);
     float     aperture = 0.8f;
     float     focusDistance = 10.0f;
