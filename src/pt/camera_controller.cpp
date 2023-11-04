@@ -35,7 +35,7 @@ void CameraController::update(const float dt)
     const glm::vec3   translation = glm::vec3(
         (rightPressed - leftPressed) * speed * dt,
         (upPressed - downPressed) * speed * dt,
-        (backwardPressed - forwardPressed) * speed * dt);
+        (forwardPressed - backwardPressed) * speed * dt);
     position += orientation.right * translation.x + orientation.up * translation.y +
                 orientation.forward * translation.z;
 }
