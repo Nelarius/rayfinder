@@ -60,7 +60,7 @@ struct FrameData {
 }
 
 struct Camera {
-    eye: vec3f,
+    origin: vec3f,
     lowerLeftCorner: vec3f,
     horizontal: vec3f,
     vertical: vec3f,
@@ -121,7 +121,7 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
 }
 
 fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
-    let origin = camera.eye;
+    let origin = camera.origin;
     let direction = camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin;
 
     return Ray(origin, direction);
