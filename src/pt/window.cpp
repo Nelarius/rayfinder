@@ -91,7 +91,7 @@ Extent2i Window::largestMonitorResolution() const
         if (area > maxArea)
         {
             maxArea = area;
-            maxResolution = Extent2i{.x = xpixels, .y = ypixels};
+            maxResolution = Extent2i(xpixels, ypixels);
         }
     }
 

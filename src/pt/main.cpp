@@ -23,15 +23,20 @@ int main()
     }};
 
     {
-        pt::GpuContext gpuContext(window.ptr(), pt::Renderer::wgpuRequiredLimits);
-        pt::Renderer   renderer(
-            pt::RendererDescriptor{
-                  .currentFramebufferSize = window.resolution(),
-                  .maxFramebufferSize = window.largestMonitorResolution(),
-            },
-            gpuContext);
-
         pt::CameraController cameraController;
+        pt::GpuContext       gpuContext(window.ptr(), pt::Renderer::wgpuRequiredLimits);
+
+        const pt::RendererDescriptor rendererDesc{
+            .renderParams = [&window, &cameraController]() -> pt::RenderParameters {
+                const pt::Extent2i framebufferSize = window.resolution();
+                return pt::RenderParameters{
+                    .framebufferSize = pt::Extent2u(framebufferSize),
+                    .camera = cameraController.getCamera(framebufferSize),
+                };
+            }(),
+            .maxFramebufferSize = window.largestMonitorResolution(),
+        };
+        pt::Renderer renderer(rendererDesc, gpuContext);
 
         {
             pt::Extent2i curFramebufferSize = window.resolution();
@@ -49,7 +54,6 @@ int main()
                     {
                         curFramebufferSize = newFramebufferSize;
                         gpuContext.resizeFramebuffer(curFramebufferSize);
-                        renderer.resizeFramebuffer(curFramebufferSize);
                     }
                 }
 
@@ -81,7 +85,7 @@ int main()
                     const pt::RenderParameters renderParams{
                         .camera = cameraController.getCamera(curFramebufferSize),
                     };
-                    renderer.setRenderParameters(gpuContext, renderParams);
+                    renderer.setRenderParameters(renderParams);
                     renderer.render(gpuContext);
                 }
 

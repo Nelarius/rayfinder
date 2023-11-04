@@ -13,37 +13,35 @@ namespace pt
 {
 struct GpuContext;
 
-struct RendererDescriptor
-{
-    Extent2i currentFramebufferSize;
-    Extent2i maxFramebufferSize;
-};
-
 struct RenderParameters
 {
-    Camera camera;
+    Extent2u framebufferSize;
+    Camera   camera;
+};
+
+struct RendererDescriptor
+{
+    RenderParameters renderParams;
+    Extent2i         maxFramebufferSize;
 };
 
 struct Renderer
 {
-    GpuBuffer     vertexBuffer;
-    GpuBuffer     uniformsBuffer;
-    WGPUBindGroup uniformsBindGroup;
-    // TODO: merge these into one buffer
-    GpuBuffer          frameDataBuffer;
+    GpuBuffer          vertexBuffer;
+    GpuBuffer          uniformsBuffer;
+    WGPUBindGroup      uniformsBindGroup;
     GpuBuffer          renderParamsBuffer;
     WGPUBindGroup      renderParamsBindGroup;
     WGPURenderPipeline renderPipeline;
 
-    Extent2i      currentFramebufferSize;
-    std::uint32_t frameCount;
+    RenderParameters currentRenderParams;
+    std::uint32_t    frameCount;
 
     Renderer(const RendererDescriptor&, const GpuContext&);
     ~Renderer();
 
-    void setRenderParameters(const GpuContext&, const RenderParameters&);
+    void setRenderParameters(const RenderParameters&);
     void render(const GpuContext&);
-    void resizeFramebuffer(const Extent2i&);
 
     static constexpr WGPURequiredLimits wgpuRequiredLimits{
         .nextInChain = nullptr,

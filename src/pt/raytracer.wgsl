@@ -23,20 +23,22 @@ fn vsMain(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-@group(1) @binding(0) var<uniform> frameData: FrameData;
-@group(1) @binding(1) var<uniform> camera: Camera;
+@group(1) @binding(0) var<uniform> renderParams: RenderParams;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let u = in.texCoord.x;
     let v = in.texCoord.y;
 
-    let j =  u32(u * f32(frameData.dimensions.x));
-    let i =  u32(v * f32(frameData.dimensions.y));
+    let dimensions = renderParams.frameData.dimensions;
+    let frameCount = renderParams.frameData.frameCount;
 
-    var rngState = initRng(vec2(j, i), frameData.dimensions, frameData.frameCount);
+    let j =  u32(u * f32(dimensions.x));
+    let i =  u32(v * f32(dimensions.y));
 
-    let primaryRay = generateCameraRay(camera, &rngState, u, v);
+    var rngState = initRng(vec2(j, i), dimensions, frameCount);
+
+    let primaryRay = generateCameraRay(renderParams.camera, &rngState, u, v);
     let rgb = rayColor(primaryRay, &rngState);
 
     return vec4f(rgb, 1f);
@@ -46,6 +48,11 @@ const PI = 3.1415927f;
 
 const T_MIN = 0.001f;
 const T_MAX = 1000f;
+
+struct RenderParams {
+  frameData: FrameData,
+  camera: Camera,
+}
 
 struct FrameData {
     dimensions: vec2u,

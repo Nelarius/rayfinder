@@ -27,15 +27,21 @@ struct Vertex
     float uv[2];
 };
 
-struct FrameDataBuffer
+struct FrameDataLayout
 {
     Extent2u      dimensions;
     std::uint32_t frameCount;
     std::uint32_t padding;
+
+    FrameDataLayout(const Extent2u& dimensions, const std::uint32_t frameCount)
+        : dimensions(dimensions),
+          frameCount(frameCount),
+          padding(0)
+    {
+    }
 };
 
-// Camera's uniform buffer layout
-struct CameraUniformLayout
+struct CameraLayout
 {
     glm::vec3 origin;
     float     padding0;
@@ -46,7 +52,7 @@ struct CameraUniformLayout
     glm::vec3 vertical;
     float     lensRadius;
 
-    CameraUniformLayout(const Camera& c)
+    CameraLayout(const Camera& c)
         : origin(c.origin),
           padding0(0.0f),
           lowerLeftCorner(c.lowerLeftCorner),
@@ -55,6 +61,21 @@ struct CameraUniformLayout
           padding2(0.0f),
           vertical(c.vertical),
           lensRadius(c.lensRadius)
+    {
+    }
+};
+
+struct RenderParamsLayout
+{
+    FrameDataLayout frameData;
+    CameraLayout    camera;
+
+    RenderParamsLayout(
+        const Extent2u&         dimensions,
+        const std::uint32_t     frameCount,
+        const RenderParameters& renderParams)
+        : frameData(dimensions, frameCount),
+          camera(renderParams.camera)
     {
     }
 };
@@ -80,19 +101,14 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
     : vertexBuffer(),
       uniformsBuffer(),
       uniformsBindGroup(nullptr),
-      frameDataBuffer(
-          gpuContext.device,
-          "frame data buffer",
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-          sizeof(FrameDataBuffer)),
       renderParamsBuffer(
           gpuContext.device,
           "render params buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-          sizeof(CameraUniformLayout)),
+          sizeof(RenderParamsLayout)),
       renderParamsBindGroup(nullptr),
       renderPipeline(nullptr),
-      currentFramebufferSize(rendererDesc.currentFramebufferSize),
+      currentRenderParams(rendererDesc.renderParams),
       frameCount(0)
 {
     {
@@ -237,16 +253,14 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // renderParams group layout
 
-        const std::array<WGPUBindGroupLayoutEntry, 2> renderParamsBindGroupLayoutEntries{
-            frameDataBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            renderParamsBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
-        };
+        const WGPUBindGroupLayoutEntry renderParamsBindGroupLayoutEntry =
+            renderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
 
         const WGPUBindGroupLayoutDescriptor renderParamsBindGroupLayoutDesc{
             .nextInChain = nullptr,
             .label = "renderParams bind group layout",
-            .entryCount = renderParamsBindGroupLayoutEntries.size(),
-            .entries = renderParamsBindGroupLayoutEntries.data(),
+            .entryCount = 1,
+            .entries = &renderParamsBindGroupLayoutEntry,
         };
         const WGPUBindGroupLayout renderParamsBindGroupLayout =
             wgpuDeviceCreateBindGroupLayout(gpuContext.device, &renderParamsBindGroupLayoutDesc);
@@ -280,17 +294,14 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
 
         // renderParams bind group
 
-        const std::array<WGPUBindGroupEntry, 2> renderParamsBindGroupEntries{
-            frameDataBuffer.bindGroupEntry(0),
-            renderParamsBuffer.bindGroupEntry(1),
-        };
+        const WGPUBindGroupEntry renderParamsBindGroupEntry = renderParamsBuffer.bindGroupEntry(0);
 
         const WGPUBindGroupDescriptor renderParamsBindGroupDesc{
             .nextInChain = nullptr,
             .label = "image bind group",
             .layout = renderParamsBindGroupLayout,
-            .entryCount = renderParamsBindGroupEntries.size(),
-            .entries = renderParamsBindGroupEntries.data(),
+            .entryCount = 1,
+            .entries = &renderParamsBindGroupEntry,
         };
         renderParamsBindGroup =
             wgpuDeviceCreateBindGroup(gpuContext.device, &renderParamsBindGroupDesc);
@@ -346,17 +357,9 @@ Renderer::~Renderer()
     uniformsBindGroup = nullptr;
 }
 
-void Renderer::setRenderParameters(
-    const GpuContext&       gpuContext,
-    const RenderParameters& renderParams)
+void Renderer::setRenderParameters(const RenderParameters& renderParams)
 {
-    const CameraUniformLayout cameraUniformLayout(renderParams.camera);
-    wgpuQueueWriteBuffer(
-        gpuContext.queue,
-        renderParamsBuffer.handle(),
-        0,
-        &cameraUniformLayout,
-        sizeof(CameraUniformLayout));
+    currentRenderParams = renderParams;
 }
 
 void Renderer::render(const GpuContext& gpuContext)
@@ -370,16 +373,15 @@ void Renderer::render(const GpuContext& gpuContext)
     }
 
     {
-        const FrameDataBuffer frameData{
-            .dimensions =
-                Extent2u{
-                    .x = static_cast<std::uint32_t>(currentFramebufferSize.x),
-                    .y = static_cast<std::uint32_t>(currentFramebufferSize.y)},
-            .frameCount = frameCount++,
-            .padding = 0,
-        };
+        // TODO: framebuffersize is now a part of render params struct, adjust constructor
+        const RenderParamsLayout renderParamsLayout(
+            currentRenderParams.framebufferSize, frameCount++, currentRenderParams);
         wgpuQueueWriteBuffer(
-            gpuContext.queue, frameDataBuffer.handle(), 0, &frameData, frameDataBuffer.byteSize());
+            gpuContext.queue,
+            renderParamsBuffer.handle(),
+            0,
+            &renderParamsLayout,
+            sizeof(RenderParamsLayout));
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {
@@ -439,15 +441,5 @@ void Renderer::render(const GpuContext& gpuContext)
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
 
     wgpuTextureViewRelease(nextTexture);
-}
-
-void Renderer::resizeFramebuffer(const Extent2i& newSize)
-{
-    if (newSize.x <= 0 || newSize.y <= 0)
-    {
-        return;
-    }
-
-    currentFramebufferSize = newSize;
 }
 } // namespace pt

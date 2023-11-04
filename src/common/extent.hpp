@@ -9,6 +9,21 @@ struct Extent2
 {
     T x = T(0);
     T y = T(0);
+
+    constexpr Extent2() noexcept = default;
+
+    constexpr Extent2(T xx, T yy) noexcept
+        : x(xx),
+          y(yy)
+    {
+    }
+
+    template<typename U>
+    constexpr explicit Extent2(const Extent2<U>& other) noexcept
+        : x(static_cast<T>(other.x)),
+          y(static_cast<T>(other.y))
+    {
+    }
 };
 
 using Extent2i = Extent2<std::int32_t>;
