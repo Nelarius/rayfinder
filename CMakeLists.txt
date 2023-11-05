@@ -103,6 +103,7 @@ add_custom_command(
 set(TESTS_SOURCE_FILES
     aabb.cpp
     angle.cpp
+    archive.cpp
     bvh.cpp
     gltf.cpp
     intersection.cpp
@@ -110,7 +111,7 @@ set(TESTS_SOURCE_FILES
 list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
 
 add_executable(tests ${TESTS_SOURCE_FILES})
-target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common glm::glm)
+target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common fmt glm::glm)
 add_custom_command(
     TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
