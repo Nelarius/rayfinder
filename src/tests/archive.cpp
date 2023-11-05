@@ -4,16 +4,90 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstring>
+#include <format>
 #include <fstream>
 #include <sstream>
+#include <limits>
+#include <stdexcept>
 
 namespace pt
 {
-using ByteStream = std::basic_stringstream<char>;
-using OutputByteStream = std::basic_ostream<char>;
-using InputByteStream = std::basic_istream<char>;
+class OutputStream
+{
+public:
+    virtual void write(const char* data, std::size_t numBytes) = 0;
+};
 
-void serialize(OutputByteStream& ostream, const Bvh& bvh)
+class InputStream
+{
+public:
+    virtual void read(char* data, std::size_t numBytes) = 0;
+};
+
+class BufferStream : public InputStream, public OutputStream
+{
+public:
+    BufferStream() = default;
+    ~BufferStream() = default;
+
+    virtual void read(char* data, std::size_t numBytes) { mBufferStream.read(data, numBytes); }
+
+    virtual void write(const char* data, std::size_t numBytes)
+    {
+        mBufferStream.write(data, numBytes);
+    }
+
+    std::string_view view() const { return mBufferStream.view(); }
+
+private:
+    std::basic_stringstream<char> mBufferStream;
+};
+
+class InputFileStream : public InputStream
+{
+public:
+    InputFileStream(const std::string_view filename)
+    {
+        mFileStream.open(filename.data(), std::ios::binary | std::ios::in);
+        if (!mFileStream.is_open())
+        {
+            throw std::runtime_error(std::format("Failed to open file: {}", filename.data()));
+        }
+    }
+    ~InputFileStream() = default;
+
+    virtual void read(char* data, std::size_t numBytes) override
+    {
+        mFileStream.read(data, numBytes);
+    }
+
+private:
+    std::ifstream mFileStream;
+};
+
+class OutputFileStream : public OutputStream
+{
+public:
+    OutputFileStream(const std::string_view filename)
+    {
+        mFileStream.open(filename.data(), std::ios::binary | std::ios::out);
+        if (!mFileStream.is_open())
+        {
+            throw std::runtime_error(std::format("Failed to open file: {}", filename.data()));
+        }
+    }
+    ~OutputFileStream() = default;
+
+    virtual void write(const char* data, std::size_t numBytes) override
+    {
+        mFileStream.write(data, numBytes);
+    }
+
+private:
+    std::ofstream mFileStream;
+};
+
+void serialize(OutputStream& ostream, const Bvh& bvh)
 {
     {
         const std::size_t nodeCount = bvh.nodes.size();
@@ -28,7 +102,7 @@ void serialize(OutputByteStream& ostream, const Bvh& bvh)
     }
 }
 
-void deserialize(InputByteStream& istream, Bvh& bvh)
+void deserialize(InputStream& istream, Bvh& bvh)
 {
     {
         std::size_t nodeCount;
@@ -61,14 +135,14 @@ SCENARIO("Serialize and deserializing a bvh", "[archive]")
 
         WHEN("serializing to a bytestream")
         {
-            pt::ByteStream byteStream;
-            pt::serialize(byteStream, bvh);
-            REQUIRE_FALSE(byteStream.view().empty());
+            pt::BufferStream bufferStream;
+            pt::serialize(bufferStream, bvh);
+            REQUIRE_FALSE(bufferStream.view().empty());
 
-            THEN("bvh2 deserialized from bytestream equals original bvh")
+            THEN("bvh2 deserialized from buffer stream equals original bvh")
             {
                 pt::Bvh bvh2;
-                pt::deserialize(byteStream, bvh2);
+                pt::deserialize(bufferStream, bvh2);
 
                 REQUIRE(bvh2.nodes.size() == bvh.nodes.size());
                 REQUIRE(bvh2.triangles.size() == bvh.triangles.size());
@@ -85,14 +159,14 @@ SCENARIO("Serialize and deserializing a bvh", "[archive]")
         WHEN("serializing to an ofstream")
         {
             {
-                std::ofstream file("bvh.testbin", std::ios::binary);
+                pt::OutputFileStream file("bvh.testbin");
                 pt::serialize(file, bvh);
             }
 
             THEN("bvh2 deserialized from ifstream equals original bvh")
             {
-                pt::Bvh       bvh2;
-                std::ifstream file("bvh.testbin", std::ios::binary);
+                pt::Bvh             bvh2;
+                pt::InputFileStream file("bvh.testbin");
                 pt::deserialize(file, bvh2);
 
                 REQUIRE(bvh2.nodes.size() == bvh.nodes.size());
