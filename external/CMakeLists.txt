@@ -24,6 +24,10 @@ FetchContent_Declare(webgpu
     GIT_REPOSITORY "https://github.com/eliemichel/WebGPU-distribution"
     GIT_TAG dawn)
 
+FetchContent_Declare(zlib
+    GIT_REPOSITORY "https://github.com/madler/zlib"
+    GIT_TAG 09155eaa2f9270dc4ed1fa13e2b4b2613e6e4851) # v1.3
+
 # Fetch
 message(STATUS "Fetching Catch2...")
 FetchContent_MakeAvailable(Catch2)
@@ -43,6 +47,9 @@ FetchContent_MakeAvailable(glm)
 
 message(STATUS "Fetching WebGPU...")
 FetchContent_MakeAvailable(webgpu)
+
+message(STATUS "Fetching zlib...")
+FetchContent_MakeAvailable(zlib)
 
 # Configure
 
