@@ -2,12 +2,12 @@
 #include <common/gltf_model.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <zlib.h>
 
 #include <cstring>
 #include <format>
 #include <fstream>
 #include <sstream>
-#include <limits>
 #include <stdexcept>
 
 namespace pt
@@ -30,6 +30,7 @@ public:
     BufferStream() = default;
     ~BufferStream() = default;
 
+    // TODO: what about the number of read bytes?
     virtual void read(char* data, std::size_t numBytes) { mBufferStream.read(data, numBytes); }
 
     virtual void write(const char* data, std::size_t numBytes)
@@ -85,6 +86,82 @@ public:
 
 private:
     std::ofstream mFileStream;
+};
+
+// Compresses the bytes written to this stream using zlib. Writes the compressed bytes to the given
+// output stream.
+template<std::size_t CHUNK_SIZE = 1024>
+class DeflatingStreamAdapter : public OutputStream
+{
+public:
+    DeflatingStreamAdapter(OutputStream& ostream)
+        : mOutputStream(ostream),
+          mBytes(),
+          mZstream()
+    {
+        mBytes.reserve(1024);
+
+        // Source: https://github.com/madler/zlib/blob/develop/examples/zpipe.c
+
+        // Allocate deflate state
+        mZstream.zalloc = Z_NULL;
+        mZstream.zfree = Z_NULL;
+        mZstream.opaque = Z_NULL;
+        // Compression levels are from 0 (no compression) to 9 (maximum compression).
+        const int ret = deflateInit(&mZstream, Z_DEFAULT_COMPRESSION);
+        if (ret != Z_OK)
+        {
+            // TODO: a custom exception type?
+            throw std::runtime_error("Failed to initialize zlib deflate stream");
+        }
+    }
+
+    ~DeflatingStreamAdapter()
+    {
+        if (mBytes.empty())
+        {
+            inflateEnd(&mZstream);
+            return;
+        }
+
+        mZstream.avail_in = static_cast<uInt>(mBytes.size());
+        mZstream.next_in = reinterpret_cast<Bytef*>(mBytes.data());
+
+        std::array<char, CHUNK_SIZE> chunk;
+
+        int state = Z_OK;
+        do
+        {
+            mZstream.avail_out = CHUNK_SIZE;
+            mZstream.next_out = reinterpret_cast<Bytef*>(chunk.data());
+
+            // `deflate` can be called with flush = Z_FINISH if the intention is to run the
+            // compression in one pass. In this case, `deflate` will return Z_STREAM_END when all
+            // input has been consumed.
+            state = deflate(&mZstream, Z_FINISH);
+            assert(state != Z_STREAM_ERROR); // state not clobbered
+
+            const std::size_t numBytes = CHUNK_SIZE - mZstream.avail_out;
+            if (numBytes > 0)
+            {
+                mOutputStream.write(chunk.data(), numBytes);
+            }
+        } while (state != Z_STREAM_END); // loop while all input not consumed
+        assert(mZstream.avail_in == 0);  // all input consumed
+        inflateEnd(&mZstream);
+    }
+
+    virtual void write(const char* data, std::size_t numBytes) override
+    {
+        const std::size_t offset = mBytes.size();
+        mBytes.resize(offset + numBytes);
+        std::memcpy(mBytes.data() + offset, data, numBytes);
+    }
+
+private:
+    OutputStream&     mOutputStream;
+    std::vector<char> mBytes;
+    z_stream          mZstream;
 };
 
 void serialize(OutputStream& ostream, const Bvh& bvh)
@@ -180,5 +257,40 @@ SCENARIO("Serialize and deserializing a bvh", "[archive]")
                     0);
             }
         }
+    }
+}
+
+TEST_CASE("DeflatingStreamAdapter", "[archive]")
+{
+    pt::BufferStream bufferStream;
+    {
+        pt::DeflatingStreamAdapter deflatingStream(bufferStream);
+
+        const std::string_view testString = "Hello world!";
+        deflatingStream.write(testString.data(), testString.size());
+    }
+
+    const std::string_view compressedString = bufferStream.view();
+    REQUIRE_FALSE(compressedString.empty());
+}
+
+TEST_CASE("DeflatingStreamAdapter writes to file", "[archive]")
+{
+    pt::GltfModel model("Duck.glb");
+    REQUIRE_FALSE(model.triangles().empty());
+
+    const pt::Bvh bvh = buildBvh(model.triangles());
+    REQUIRE_FALSE(bvh.nodes.empty());
+    REQUIRE_FALSE(bvh.triangles.empty());
+
+    {
+        pt::OutputFileStream       file("bvh.compressed");
+        pt::DeflatingStreamAdapter deflatingStream(file);
+        pt::serialize(deflatingStream, bvh);
+    }
+
+    {
+        pt::OutputFileStream file("bvh.uncompressed");
+        pt::serialize(file, bvh);
     }
 }
