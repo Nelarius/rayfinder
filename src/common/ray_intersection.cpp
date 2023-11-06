@@ -3,6 +3,7 @@
 #include "ray_intersection.hpp"
 
 #include <algorithm>
+#include <cassert>
 
 namespace pt
 {
@@ -116,10 +117,12 @@ bool rayIntersectBvh(
 {
     const RayAabbIntersector intersector(ray);
 
+    constexpr size_t STACK_SIZE = 32;
+
     uint32_t nodesVisited = 0;
     size_t   toVisitOffset = 0;
     size_t   currentNodeIdx = 0;
-    size_t   nodesToVisit[64];
+    size_t   nodesToVisit[STACK_SIZE];
     bool     didIntersect = false;
 
     while (true)
@@ -160,6 +163,7 @@ bool rayIntersectBvh(
                     nodesToVisit[toVisitOffset++] = node.secondChildOffset;
                     currentNodeIdx = currentNodeIdx + 1;
                 }
+                assert(toVisitOffset < STACK_SIZE);
             }
         }
         else
