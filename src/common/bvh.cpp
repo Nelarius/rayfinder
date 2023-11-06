@@ -57,7 +57,7 @@ void buildLeafNode(
     const Aabb&                         nodeAabb,
     const std::span<const Triangle>     triangles,
     const std::span<const BvhPrimitive> bvhPrimitives,
-    std::span<Triangle>                 orderedTriangles,
+    std::span<Triangle48>               orderedTriangles,
     const std::size_t                   orderedTrianglesOffset)
 {
     const std::size_t trianglesOffset = orderedTrianglesOffset;
@@ -65,7 +65,7 @@ void buildLeafNode(
     for (std::size_t spanIdx = 0; spanIdx < triangleCount; ++spanIdx)
     {
         const std::size_t triangleIdx = bvhPrimitives[spanIdx].triangleIdx;
-        orderedTriangles[trianglesOffset + spanIdx] = triangles[triangleIdx];
+        orderedTriangles[trianglesOffset + spanIdx] = Triangle48(triangles[triangleIdx]);
     }
     assert(trianglesOffset < std::numeric_limits<std::uint32_t>::max());
     assert(triangleCount < std::numeric_limits<std::uint32_t>::max());
@@ -80,7 +80,7 @@ std::size_t buildRecursive(
     const std::span<const Triangle> triangles,
     std::span<BvhPrimitive>         bvhPrimitives,
     std::vector<BvhNode>&           bvhNodes,
-    std::vector<Triangle>&          orderedTriangles,
+    std::vector<Triangle48>&        orderedTriangles,
     const std::size_t               orderedTrianglesOffset)
 {
     assert(triangles.size() == orderedTriangles.size());
@@ -277,8 +277,8 @@ Bvh buildBvh(std::span<const Triangle> triangles)
         });
     }
 
-    std::vector<Triangle> orderedTriangles(triangles.size());
-    std::vector<BvhNode>  bvhNodes;
+    std::vector<Triangle48> orderedTriangles(triangles.size());
+    std::vector<BvhNode>    bvhNodes;
     bvhNodes.reserve(1024);
 
     buildRecursive(triangles, bvhPrimitives, bvhNodes, orderedTriangles, 0);

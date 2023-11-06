@@ -7,7 +7,7 @@ namespace pt
 struct Aabb32;
 struct Bvh;
 struct Ray;
-struct Triangle;
+struct Triangle48;
 
 struct Intersection
 {
@@ -15,7 +15,11 @@ struct Intersection
     float     t;
 };
 
-bool rayIntersectTriangle(const Ray& ray, const Triangle& tri, float tMax, Intersection& intersect);
+bool rayIntersectTriangle(
+    const Ray&        ray,
+    const Triangle48& tri,
+    float             tMax,
+    Intersection&     intersect);
 
 struct RayAabbIntersector
 {
