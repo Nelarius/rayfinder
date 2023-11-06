@@ -220,7 +220,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
         const WGPUDeviceDescriptor deviceDesc{
             .nextInChain = nullptr,
             .label = "Device",
-            .requiredFeatureCount = 0,
+            .requiredFeaturesCount = 0,
             .requiredFeatures = nullptr,
             .requiredLimits = &requiredLimits,
             .defaultQueue = WGPUQueueDescriptor{.nextInChain = nullptr, .label = "Default queue"},
@@ -256,7 +256,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     }
 
     queue = wgpuDeviceGetQueue(device);
-    wgpuQueueOnSubmittedWorkDone(queue, onQueueWorkDone, nullptr);
+    wgpuQueueOnSubmittedWorkDone(queue, 0, onQueueWorkDone, nullptr);
 
     swapChain = createSwapChain(device, surface, swapChainFormat, framebufferSize);
 }

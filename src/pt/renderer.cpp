@@ -411,6 +411,7 @@ void Renderer::render(const GpuContext& gpuContext)
                 .colorAttachments = &renderPassColorAttachment,
                 .depthStencilAttachment = nullptr,
                 .occlusionQuerySet = nullptr,
+                .timestampWriteCount = 0,
                 .timestampWrites = nullptr,
             };
 

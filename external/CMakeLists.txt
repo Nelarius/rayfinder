@@ -22,7 +22,7 @@ FetchContent_Declare(glm GIT_REPOSITORY "https://github.com/g-truc/glm"
 
 FetchContent_Declare(webgpu
     GIT_REPOSITORY "https://github.com/eliemichel/WebGPU-distribution"
-    GIT_TAG dawn)
+    GIT_TAG 1058c7eba4fdad74adb87192eede272c0c69c39e) # dawn-branch, 2023-09-04
 
 # Fetch
 message(STATUS "Fetching Catch2...")
