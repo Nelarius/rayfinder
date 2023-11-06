@@ -22,7 +22,7 @@ int main()
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];
-        const Aabb      rootAabb = rootNode.aabb;
+        const Aabb      rootAabb = Aabb(rootNode.aabb.min, rootNode.aabb.max);
         const glm::vec3 rootDiagonal = diagonal(rootAabb);
         const glm::vec3 rootCentroid = centroid(rootAabb);
         const int       maxDim = maxDimension(rootAabb);

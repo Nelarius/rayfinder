@@ -4,7 +4,7 @@
 
 namespace pt
 {
-struct Aabb;
+struct Aabb32;
 struct Bvh;
 struct Ray;
 struct Triangle;
@@ -26,7 +26,7 @@ struct RayAabbIntersector
     explicit RayAabbIntersector(const Ray& ray);
 };
 
-bool rayIntersectAabb(const RayAabbIntersector& intersector, const Aabb& aabb, float rayTMax);
+bool rayIntersectAabb(const RayAabbIntersector& intersector, const Aabb32& aabb, float rayTMax);
 
 struct BvhStats
 {

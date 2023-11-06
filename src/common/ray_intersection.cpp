@@ -67,7 +67,10 @@ RayAabbIntersector::RayAabbIntersector(const Ray& ray)
     dirNeg[2] = static_cast<uint32_t>(invDir.z < 0.0f);
 }
 
-bool rayIntersectAabb(const RayAabbIntersector& intersector, const Aabb& aabb, const float rayTMax)
+bool rayIntersectAabb(
+    const RayAabbIntersector& intersector,
+    const Aabb32&             aabb,
+    const float               rayTMax)
 {
     const glm::vec3 bounds[2] = {aabb.min, aabb.max};
 

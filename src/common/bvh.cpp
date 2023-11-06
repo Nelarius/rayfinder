@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cassert>
-#include <limits>
 
 namespace pt
 {
@@ -31,22 +30,24 @@ void initLeafNode(
     BvhNode&            node,
     const Aabb&         bounds,
     const std::uint32_t trianglesOffset,
-    const std::uint16_t count)
+    const std::uint32_t count)
 {
-    node.aabb = bounds;
+    node.aabb = Aabb32(bounds);
+    node.secondChildOffset = 0;
     node.trianglesOffset = trianglesOffset;
     node.triangleCount = count;
-    node.splitAxis = static_cast<std::uint16_t>(-1);
+    node.splitAxis = static_cast<std::uint32_t>(-1);
 }
 
 void initInteriorNode(
     BvhNode&      node,
-    std::uint16_t axis,
+    std::uint32_t axis,
     std::uint32_t secondChildOffset,
-    Aabb          childAabb)
+    const Aabb&   childAabb)
 {
-    node.aabb = childAabb;
+    node.aabb = Aabb32(childAabb);
     node.secondChildOffset = secondChildOffset;
+    node.trianglesOffset = 0;
     node.triangleCount = 0;
     node.splitAxis = axis;
 }
@@ -67,12 +68,12 @@ void BuildLeafNode(
         orderedTriangles[trianglesOffset + spanIdx] = triangles[triangleIdx];
     }
     assert(trianglesOffset < std::numeric_limits<std::uint32_t>::max());
-    assert(triangleCount < std::numeric_limits<std::uint16_t>::max());
+    assert(triangleCount < std::numeric_limits<std::uint32_t>::max());
     initLeafNode(
         node,
         nodeAabb,
         static_cast<std::uint32_t>(trianglesOffset),
-        static_cast<std::uint16_t>(triangleCount));
+        static_cast<std::uint32_t>(triangleCount));
 }
 
 std::size_t buildRecursive(
@@ -251,7 +252,7 @@ std::size_t buildRecursive(
     assert(secondChildOffset < std::numeric_limits<std::uint32_t>::max());
     initInteriorNode(
         bvhNodes[currentNodeIdx],
-        static_cast<uint16_t>(splitAxis),
+        static_cast<std::uint32_t>(splitAxis),
         static_cast<std::uint32_t>(secondChildOffset),
         nodeAabb);
 

@@ -1,3 +1,4 @@
+#include <common/bvh.hpp>
 #include <common/geometry.hpp>
 #include <common/ray_intersection.hpp>
 
@@ -53,6 +54,10 @@ TEST_CASE("Aabb surface area", "[aabb]")
     REQUIRE(surfaceArea == Catch::Approx(24.0f));
 }
 
+// TODO: do these tests really belong among AABB tests? Aabb32 is an implementation detail of BVH,
+// and is defined in bvh.hpp. Perhaps bvh intersection testing definitions could be moved to
+// bvh.hpp, and the tests to bvh.cpp.
+
 TEST_CASE("Ray-Aabb intersection test", "[bvh]")
 {
     SECTION("Ray intersects x slab")
@@ -64,7 +69,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
 
         REQUIRE(intersects);
     }
@@ -78,7 +83,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, 0.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
 
         REQUIRE(intersects);
     }
@@ -92,7 +97,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, 0.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
 
         REQUIRE(intersects);
     }
@@ -106,7 +111,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
 
         REQUIRE(intersects);
     }
@@ -120,7 +125,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
+        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
 
         REQUIRE_FALSE(intersects);
     }
