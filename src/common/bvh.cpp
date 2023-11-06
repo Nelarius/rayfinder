@@ -52,7 +52,7 @@ void initInteriorNode(
     node.splitAxis = axis;
 }
 
-void BuildLeafNode(
+void buildLeafNode(
     BvhNode&                            node,
     const Aabb&                         nodeAabb,
     const std::span<const Triangle>     triangles,
@@ -109,7 +109,7 @@ std::size_t buildRecursive(
     if (surfaceArea(nodeAabb) == 0.0f ||
         centroidAabb.min[splitAxis] == centroidAabb.max[splitAxis] || primitiveCount == 1)
     {
-        BuildLeafNode(
+        buildLeafNode(
             bvhNodes[currentNodeIdx],
             nodeAabb,
             triangles,
@@ -221,7 +221,7 @@ std::size_t buildRecursive(
             }
             else
             {
-                BuildLeafNode(
+                buildLeafNode(
                     bvhNodes[currentNodeIdx],
                     nodeAabb,
                     triangles,
