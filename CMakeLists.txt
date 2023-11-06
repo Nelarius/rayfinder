@@ -46,8 +46,8 @@ add_custom_command(
     TARGET pt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${CMAKE_SOURCE_DIR}/src/pt/raytracer.wgsl
-    ${CMAKE_CURRENT_BINARY_DIR}/raytracer.wgsl
-    COMMENT "Copying raytracer.wgsl to the build folder"
+    $<TARGET_FILE_DIR:pt>/raytracer.wgsl
+    COMMENT "Copying $<TARGET_FILE_DIR:pt>/raytracer.wgsl"
 )
 
 # bvh-visualizer
@@ -57,7 +57,9 @@ add_custom_command(
     TARGET bvh-visualizer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
     ${CMAKE_SOURCE_DIR}/assets/Duck.glb
-    ${CMAKE_CURRENT_BINARY_DIR}/Duck.glb)
+    $<TARGET_FILE_DIR:bvh-visualizer>/Duck.glb
+    COMMENT "Copying $<TARGET_FILE_DIR:bvh-visualizer>/Duck.glb"
+)
 
 # tests
 set(TESTS_SOURCE_FILES
@@ -74,4 +76,6 @@ add_custom_command(
     TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
     ${CMAKE_SOURCE_DIR}/assets/Duck.glb
-    ${CMAKE_CURRENT_BINARY_DIR}/Duck.glb)
+    $<TARGET_FILE_DIR:tests>/Duck.glb
+    COMMENT "Copying $<TARGET_FILE_DIR:tests>/Duck.glb"
+)
