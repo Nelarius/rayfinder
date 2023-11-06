@@ -49,6 +49,13 @@ add_custom_command(
     $<TARGET_FILE_DIR:pt>/raytracer.wgsl
     COMMENT "Copying $<TARGET_FILE_DIR:pt>/raytracer.wgsl"
 )
+add_custom_command(
+    TARGET pt POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_SOURCE_DIR}/assets/Duck.glb
+    $<TARGET_FILE_DIR:pt>/Duck.glb
+    COMMENT "Copying $<TARGET_FILE_DIR:pt>/Duck.glb"
+)
 
 # bvh-visualizer
 add_executable(bvh-visualizer src/bvh-visualizer/main.cpp)

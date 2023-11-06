@@ -3,6 +3,9 @@
 #include "renderer.hpp"
 #include "window.hpp"
 
+#include <common/bvh.hpp>
+#include <common/gltf_model.hpp>
+
 #include <cassert>
 #include <chrono>
 #include <cstdio>
@@ -26,17 +29,43 @@ int main()
         pt::CameraController cameraController;
         pt::GpuContext       gpuContext(window.ptr(), pt::Renderer::wgpuRequiredLimits);
 
+        const pt::GltfModel model("Duck.glb");
+        const pt::Bvh       bvh = pt::buildBvh(model.triangles());
+
         const pt::RendererDescriptor rendererDesc{
-            .renderParams = [&window, &cameraController]() -> pt::RenderParameters {
+            .renderParams = [&window, &bvh]() -> pt::RenderParameters {
                 const pt::Extent2i framebufferSize = window.resolution();
                 return pt::RenderParameters{
                     .framebufferSize = pt::Extent2u(framebufferSize),
-                    .camera = cameraController.getCamera(framebufferSize),
+                    .camera = [&window, &bvh]() -> pt::Camera {
+                        const pt::Extent2i framebufferSize = window.resolution();
+                        const pt::BvhNode& rootNode = bvh.nodes[0];
+                        const pt::Aabb  rootAabb = pt::Aabb(rootNode.aabb.min, rootNode.aabb.max);
+                        const glm::vec3 rootDiagonal = diagonal(rootAabb);
+                        const glm::vec3 rootCentroid = centroid(rootAabb);
+                        const int       maxDim = maxDimension(rootAabb);
+
+                        const float     aperture = 0.0f;
+                        const float     focusDistance = 1.0f;
+                        const pt::Angle vfov = pt::Angle::degrees(70.0f);
+
+                        return createCamera(
+                            rootCentroid -
+                                glm::vec3(
+                                    -0.8 * rootDiagonal[maxDim], 0.0f, 0.8f * rootDiagonal[maxDim]),
+                            rootCentroid,
+                            aperture,
+                            focusDistance,
+                            vfov,
+                            framebufferSize.x,
+                            framebufferSize.y);
+                    }(),
                 };
             }(),
             .maxFramebufferSize = window.largestMonitorResolution(),
         };
-        pt::Renderer renderer(rendererDesc, gpuContext);
+
+        pt::Renderer renderer(rendererDesc, gpuContext, bvh);
 
         {
             pt::Extent2i curFramebufferSize = window.resolution();
@@ -82,10 +111,10 @@ int main()
                 // Render
 
                 {
-                    const pt::RenderParameters renderParams{
-                        .camera = cameraController.getCamera(curFramebufferSize),
-                    };
-                    renderer.setRenderParameters(renderParams);
+                    // const pt::RenderParameters renderParams{
+                    //     .camera = cameraController.getCamera(curFramebufferSize),
+                    // };
+                    // renderer.setRenderParameters(renderParams);
                     renderer.render(gpuContext);
                 }
 

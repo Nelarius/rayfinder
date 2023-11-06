@@ -23,7 +23,14 @@ fn vsMain(in: VertexInput) -> VertexOutput {
     return out;
 }
 
+// render params bind group
 @group(1) @binding(0) var<uniform> renderParams: RenderParams;
+
+// scene bind group
+// TODO: these are `read` only buffers. How can I create a buffer layout type which allows this?
+// Annotating these as read causes validation failures.
+@group(2) @binding(0) var<storage, read_write> bvhNodes: array<BvhNode>;
+@group(2) @binding(1) var<storage, read_write> triangles: array<Triangle>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
@@ -33,8 +40,8 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let dimensions = renderParams.frameData.dimensions;
     let frameCount = renderParams.frameData.frameCount;
 
-    let j =  u32(u * f32(dimensions.x));
-    let i =  u32(v * f32(dimensions.y));
+    let j = u32(u * f32(dimensions.x));
+    let i = u32(v * f32(dimensions.y));
 
     var rngState = initRng(vec2(j, i), dimensions, frameCount);
 
@@ -44,10 +51,12 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     return vec4f(rgb, 1f);
 }
 
+const EPSILON = 0.00001f;
+
 const PI = 3.1415927f;
 
 const T_MIN = 0.001f;
-const T_MAX = 1000f;
+const T_MAX = 10000f;
 
 struct RenderParams {
   frameData: FrameData,
@@ -67,9 +76,23 @@ struct Camera {
     lensRadius: f32,
 }
 
-struct Sphere {
-    center: vec3f,
-    radius: f32,
+struct Aabb {
+    min: vec3f,
+    max: vec3f,
+}
+
+struct BvhNode {
+    aabb: Aabb,
+    trianglesOffset: u32,
+    secondChildOffset: u32,
+    triangleCount: u32,
+    splitAxis: u32,
+}
+
+struct Triangle {
+    v0: vec3f,
+    v1: vec3f,
+    v2: vec3f,
 }
 
 struct Ray {
@@ -85,36 +108,14 @@ struct Intersection {
 
 fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var ray = primaryRay;
-    var color = vec3f(0f, 0f, 0f);
-    var closestIntersect = Intersection();
 
-    let spheres = array<Sphere, 4>(
-        Sphere(vec3f(0.0, -500.0, -1.0), 500.0),
-        Sphere(vec3f(0.0, 1.0, 0.0), 1.0),
-        Sphere(vec3f(-5.0, 1.0, 0.0), 1.0),
-        Sphere(vec3f(5.0, 1.0, 0.0), 1.0)
-    );
+    let unitDirection = normalize(ray.direction);
+    let t = 0.5f * (unitDirection.y + 1f);
+    var color = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
 
-    var tClosest = T_MAX;
-    var testIntersect = Intersection();
-    var hit = false;
-    for (var idx = 0u; idx < 4u; idx = idx + 1u) {
-        let sphere = spheres[idx];
-        if rayIntersectSphere(ray, sphere, T_MIN, T_MAX, &testIntersect) {
-            if testIntersect.t < tClosest {
-                tClosest = testIntersect.t;
-                closestIntersect = testIntersect;
-                hit = true;
-            }
-        }
-    }
-
-    if hit {
-        color = 0.5f * (vec3f(1f, 1f, 1f) + closestIntersect.n);
-    } else {
-        let unitDirection = normalize(ray.direction);
-        let t = 0.5f * (unitDirection.y + 1f);
-        color = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
+    var intersection = Intersection();
+    if rayIntersectBvh(ray, T_MAX, &intersection) {
+        color = 0.5f * (vec3f(1f, 1f, 1f) + intersection.n);
     }
 
     return color;
@@ -127,39 +128,143 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
     return Ray(origin, direction);
 }
 
-fn rayIntersectSphere(ray: Ray, sphere: Sphere, tmin: f32, tmax: f32, hit: ptr<function, Intersection>) -> bool {
-    let oc = ray.origin - sphere.center;
-    let a = dot(ray.direction, ray.direction);
-    let b = dot(oc, ray.direction);
-    let c = dot(oc, oc) - sphere.radius * sphere.radius;
-    let discriminant = b * b - a * c;
+fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
+    let intersector = rayAabbIntersector(ray);
+    var toVisitOffset: u32 = 0;
+    var currentNodeIdx: u32 = 0;
+    var nodesToVisit: array<u32, 32u>;
+    var didIntersect: bool = false;
+    var tmax = rayTMax;
 
-    if discriminant > 0f {
-        var t = (-b - sqrt(b * b - a * c)) / a;
-        if t < tmax && t > tmin {
-            *hit = sphereIntersection(ray, sphere, t);
-            return true;
-        }
+    loop {
+        let node: BvhNode = bvhNodes[currentNodeIdx];
 
-        t = (-b + sqrt(b * b - a * c)) / a;
-        if t < tmax && t > tmin {
-            *hit = sphereIntersection(ray, sphere, t);
-            return true;
+        if (rayIntersectAabb(intersector, node.aabb, tmax)) {
+            if (node.triangleCount > 0) {
+                for (var idx: u32 = 0; idx < node.triangleCount; idx = idx + 1) {
+                    let triangle: Triangle = triangles[node.trianglesOffset + idx];
+                    if (rayIntersectTriangle(ray, triangle, tmax, hit)) {
+                        tmax = (*hit).t;
+                        didIntersect = true;
+                    }
+                }
+                if (toVisitOffset == 0) {
+                    break;
+                }
+                toVisitOffset -= 1;
+                currentNodeIdx = nodesToVisit[toVisitOffset];
+            } else {
+                // Is intersector.invDir[node.splitAxis] < 0f? If so, visit second child first.
+                if (intersector.dirNeg[node.splitAxis] == 1u) {
+                    nodesToVisit[toVisitOffset] = currentNodeIdx + 1;
+                    currentNodeIdx = node.secondChildOffset;
+                } else {
+                    nodesToVisit[toVisitOffset] = node.secondChildOffset;
+                    currentNodeIdx = currentNodeIdx + 1;
+                }
+                toVisitOffset += 1;
+            }
+        } else {
+            if (toVisitOffset == 0) {
+                break;
+            }
+            toVisitOffset -= 1;
+            currentNodeIdx = nodesToVisit[toVisitOffset];
         }
     }
 
-    return false;
+    return didIntersect;
 }
 
-fn sphereIntersection(ray: Ray, sphere: Sphere, t: f32) -> Intersection {
-    let p = rayPointAtParameter(ray, t);
-    let n = (1f / sphere.radius) * (p - sphere.center);
-    let theta = acos(-n.y);
-    let phi = atan2(-n.z, n.x) + PI;
-
-    return Intersection(p, n, t);
+struct RayAabbIntersector {
+    origin: vec3f,
+    invDir: vec3f,
+    dirNeg: vec3u,
 }
 
+@must_use
+fn rayAabbIntersector(ray: Ray) -> RayAabbIntersector {
+    let invDirection = vec3f(1f / ray.direction.x, 1f / ray.direction.y, 1f / ray.direction.z);
+    return RayAabbIntersector(
+        ray.origin,
+        invDirection,
+        vec3u(select(0u, 1u, (invDirection.x < 0f)), select(0u, 1u, (invDirection.y < 0f)), select(0u, 1u, (invDirection.z < 0f)))
+    );
+}
+
+@must_use
+fn rayIntersectAabb(intersector: RayAabbIntersector, aabb: Aabb, rayTMax: f32) -> bool {
+    let bounds: array<vec3f, 2> = array(aabb.min, aabb.max);
+
+    var tmin: f32 = (bounds[intersector.dirNeg[0]].x - intersector.origin.x) * intersector.invDir.x;
+    var tmax: f32 = (bounds[1u - intersector.dirNeg[0]].x - intersector.origin.x) * intersector.invDir.x;
+
+    let tymin = (bounds[intersector.dirNeg[1]].y - intersector.origin.y) * intersector.invDir.y;
+    let tymax = (bounds[1 - intersector.dirNeg[1]].y - intersector.origin.y) * intersector.invDir.y;
+
+    if (tmin > tymax) || (tymin > tmax) {
+        return false;
+    }
+
+    tmin = max(tymin, tmin);
+    tmax = min(tymax, tmax);
+
+    let tzmin = (bounds[intersector.dirNeg[2]].z - intersector.origin.z) * intersector.invDir.z;
+    let tzmax = (bounds[1 - intersector.dirNeg[2]].z - intersector.origin.z) * intersector.invDir.z;
+
+    if (tmin > tzmax) || (tzmin > tmax) {
+        return false;
+    }
+
+    tmin = max(tzmin, tmin);
+    tmax = min(tzmax, tmax);
+
+    return (tmin < rayTMax) && (tmax > 0.0);
+}
+
+fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, Intersection>) -> bool {
+    // Mäller-Trumbore algorithm
+    // https://en.wikipedia.org/wiki/Möller–Trumbore_intersection_algorithm
+    let e1 = tri.v1 - tri.v0;
+    let e2 = tri.v2 - tri.v0;
+
+    let h = cross(ray.direction, e2);
+    let det = dot(e1, h);
+
+    if det > -EPSILON && det < EPSILON {
+        return false;
+    }
+
+    let invDet = 1.0f / det;
+    let s = ray.origin - tri.v0;
+    let u = invDet * dot(s, h);
+
+    if u < 0.0f || u > 1.0f {
+        return false;
+    }
+
+    let q = cross(s, e1);
+    let v = invDet * dot(ray.direction, q);
+
+    if v < 0.0f || u + v > 1.0f {
+        return false;
+    }
+
+    let t = invDet * dot(e2, q);
+
+    if t > EPSILON && t < tmax {
+        *hit = Intersection(
+            rayPointAtParameter(ray, t),    // p
+            normalize(cross(e1, e2)),       // n
+            t                               // t
+        );
+        return true;
+    } else {
+        return false;
+    }
+}
+
+@must_use
 fn rayPointAtParameter(ray: Ray, t: f32) -> vec3f {
     return ray.origin + t * ray.direction;
 }

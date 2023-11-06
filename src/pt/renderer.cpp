@@ -1,6 +1,8 @@
 #include "gpu_context.hpp"
 #include "renderer.hpp"
 
+#include <common/bvh.hpp>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -97,7 +99,10 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 }
 } // namespace
 
-Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpuContext)
+Renderer::Renderer(
+    const RendererDescriptor& rendererDesc,
+    const GpuContext&         gpuContext,
+    const Bvh&                bvh)
     : vertexBuffer(),
       uniformsBuffer(),
       uniformsBindGroup(nullptr),
@@ -107,6 +112,17 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(RenderParamsLayout)),
       renderParamsBindGroup(nullptr),
+      bvhNodeBuffer(
+          gpuContext.device,
+          "bvh nodes buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+          std::span<const BvhNode>(bvh.nodes)),
+      triangleBuffer(
+          gpuContext.device,
+          "triangles buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+          std::span<const Triangle48>(bvh.triangles)),
+      sceneBindGroup(nullptr),
       renderPipeline(nullptr),
       currentRenderParams(rendererDesc.renderParams),
       frameCount(0)
@@ -265,9 +281,29 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         const WGPUBindGroupLayout renderParamsBindGroupLayout =
             wgpuDeviceCreateBindGroupLayout(gpuContext.device, &renderParamsBindGroupLayoutDesc);
 
-        std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
+        // scene bind group layout
+
+        const std::array<WGPUBindGroupLayoutEntry, 2> sceneBindGroupLayoutEntries{
+            bvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            triangleBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+        };
+
+        const WGPUBindGroupLayoutDescriptor sceneBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "scene bind group layout",
+            .entryCount = sceneBindGroupLayoutEntries.size(),
+            .entries = sceneBindGroupLayoutEntries.data(),
+        };
+
+        const WGPUBindGroupLayout sceneBindGroupLayout =
+            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &sceneBindGroupLayoutDesc);
+
+        // pipeline layout
+
+        std::array<WGPUBindGroupLayout, 3> bindGroupLayouts{
             uniformsBindGroupLayout,
             renderParamsBindGroupLayout,
+            sceneBindGroupLayout,
         };
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
@@ -305,6 +341,22 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         };
         renderParamsBindGroup =
             wgpuDeviceCreateBindGroup(gpuContext.device, &renderParamsBindGroupDesc);
+
+        // scene bind group
+
+        const std::array<WGPUBindGroupEntry, 2> sceneBindGroupEntries{
+            bvhNodeBuffer.bindGroupEntry(0),
+            triangleBuffer.bindGroupEntry(1),
+        };
+
+        const WGPUBindGroupDescriptor sceneBindGroupDesc{
+            .nextInChain = nullptr,
+            .label = "scene bind group",
+            .layout = sceneBindGroupLayout,
+            .entryCount = sceneBindGroupEntries.size(),
+            .entries = sceneBindGroupEntries.data(),
+        };
+        sceneBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &sceneBindGroupDesc);
 
         const WGPURenderPipelineDescriptor pipelineDesc{
             .nextInChain = nullptr,
@@ -351,6 +403,8 @@ Renderer::~Renderer()
 {
     renderPipelineSafeRelease(renderPipeline);
     renderPipeline = nullptr;
+    bindGroupSafeRelease(sceneBindGroup);
+    sceneBindGroup = nullptr;
     bindGroupSafeRelease(renderParamsBindGroup);
     renderParamsBindGroup = nullptr;
     bindGroupSafeRelease(uniformsBindGroup);
@@ -423,6 +477,7 @@ void Renderer::render(const GpuContext& gpuContext)
             wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, uniformsBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetBindGroup(
                 renderPassEncoder, 1, renderParamsBindGroup, 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 2, sceneBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);

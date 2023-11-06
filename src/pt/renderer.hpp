@@ -11,6 +11,7 @@
 
 namespace pt
 {
+struct Bvh;
 struct GpuContext;
 
 struct RenderParameters
@@ -32,12 +33,15 @@ struct Renderer
     WGPUBindGroup      uniformsBindGroup;
     GpuBuffer          renderParamsBuffer;
     WGPUBindGroup      renderParamsBindGroup;
+    GpuBuffer          bvhNodeBuffer;
+    GpuBuffer          triangleBuffer;
+    WGPUBindGroup      sceneBindGroup;
     WGPURenderPipeline renderPipeline;
 
     RenderParameters currentRenderParams;
     std::uint32_t    frameCount;
 
-    Renderer(const RendererDescriptor&, const GpuContext&);
+    Renderer(const RendererDescriptor&, const GpuContext&, const Bvh& bvh);
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);
