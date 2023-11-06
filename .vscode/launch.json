@@ -35,7 +35,7 @@
             "program": "${workspaceFolder}/build/Debug/pt.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/build/Debug",
             "environment": [],
             "console": "externalTerminal"
         },
