@@ -174,7 +174,7 @@ Renderer::Renderer(const RendererDescriptor& rendererDesc, const GpuContext& gpu
         // Shader modules
 
         auto loadShaderSource = [](std::string_view path) -> std::string {
-            std::ifstream file(path);
+            std::ifstream file(path.data());
             if (!file)
             {
                 throw std::runtime_error(std::format("Error opening file: {}.", path));
@@ -411,7 +411,6 @@ void Renderer::render(const GpuContext& gpuContext)
                 .colorAttachments = &renderPassColorAttachment,
                 .depthStencilAttachment = nullptr,
                 .occlusionQuerySet = nullptr,
-                .timestampWriteCount = 0,
                 .timestampWrites = nullptr,
             };
 
