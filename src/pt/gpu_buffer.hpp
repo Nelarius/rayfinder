@@ -64,12 +64,10 @@ GpuBuffer::GpuBuffer(
     const WGPUBufferUsageFlags usage,
     const std::span<const T>   data)
     : mBuffer(nullptr),
-      mByteSize(0),
+      mByteSize(sizeof(T) * data.size()),
       mUsage(usage)
 {
     assert(device != nullptr);
-
-    mByteSize = sizeof(T) * data.size();
 
     const WGPUBufferDescriptor bufferDesc{
         .nextInChain = nullptr,

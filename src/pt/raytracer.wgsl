@@ -269,12 +269,14 @@ fn rayPointAtParameter(ray: Ray, t: f32) -> vec3f {
     return ray.origin + t * ray.direction;
 }
 
+@must_use
 fn initRng(pixel: vec2u, resolution: vec2u, frame: u32) -> u32 {
     // Adapted from https://github.com/boksajak/referencePT
     let seed = dot(pixel, vec2u(1u, resolution.x)) ^ jenkinsHash(frame);
     return jenkinsHash(seed);
 }
 
+@must_use
 fn jenkinsHash(input: u32) -> u32 {
     var x = input;
     x += x << 10u;

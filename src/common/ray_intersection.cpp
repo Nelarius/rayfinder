@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 
 namespace pt
 {
@@ -63,9 +64,9 @@ RayAabbIntersector::RayAabbIntersector(const Ray& ray)
 {
     origin = ray.origin;
     invDir = 1.0f / ray.direction;
-    dirNeg[0] = static_cast<uint32_t>(invDir.x < 0.0f);
-    dirNeg[1] = static_cast<uint32_t>(invDir.y < 0.0f);
-    dirNeg[2] = static_cast<uint32_t>(invDir.z < 0.0f);
+    dirNeg[0] = static_cast<std::uint32_t>(invDir.x < 0.0f);
+    dirNeg[1] = static_cast<std::uint32_t>(invDir.y < 0.0f);
+    dirNeg[2] = static_cast<std::uint32_t>(invDir.z < 0.0f);
 }
 
 bool rayIntersectAabb(
@@ -117,13 +118,13 @@ bool rayIntersectBvh(
 {
     const RayAabbIntersector intersector(ray);
 
-    constexpr size_t STACK_SIZE = 32;
+    constexpr std::size_t STACK_SIZE = 32;
 
-    uint32_t nodesVisited = 0;
-    size_t   toVisitOffset = 0;
-    size_t   currentNodeIdx = 0;
-    size_t   nodesToVisit[STACK_SIZE];
-    bool     didIntersect = false;
+    std::uint32_t nodesVisited = 0;
+    std::size_t   toVisitOffset = 0;
+    std::size_t   currentNodeIdx = 0;
+    std::size_t   nodesToVisit[STACK_SIZE];
+    bool          didIntersect = false;
 
     while (true)
     {
@@ -136,7 +137,7 @@ bool rayIntersectBvh(
             if (node.triangleCount > 0)
             {
                 // Check for intersection with primitives in BVH node
-                for (size_t idx = 0; idx < node.triangleCount; ++idx)
+                for (std::size_t idx = 0; idx < node.triangleCount; ++idx)
                 {
                     const Triangle48& triangle = bvh.triangles[node.trianglesOffset + idx];
                     if (rayIntersectTriangle(ray, triangle, rayTMax, intersect))
