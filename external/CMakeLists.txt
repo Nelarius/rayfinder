@@ -20,6 +20,9 @@ FetchContent_Declare(glfw3webgpu
 FetchContent_Declare(glm GIT_REPOSITORY "https://github.com/g-truc/glm"
     GIT_TAG bf71a834948186f4097caa076cd2663c69a10e1e) # v.0.9.9.8
 
+FetchContent_Declare(imgui GIT_REPOSITORY "https://github.com/ocornut/imgui"
+    GIT_TAG c6e0284ac58b3f205c95365478888f7b53b077e2) # v1.89.9
+
 FetchContent_Declare(webgpu
     GIT_REPOSITORY "https://github.com/eliemichel/WebGPU-distribution"
     GIT_TAG 1058c7eba4fdad74adb87192eede272c0c69c39e) # dawn-branch, 2023-09-04
@@ -41,6 +44,10 @@ FetchContent_MakeAvailable(glfw3webgpu)
 message(STATUS "Fetching glm...")
 FetchContent_MakeAvailable(glm)
 
+message(STATUS "Fetcing imgui...")
+FetchContent_MakeAvailable(imgui)
+set(IMGUI_SOURCE_DIR ${imgui_SOURCE_DIR})
+
 message(STATUS "Fetching WebGPU...")
 FetchContent_MakeAvailable(webgpu)
 
@@ -48,3 +55,17 @@ FetchContent_MakeAvailable(webgpu)
 
 # cgltf
 set(CGLTF_INCLUDE_DIR ${CGLTF_SOURCE_DIR} CACHE INTERNAL "cgltf Include Directory")
+
+# imgui
+set(IMGUI_INCLUDE_DIR ${IMGUI_SOURCE_DIR} CACHE INTERNAL "imgui Include Directory")
+add_library(imgui STATIC
+    ${IMGUI_SOURCE_DIR}/imgui.cpp
+    ${IMGUI_SOURCE_DIR}/imgui_demo.cpp
+    ${IMGUI_SOURCE_DIR}/imgui_draw.cpp
+    ${IMGUI_SOURCE_DIR}/imgui_widgets.cpp
+    ${IMGUI_SOURCE_DIR}/imgui_tables.cpp
+    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_wgpu.cpp
+    ${IMGUI_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+)
+target_include_directories(imgui PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
+target_link_libraries(imgui PRIVATE glfw webgpu)
