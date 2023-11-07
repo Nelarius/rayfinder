@@ -55,6 +55,7 @@ int main()
 
         {
             pt::Extent2i curFramebufferSize = window.resolution();
+            float        vfovDegrees = 80.0f;
             while (!glfwWindowShouldClose(window.ptr()))
             {
                 // Non-standard Dawn way to ensure that Dawn checks that whether the async operation
@@ -78,8 +79,33 @@ int main()
                 window.beginFrame();
 
                 {
-                    ImGui::Begin("Hello, GUI");
-                    ImGui::Text("Hello, GUI!");
+                    ImGui::Begin("Settings");
+                    ImGui::Text("Parameters");
+                    ImGui::SliderFloat(
+                        "camera speed",
+                        &cameraController.speed(),
+                        0.05f,
+                        100.0f,
+                        "%.2f",
+                        ImGuiSliderFlags_Logarithmic);
+                    ImGui::SliderFloat("camera vfov", &vfovDegrees, 10.0f, 120.0f);
+                    cameraController.vfov() = pt::Angle::degrees(vfovDegrees);
+
+                    ImGui::Separator();
+                    ImGui::Text("Scene");
+                    {
+                        const pt::BvhNode& rootNode = bvh.nodes[0];
+                        const glm::vec3    rootCenter = centroid(rootNode.aabb);
+                        const glm::vec3    camPos = cameraController.position();
+                        ImGui::Text(
+                            "camera position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
+                        ImGui::Text(
+                            "root centroid: (%.2f, %.2f, %.2f)",
+                            rootCenter.x,
+                            rootCenter.y,
+                            rootCenter.z);
+                    }
+
                     ImGui::End();
                 }
 

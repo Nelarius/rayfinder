@@ -22,6 +22,12 @@ public:
     void lookAt(const glm::vec3& p);
     void update(GLFWwindow* window, float dt);
 
+    // Accessors
+
+    float&           speed() { return mSpeed; }
+    Angle&           vfov() { return mVfov; }
+    const glm::vec3& position() const { return mPosition; }
+
 private:
     // Camera orientation and physical characteristics
 
