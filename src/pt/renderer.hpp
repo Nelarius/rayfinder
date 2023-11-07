@@ -45,6 +45,7 @@ struct Renderer
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);
+    void beginFrame();
     void render(const GpuContext&);
 
     static constexpr WGPURequiredLimits wgpuRequiredLimits{

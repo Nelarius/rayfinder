@@ -1,6 +1,8 @@
 #include "window.hpp"
 
 #include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
 
 #include <cassert>
 #include <format>
@@ -35,10 +37,18 @@ Window::Window(const WindowDescriptor& windowDesc)
     {
         throw std::runtime_error("Failed to create GLFW window.");
     }
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    ImGui_ImplGlfw_InitForOther(mWindow, true);
 }
 
 Window::~Window()
 {
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
     if (mWindow)
     {
         glfwDestroyWindow(mWindow);
@@ -96,5 +106,11 @@ Extent2i Window::largestMonitorResolution() const
     }
 
     return maxResolution;
+}
+
+void Window::beginFrame()
+{
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
 }
 } // namespace pt

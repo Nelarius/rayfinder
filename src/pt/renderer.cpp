@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui_impl_wgpu.h>
 
 #include <array>
 #include <cassert>
@@ -397,6 +398,16 @@ Renderer::Renderer(
 
         renderPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
     }
+
+    {
+        const int               swapchainFramesInFlight = 3;
+        const WGPUTextureFormat depthStencilTextureFormat = WGPUTextureFormat_Undefined;
+        ImGui_ImplWGPU_Init(
+            gpuContext.device,
+            swapchainFramesInFlight,
+            GpuContext::swapChainFormat,
+            depthStencilTextureFormat);
+    }
 }
 
 Renderer::~Renderer()
@@ -415,6 +426,8 @@ void Renderer::setRenderParameters(const RenderParameters& renderParams)
 {
     currentRenderParams = renderParams;
 }
+
+void Renderer::beginFrame() { ImGui_ImplWGPU_NewFrame(); }
 
 void Renderer::render(const GpuContext& gpuContext)
 {
@@ -482,6 +495,9 @@ void Renderer::render(const GpuContext& gpuContext)
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
         }
+
+        ImGui::Render();
+        ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPassEncoder);
 
         wgpuRenderPassEncoderEnd(renderPassEncoder);
     }

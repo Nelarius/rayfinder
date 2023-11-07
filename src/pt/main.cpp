@@ -13,6 +13,7 @@
 
 #include <GLFW/glfw3.h>
 #include <glfw3webgpu.h>
+#include <imgui.h>
 #include <webgpu/webgpu.h>
 
 inline constexpr int defaultWindowWidth = 640;
@@ -40,7 +41,7 @@ int main()
         }
 
         const pt::RendererDescriptor rendererDesc{
-            .renderParams = [&window, &bvh, &cameraController]() -> pt::RenderParameters {
+            .renderParams = [&window, &cameraController]() -> pt::RenderParameters {
                 const pt::Extent2i framebufferSize = window.resolution();
                 return pt::RenderParameters{
                     .framebufferSize = pt::Extent2u(framebufferSize),
@@ -71,6 +72,17 @@ int main()
                     }
                 }
 
+                // ImGui
+
+                renderer.beginFrame();
+                window.beginFrame();
+
+                {
+                    ImGui::Begin("Hello, GUI");
+                    ImGui::Text("Hello, GUI!");
+                    ImGui::End();
+                }
+
                 // Update
 
                 {
@@ -79,7 +91,11 @@ int main()
                         glfwSetWindowShouldClose(window.ptr(), GLFW_TRUE);
                     }
 
-                    cameraController.update(window.ptr(), 0.0167f);
+                    // Skip input if ImGui captured input
+                    if (!ImGui::GetIO().WantCaptureMouse)
+                    {
+                        cameraController.update(window.ptr(), 0.0167f);
+                    }
                 }
 
                 // Render
