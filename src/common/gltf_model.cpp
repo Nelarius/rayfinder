@@ -25,18 +25,26 @@ void traverseNodeHierarchy(
     const glm::mat4&        parentTransform,
     std::vector<glm::mat4>& transforms)
 {
-    // TODO: what if node->has_matrix is set?
-    // NOTE: in that case, node->rotation, node->scale, and node->translation are identity
-    // operations, and the matrix should be used instead.
-    const glm::quat& q = *reinterpret_cast<const glm::quat*>(node->rotation);
-    const glm::mat4  scale =
-        glm::scale(glm::mat4(1.0), glm::vec3(node->scale[0], node->scale[1], node->scale[2]));
-    const glm::mat4 rotation = glm::toMat4(q);
-    const glm::mat4 translation = glm::translate(
-        glm::mat4(1.0),
-        glm::vec3(node->translation[0], node->translation[1], node->translation[2]));
 
-    const glm::mat4 transform = parentTransform * translation * rotation * scale;
+    const glm::mat4 local = [node]() -> glm::mat4 {
+        if (node->has_matrix)
+        {
+            return *reinterpret_cast<const glm::mat4*>(node->matrix);
+        }
+        else
+        {
+            const glm::quat& q = *reinterpret_cast<const glm::quat*>(node->rotation);
+            const glm::mat4  scale = glm::scale(
+                glm::mat4(1.0), glm::vec3(node->scale[0], node->scale[1], node->scale[2]));
+            const glm::mat4 rotation = glm::toMat4(q);
+            const glm::mat4 translation = glm::translate(
+                glm::mat4(1.0),
+                glm::vec3(node->translation[0], node->translation[1], node->translation[2]));
+            return translation * rotation * scale;
+        }
+    }();
+
+    const glm::mat4 transform = parentTransform * local;
 
     if (node->mesh != nullptr)
     {
