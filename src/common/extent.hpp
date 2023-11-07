@@ -30,6 +30,12 @@ using Extent2i = Extent2<std::int32_t>;
 using Extent2u = Extent2<std::uint32_t>;
 
 template<typename T>
+constexpr float aspectRatio(const Extent2<T>& extent) noexcept
+{
+    return static_cast<float>(extent.x) / static_cast<float>(extent.y);
+}
+
+template<typename T>
 constexpr bool operator==(const Extent2<T>& lhs, const Extent2<T>& rhs) noexcept
 {
     return lhs.x == rhs.x && lhs.y == rhs.y;

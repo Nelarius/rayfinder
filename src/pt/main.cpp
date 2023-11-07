@@ -57,8 +57,7 @@ int main()
                             aperture,
                             focusDistance,
                             vfov,
-                            framebufferSize.x,
-                            framebufferSize.y);
+                            pt::aspectRatio(framebufferSize));
                     }(),
                 };
             }(),

@@ -8,11 +8,8 @@ Camera createCamera(
     const float     aperture,
     const float     focusDistance,
     const Angle     vfov,
-    const int       viewportWidth,
-    const int       viewportHeight)
+    const float     aspectRatio)
 {
-    const float aspectRatio =
-        static_cast<float>(viewportWidth) / static_cast<float>(viewportHeight);
     const float theta = vfov.as_radians();
     const float halfHeight = glm::tan(0.5f * theta);
     const float halfWidth = aspectRatio * halfHeight;

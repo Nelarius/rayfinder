@@ -16,14 +16,14 @@ struct Camera
     float     lensRadius;
 };
 
+// `aspectRatio` is defined as (width / height).
 Camera createCamera(
     glm::vec3 origin,
     glm::vec3 lookAt,
     float     aperture,
     float     focusDistance,
     Angle     vfov,
-    int       viewportWidth,
-    int       viewportHeight);
+    float     aspectRatio);
 
 // (u, v) are in [0, 1] range, where (0, 0) is the lower left corner and (1, 1) is the upper right
 // corner.

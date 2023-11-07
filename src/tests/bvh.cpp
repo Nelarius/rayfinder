@@ -56,8 +56,6 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
         const float aperture = 0.0f;
         const float focusDistance = 1.0f;
         const Angle vfov = Angle::degrees(70.0f);
-        const int   viewportWidth = 1;
-        const int   viewportHeight = 1;
 
         return createCamera(
             rootCentroid -
@@ -66,8 +64,7 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
             aperture,
             focusDistance,
             vfov,
-            viewportWidth,
-            viewportHeight);
+            1.0f);
     }();
 
     const float rayTMax = 1000.0f;

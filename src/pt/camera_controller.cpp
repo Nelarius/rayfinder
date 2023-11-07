@@ -25,8 +25,7 @@ Camera CameraController::getCamera(const Extent2i& windowSize) const
         aperture,
         focusDistance,
         vfov,
-        windowSize.x,
-        windowSize.y);
+        aspectRatio(windowSize));
 }
 
 void CameraController::update(const float dt)
