@@ -17,6 +17,16 @@ Camera FlyCameraController::getCamera() const
         aspectRatio(windowSize));
 }
 
+void FlyCameraController::lookAt(const glm::vec3& p)
+{
+    const glm::vec3 d = p - position;
+    const float     r = glm::length(d);
+    const float     x = std::atan2(d.z, d.x);
+    const float     y = std::asin(d.y / r);
+    yaw = Angle::radians(x);
+    pitch = Angle::radians(y);
+}
+
 void FlyCameraController::update(const float dt, const MousePos& mousePos)
 {
     if (mouseLookPressed)

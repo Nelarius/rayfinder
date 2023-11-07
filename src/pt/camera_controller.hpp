@@ -24,9 +24,10 @@ public:
 
     Camera getCamera() const;
 
+    void lookAt(const glm::vec3& p);
     void update(float dt, const MousePos&);
 
-    float speed = 0.8f;
+    float speed = 100.0f;
     bool  leftPressed = false;
     bool  rightPressed = false;
     bool  forwardPressed = false;
@@ -40,7 +41,7 @@ public:
     std::optional<MousePos> lastMousePos = std::nullopt;
 
 private:
-    glm::vec3 position = glm::vec3(-19.0f, 2.0f, -8.0f);
+    glm::vec3 position = glm::vec3(716.0f, 157.0f, -794.0f);
     Angle     yaw = Angle::degrees(25.0f);
     Angle     pitch = Angle::degrees(-5.0f);
     Angle     vfov = Angle::degrees(80.0f);

@@ -26,11 +26,18 @@ int main()
     }};
 
     {
+        const pt::GltfModel model("Duck.glb");
+        const pt::Bvh       bvh = pt::buildBvh(model.triangles());
+
         pt::FlyCameraController cameraController;
         pt::GpuContext          gpuContext(window.ptr(), pt::Renderer::wgpuRequiredLimits);
 
-        const pt::GltfModel model("Duck.glb");
-        const pt::Bvh       bvh = pt::buildBvh(model.triangles());
+        {
+            const pt::BvhNode& rootNode = bvh.nodes[0];
+            const glm::vec3    rootCentroid = centroid(rootNode.aabb);
+
+            cameraController.lookAt(rootCentroid);
+        }
 
         const pt::RendererDescriptor rendererDesc{
             .renderParams = [&window, &bvh, &cameraController]() -> pt::RenderParameters {
