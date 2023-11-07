@@ -25,7 +25,7 @@ public:
 private:
     // Camera orientation and physical characteristics
 
-    glm::vec3 mPosition = glm::vec3(716.0f, 157.0f, -794.0f);
+    glm::vec3 mPosition = glm::vec3(8.0f, 2.8f, -8.3f);
     Angle     mYaw = Angle::degrees(25.0f);
     Angle     mPitch = Angle::degrees(-5.0f);
     Angle     mVfov = Angle::degrees(80.0f);
@@ -34,7 +34,7 @@ private:
 
     // Input state
 
-    float mSpeed = 100.0f;
+    float mSpeed = 5.0f;
     bool  mLeftPressed = false;
     bool  mRightPressed = false;
     bool  mForwardPressed = false;
