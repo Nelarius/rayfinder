@@ -130,8 +130,8 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
 
 fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
     let intersector = rayAabbIntersector(ray);
-    var toVisitOffset: u32 = 0;
-    var currentNodeIdx: u32 = 0;
+    var toVisitOffset = 0u;
+    var currentNodeIdx = 0u;
     var nodesToVisit: array<u32, 32u>;
     var didIntersect: bool = false;
     var tmax = rayTMax;
@@ -139,36 +139,36 @@ fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> 
     loop {
         let node: BvhNode = bvhNodes[currentNodeIdx];
 
-        if (rayIntersectAabb(intersector, node.aabb, tmax)) {
-            if (node.triangleCount > 0) {
-                for (var idx: u32 = 0; idx < node.triangleCount; idx = idx + 1) {
+        if rayIntersectAabb(intersector, node.aabb, tmax) {
+            if node.triangleCount > 0u {
+                for (var idx = 0u; idx < node.triangleCount; idx = idx + 1u) {
                     let triangle: Triangle = triangles[node.trianglesOffset + idx];
-                    if (rayIntersectTriangle(ray, triangle, tmax, hit)) {
+                    if rayIntersectTriangle(ray, triangle, tmax, hit) {
                         tmax = (*hit).t;
                         didIntersect = true;
                     }
                 }
-                if (toVisitOffset == 0) {
+                if toVisitOffset == 0u {
                     break;
                 }
-                toVisitOffset -= 1;
+                toVisitOffset -= 1u;
                 currentNodeIdx = nodesToVisit[toVisitOffset];
             } else {
                 // Is intersector.invDir[node.splitAxis] < 0f? If so, visit second child first.
-                if (intersector.dirNeg[node.splitAxis] == 1u) {
-                    nodesToVisit[toVisitOffset] = currentNodeIdx + 1;
+                if intersector.dirNeg[node.splitAxis] == 1u {
+                    nodesToVisit[toVisitOffset] = currentNodeIdx + 1u;
                     currentNodeIdx = node.secondChildOffset;
                 } else {
                     nodesToVisit[toVisitOffset] = node.secondChildOffset;
-                    currentNodeIdx = currentNodeIdx + 1;
+                    currentNodeIdx = currentNodeIdx + 1u;
                 }
-                toVisitOffset += 1;
+                toVisitOffset += 1u;
             }
         } else {
-            if (toVisitOffset == 0) {
+            if toVisitOffset == 0u {
                 break;
             }
-            toVisitOffset -= 1;
+            toVisitOffset -= 1u;
             currentNodeIdx = nodesToVisit[toVisitOffset];
         }
     }
@@ -196,11 +196,11 @@ fn rayAabbIntersector(ray: Ray) -> RayAabbIntersector {
 fn rayIntersectAabb(intersector: RayAabbIntersector, aabb: Aabb, rayTMax: f32) -> bool {
     let bounds: array<vec3f, 2> = array(aabb.min, aabb.max);
 
-    var tmin: f32 = (bounds[intersector.dirNeg[0]].x - intersector.origin.x) * intersector.invDir.x;
-    var tmax: f32 = (bounds[1u - intersector.dirNeg[0]].x - intersector.origin.x) * intersector.invDir.x;
+    var tmin: f32 = (bounds[intersector.dirNeg[0u]].x - intersector.origin.x) * intersector.invDir.x;
+    var tmax: f32 = (bounds[1u - intersector.dirNeg[0u]].x - intersector.origin.x) * intersector.invDir.x;
 
-    let tymin = (bounds[intersector.dirNeg[1]].y - intersector.origin.y) * intersector.invDir.y;
-    let tymax = (bounds[1 - intersector.dirNeg[1]].y - intersector.origin.y) * intersector.invDir.y;
+    let tymin: f32 = (bounds[intersector.dirNeg[1u]].y - intersector.origin.y) * intersector.invDir.y;
+    let tymax: f32 = (bounds[1 - intersector.dirNeg[1u]].y - intersector.origin.y) * intersector.invDir.y;
 
     if (tmin > tymax) || (tymin > tmax) {
         return false;
@@ -209,8 +209,8 @@ fn rayIntersectAabb(intersector: RayAabbIntersector, aabb: Aabb, rayTMax: f32) -
     tmin = max(tymin, tmin);
     tmax = min(tymax, tmax);
 
-    let tzmin = (bounds[intersector.dirNeg[2]].z - intersector.origin.z) * intersector.invDir.z;
-    let tzmax = (bounds[1 - intersector.dirNeg[2]].z - intersector.origin.z) * intersector.invDir.z;
+    let tzmin: f32 = (bounds[intersector.dirNeg[2u]].z - intersector.origin.z) * intersector.invDir.z;
+    let tzmax: f32 = (bounds[1 - intersector.dirNeg[2u]].z - intersector.origin.z) * intersector.invDir.z;
 
     if (tmin > tzmax) || (tzmin > tmax) {
         return false;
