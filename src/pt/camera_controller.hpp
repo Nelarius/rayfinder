@@ -8,15 +8,10 @@
 
 #include <optional>
 
+struct GLFWwindow;
+
 namespace pt
 {
-struct MousePos
-{
-    // Mouse position coordinates are given in screen coordinates not pixel coordinates.
-    double x = 0.0;
-    double y = 0.0;
-};
-
 struct FlyCameraController
 {
 public:
@@ -25,28 +20,42 @@ public:
     Camera getCamera() const;
 
     void lookAt(const glm::vec3& p);
-    void update(float dt, const MousePos&);
-
-    float speed = 100.0f;
-    bool  leftPressed = false;
-    bool  rightPressed = false;
-    bool  forwardPressed = false;
-    bool  backwardPressed = false;
-    bool  upPressed = false;
-    bool  downPressed = false;
-    bool  mouseLookPressed = false;
-    // TODO: discriminate between window size and framebuffer size to avoid accidents with mouse
-    // cursor uv-coordinates
-    Extent2i                windowSize = Extent2i(0, 0);
-    std::optional<MousePos> lastMousePos = std::nullopt;
+    void update(GLFWwindow* window, float dt);
 
 private:
-    glm::vec3 position = glm::vec3(716.0f, 157.0f, -794.0f);
-    Angle     yaw = Angle::degrees(25.0f);
-    Angle     pitch = Angle::degrees(-5.0f);
-    Angle     vfov = Angle::degrees(80.0f);
-    float     aperture = 0.8f;
-    float     focusDistance = 10.0f;
+    // Camera orientation and physical characteristics
+
+    glm::vec3 mPosition = glm::vec3(716.0f, 157.0f, -794.0f);
+    Angle     mYaw = Angle::degrees(25.0f);
+    Angle     mPitch = Angle::degrees(-5.0f);
+    Angle     mVfov = Angle::degrees(80.0f);
+    float     mAperture = 0.8f;
+    float     mFocusDistance = 10.0f;
+
+    // Input state
+
+    float mSpeed = 100.0f;
+    bool  mLeftPressed = false;
+    bool  mRightPressed = false;
+    bool  mForwardPressed = false;
+    bool  mBackwardPressed = false;
+    bool  mUpPressed = false;
+    bool  mDownPressed = false;
+    bool  mMouseLookPressed = false;
+
+    // Window state
+
+    struct MousePos
+    {
+        // Mouse position coordinates are given in screen coordinates not pixel coordinates.
+        double x = 0.0;
+        double y = 0.0;
+    };
+
+    // TODO: discriminate between window size and framebuffer size to avoid accidents with mouse
+    // cursor uv-coordinates
+    Extent2i                mWindowSize = Extent2i(0, 0);
+    std::optional<MousePos> mLastMousePos = std::nullopt;
 
     struct Orientation
     {

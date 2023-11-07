@@ -1,5 +1,7 @@
 #include "camera_controller.hpp"
 
+#include <GLFW/glfw3.h>
+
 #include <cassert>
 #include <cmath>
 
@@ -9,29 +11,48 @@ Camera FlyCameraController::getCamera() const
 {
     const auto orientation = cameraOrientation();
     return createCamera(
-        position,
-        position + focusDistance * orientation.forward,
-        aperture,
-        focusDistance,
-        vfov,
-        aspectRatio(windowSize));
+        mPosition,
+        mPosition + mFocusDistance * orientation.forward,
+        mAperture,
+        mFocusDistance,
+        mVfov,
+        aspectRatio(mWindowSize));
 }
 
 void FlyCameraController::lookAt(const glm::vec3& p)
 {
-    const glm::vec3 d = p - position;
-    const float     r = glm::length(d);
+    const glm::vec3 d = p - mPosition;
+    const float     l = glm::length(d);
     const float     x = std::atan2(d.z, d.x);
-    const float     y = std::asin(d.y / r);
-    yaw = Angle::radians(x);
-    pitch = Angle::radians(y);
+    const float     y = std::asin(d.y / l);
+    mYaw = Angle::radians(x);
+    mPitch = Angle::radians(y);
 }
 
-void FlyCameraController::update(const float dt, const MousePos& mousePos)
+void FlyCameraController::update(GLFWwindow* const window, const float dt)
 {
-    if (mouseLookPressed)
+    MousePos mousePos;
+    glfwGetCursorPos(window, &mousePos.x, &mousePos.y);
+
+    // Update input state
+
     {
-        if (lastMousePos)
+        glfwGetWindowSize(window, &mWindowSize.x, &mWindowSize.y);
+        mLeftPressed = glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS;
+        mRightPressed = glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS;
+        mForwardPressed = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
+        mBackwardPressed = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
+        mUpPressed = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
+        mDownPressed = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
+
+        mMouseLookPressed = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    }
+
+    // Update orientation
+
+    if (mMouseLookPressed)
+    {
+        if (mLastMousePos)
         {
             const auto      orientation = cameraOrientation();
             const glm::vec3 c1 = orientation.right;
@@ -43,10 +64,10 @@ void FlyCameraController::update(const float dt, const MousePos& mousePos)
             // Perform cartesian to spherical coordinate conversion in camera-local space,
             // where z points straight into the screen. That way there is no need to worry
             // about which quadrant of the sphere we are in for the conversion.
-            assert(lastMousePos.has_value());
+            assert(mLastMousePos.has_value());
             const glm::vec3 currentDir = toLocal * generateCameraRayDir(orientation, mousePos);
             const glm::vec3 previousDir =
-                toLocal * generateCameraRayDir(orientation, *lastMousePos);
+                toLocal * generateCameraRayDir(orientation, *mLastMousePos);
 
             const float x1 = currentDir.x;
             const float y1 = currentDir.y;
@@ -62,31 +83,33 @@ void FlyCameraController::update(const float dt, const MousePos& mousePos)
             const float a1 = std::copysign(1.0f, y1) * std::acos(x1 / std::sqrt(x1 * x1 + y1 * y1));
             const float a2 = std::copysign(1.0f, y2) * std::acos(x2 / std::sqrt(x2 * x2 + y2 * y2));
 
-            yaw = yaw + Angle::radians(a1 - a2);
-            pitch = Angle::radians(glm::clamp(
-                pitch.as_radians() + (p1 - p2), glm::radians(-89.0f), glm::radians(89.0f)));
+            mYaw = mYaw + Angle::radians(a1 - a2);
+            mPitch = Angle::radians(glm::clamp(
+                mPitch.as_radians() + (p1 - p2), glm::radians(-89.0f), glm::radians(89.0f)));
         }
     }
 
+    // Update translation
+
     {
         const glm::vec3 translation = glm::vec3(
-            (rightPressed - leftPressed) * speed * dt,
-            (upPressed - downPressed) * speed * dt,
-            (forwardPressed - backwardPressed) * speed * dt);
+            (mRightPressed - mLeftPressed) * mSpeed * dt,
+            (mUpPressed - mDownPressed) * mSpeed * dt,
+            (mForwardPressed - mBackwardPressed) * mSpeed * dt);
         const auto orientation = cameraOrientation();
-        position += orientation.right * translation.x + orientation.up * translation.y +
-                    orientation.forward * translation.z;
+        mPosition += orientation.right * translation.x + orientation.up * translation.y +
+                     orientation.forward * translation.z;
     }
 
-    lastMousePos = mousePos;
+    mLastMousePos = mousePos;
 }
 
 FlyCameraController::Orientation FlyCameraController::cameraOrientation() const
 {
     const glm::vec3 forward = glm::normalize(glm::vec3(
-        std::cos(yaw.as_radians()) * std::cos(pitch.as_radians()),
-        std::sin(pitch.as_radians()),
-        std::sin(yaw.as_radians()) * std::cos(pitch.as_radians())));
+        std::cos(mYaw.as_radians()) * std::cos(mPitch.as_radians()),
+        std::sin(mPitch.as_radians()),
+        std::sin(mYaw.as_radians()) * std::cos(mPitch.as_radians())));
     const glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
     const glm::vec3 right = glm::cross(forward, worldUp);
     const glm::vec3 up = glm::cross(right, forward);
@@ -97,22 +120,22 @@ glm::vec3 FlyCameraController::generateCameraRayDir(
     const Orientation& orientation,
     const MousePos&    pos) const
 {
-    const float aspect = aspectRatio(windowSize);
-    const float halfHeight = std::tan(0.5f * vfov.as_radians());
+    const float aspect = aspectRatio(mWindowSize);
+    const float halfHeight = std::tan(0.5f * mVfov.as_radians());
     const float halfWidth = aspect * halfHeight;
 
     // UV coordinates in [0, 1] range with (0, 0) in the top-left corner.
-    const float u = static_cast<float>(pos.x / windowSize.x);
-    const float v = static_cast<float>(pos.y / windowSize.y);
+    const float u = static_cast<float>(pos.x / mWindowSize.x);
+    const float v = static_cast<float>(pos.y / mWindowSize.y);
 
     // Map coordinates to [-1, 1] range with (-1, -1) in the bottom-left corner.
     const float x = 2.0f * u - 1.0f;
     const float y = 1.0f - 2.0f * v;
 
-    const glm::vec3 pointOnPlane = position + focusDistance * orientation.forward +
+    const glm::vec3 pointOnPlane = mPosition + mFocusDistance * orientation.forward +
                                    x * halfWidth * orientation.right +
                                    y * halfHeight * orientation.up;
 
-    return glm::normalize(pointOnPlane - position);
+    return glm::normalize(pointOnPlane - mPosition);
 }
 } // namespace pt

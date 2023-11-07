@@ -79,27 +79,7 @@ int main()
                         glfwSetWindowShouldClose(window.ptr(), GLFW_TRUE);
                     }
 
-                    cameraController.leftPressed =
-                        glfwGetKey(window.ptr(), GLFW_KEY_A) == GLFW_PRESS;
-                    cameraController.rightPressed =
-                        glfwGetKey(window.ptr(), GLFW_KEY_D) == GLFW_PRESS;
-                    cameraController.forwardPressed =
-                        glfwGetKey(window.ptr(), GLFW_KEY_W) == GLFW_PRESS;
-                    cameraController.backwardPressed =
-                        glfwGetKey(window.ptr(), GLFW_KEY_S) == GLFW_PRESS;
-                    cameraController.upPressed = glfwGetKey(window.ptr(), GLFW_KEY_E) == GLFW_PRESS;
-                    cameraController.downPressed =
-                        glfwGetKey(window.ptr(), GLFW_KEY_Q) == GLFW_PRESS;
-
-                    cameraController.mouseLookPressed =
-                        glfwGetMouseButton(window.ptr(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-                    cameraController.windowSize = window.size();
-
-                    {
-                        pt::MousePos mousePos;
-                        glfwGetCursorPos(window.ptr(), &mousePos.x, &mousePos.y);
-                        cameraController.update(0.0167f, mousePos);
-                    }
+                    cameraController.update(window.ptr(), 0.0167f);
                 }
 
                 // Render
