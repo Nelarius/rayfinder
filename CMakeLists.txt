@@ -31,7 +31,7 @@ target_link_libraries(common PRIVATE glm::glm)
 
 # pt
 set(PT_SOURCE_FILES
-    camera_controller.cpp
+    fly_camera_controller.cpp
     main.cpp
     gpu_buffer.cpp
     gpu_context.cpp

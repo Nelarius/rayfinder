@@ -1,4 +1,4 @@
-#include "camera_controller.hpp"
+#include "fly_camera_controller.hpp"
 
 #include <GLFW/glfw3.h>
 
