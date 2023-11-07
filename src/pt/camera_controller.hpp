@@ -6,16 +6,25 @@
 
 #include <glm/glm.hpp>
 
+#include <optional>
+
 namespace pt
 {
-struct CameraController
+struct MousePos
+{
+    // Mouse position coordinates are given in screen coordinates not pixel coordinates.
+    double x = 0.0;
+    double y = 0.0;
+};
+
+struct FlyCameraController
 {
 public:
-    CameraController() = default;
+    FlyCameraController() = default;
 
-    Camera getCamera(const Extent2i& windowSize) const;
+    Camera getCamera() const;
 
-    void update(float dt);
+    void update(float dt, const MousePos&);
 
     float speed = 0.8f;
     bool  leftPressed = false;
@@ -24,6 +33,11 @@ public:
     bool  backwardPressed = false;
     bool  upPressed = false;
     bool  downPressed = false;
+    bool  mouseLookPressed = false;
+    // TODO: discriminate between window size and framebuffer size to avoid accidents with mouse
+    // cursor uv-coordinates
+    Extent2i                windowSize = Extent2i(0, 0);
+    std::optional<MousePos> lastMousePos = std::nullopt;
 
 private:
     glm::vec3 position = glm::vec3(-19.0f, 2.0f, -8.0f);
@@ -41,5 +55,6 @@ private:
     };
 
     Orientation cameraOrientation() const;
+    glm::vec3   generateCameraRayDir(const Orientation&, const MousePos&) const;
 };
 } // namespace pt
