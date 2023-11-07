@@ -160,7 +160,7 @@ GltfModel::GltfModel(const std::string_view gltfPath)
             const glm::vec3& p1 = positions[idx1];
             const glm::vec3& p2 = positions[idx2];
 
-            Triangle t{p0, p1, p2};
+            Triangle t{.v0 = p0, .v1 = p1, .v2 = p2};
             assert(surfaceArea(t) > 0.00001f);
             mTriangles.push_back(t);
         }

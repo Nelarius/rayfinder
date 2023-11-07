@@ -121,7 +121,7 @@ Renderer::Renderer(
           gpuContext.device,
           "triangles buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const Triangle48>(bvh.triangles)),
+          std::span<const Triangle>(bvh.triangles)),
       sceneBindGroup(nullptr),
       renderPipeline(nullptr),
       currentRenderParams(rendererDesc.renderParams),

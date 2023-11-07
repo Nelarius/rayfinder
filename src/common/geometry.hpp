@@ -5,15 +5,20 @@
 
 namespace pt
 {
+// Vector elements are 16-byte aligned, for GPU memory.
 struct Aabb
 {
     glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
+    float     pad0 = 0.0f;
     glm::vec3 max = glm::vec3(std::numeric_limits<float>::lowest());
+    float     pad1 = 0.0f;
 
     Aabb() = default;
     Aabb(const glm::vec3& p1, const glm::vec3& p2)
         : min(glm::min(p1, p2)),
-          max(glm::max(p1, p2))
+          pad0(0.0f),
+          max(glm::max(p1, p2)),
+          pad1(0.0f)
     {
     }
 };
@@ -24,11 +29,15 @@ struct Ray
     glm::vec3 direction;
 };
 
+// Vector elements are 16-byte aligned, for GPU memory.
 struct Triangle
 {
     glm::vec3 v0;
+    float     pad0;
     glm::vec3 v1;
+    float     pad1;
     glm::vec3 v2;
+    float     pad2;
 };
 
 inline glm::vec3 centroid(const Aabb& aabb) { return 0.5f * (aabb.min + aabb.max); }

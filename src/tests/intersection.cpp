@@ -18,7 +18,7 @@ TEST_CASE("Ray intersects triangle", "[intersection]")
     };
 
     pt::Intersection isect;
-    const bool intersects = rayIntersectTriangle(ray, pt::Triangle48(triangle), 1000.0f, isect);
+    const bool       intersects = rayIntersectTriangle(ray, triangle, 1000.0f, isect);
 
     REQUIRE(intersects);
     REQUIRE(isect.p.x == Catch::Approx(0.0f));

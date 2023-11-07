@@ -1,4 +1,3 @@
-#include <common/bvh.hpp>
 #include <common/geometry.hpp>
 #include <common/ray_intersection.hpp>
 
@@ -69,7 +68,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
 
         REQUIRE(intersects);
     }
@@ -83,7 +82,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, 0.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
 
         REQUIRE(intersects);
     }
@@ -97,7 +96,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, 0.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
 
         REQUIRE(intersects);
     }
@@ -111,7 +110,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
 
         REQUIRE(intersects);
     }
@@ -125,7 +124,7 @@ TEST_CASE("Ray-Aabb intersection test", "[bvh]")
         const pt::Aabb aabb(glm::vec3{-1.0f, -1.0f, -1.0f}, glm::vec3{1.0f, 1.0f, 1.0f});
 
         const pt::RayAabbIntersector intersector(ray);
-        const bool intersects = pt::rayIntersectAabb(intersector, pt::Aabb32(aabb), 100.0f);
+        const bool                   intersects = pt::rayIntersectAabb(intersector, aabb, 100.0f);
 
         REQUIRE_FALSE(intersects);
     }

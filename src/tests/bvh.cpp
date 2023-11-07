@@ -18,7 +18,7 @@ bool bruteForceRayIntersectModel(
     bool didIntersect = false;
     for (const Triangle& tri : triangles)
     {
-        if (rayIntersectTriangle(ray, Triangle48(tri), rayTMax, intersect))
+        if (rayIntersectTriangle(ray, tri, rayTMax, intersect))
         {
             rayTMax = intersect.t;
             didIntersect = true;

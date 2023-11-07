@@ -9,10 +9,10 @@
 namespace pt
 {
 bool rayIntersectTriangle(
-    const Ray&        ray,
-    const Triangle48& tri,
-    const float       rayTMax,
-    Intersection&     intersect)
+    const Ray&      ray,
+    const Triangle& tri,
+    const float     rayTMax,
+    Intersection&   intersect)
 {
     constexpr float EPSILON = 0.00001f;
 
@@ -69,10 +69,7 @@ RayAabbIntersector::RayAabbIntersector(const Ray& ray)
     dirNeg[2] = static_cast<std::uint32_t>(invDir.z < 0.0f);
 }
 
-bool rayIntersectAabb(
-    const RayAabbIntersector& intersector,
-    const Aabb32&             aabb,
-    const float               rayTMax)
+bool rayIntersectAabb(const RayAabbIntersector& intersector, const Aabb& aabb, const float rayTMax)
 {
     const glm::vec3 bounds[2] = {aabb.min, aabb.max};
 
@@ -139,7 +136,7 @@ bool rayIntersectBvh(
                 // Check for intersection with primitives in BVH node
                 for (std::size_t idx = 0; idx < node.triangleCount; ++idx)
                 {
-                    const Triangle48& triangle = bvh.triangles[node.trianglesOffset + idx];
+                    const Triangle& triangle = bvh.triangles[node.trianglesOffset + idx];
                     if (rayIntersectTriangle(ray, triangle, rayTMax, intersect))
                     {
                         rayTMax = intersect.t;
