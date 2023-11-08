@@ -1,10 +1,12 @@
 #include "gltf_model.hpp"
+#include "texture.hpp"
+#include "vector_set.hpp"
 
 #include <cgltf.h>
-
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <stb_image.h>
 
 #include <algorithm>
 #include <cassert>
@@ -12,8 +14,11 @@
 #include <cstring>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <iterator> // std::distance
 #include <stdexcept>
+
+namespace fs = std::filesystem;
 
 namespace pt
 {
@@ -25,7 +30,6 @@ void traverseNodeHierarchy(
     const glm::mat4&        parentTransform,
     std::vector<glm::mat4>& transforms)
 {
-
     const glm::mat4 local = [node]() -> glm::mat4 {
         if (node->has_matrix)
         {
@@ -48,8 +52,7 @@ void traverseNodeHierarchy(
 
     if (node->mesh != nullptr)
     {
-        const std::ptrdiff_t distance =
-            std::distance(meshBegin, const_cast<const cgltf_mesh*>(node->mesh));
+        const auto distance = std::distance(meshBegin, const_cast<const cgltf_mesh*>(node->mesh));
         assert(distance >= 0);
         assert(static_cast<std::size_t>(distance) < transforms.size());
         const std::size_t meshIdx = static_cast<std::size_t>(distance);
@@ -66,21 +69,23 @@ void traverseNodeHierarchy(
 }
 } // namespace
 
-GltfModel::GltfModel(const std::string_view gltfPath)
-    : mTriangles()
+GltfModel::GltfModel(const fs::path gltfPath)
+    : mTriangles(),
+      mBaseColorTextureIndices(),
+      mBaseColorTextures()
 {
-    const std::filesystem::path path(gltfPath);
-    if (!std::filesystem::exists(path))
+    if (!fs::exists(gltfPath))
     {
-        throw std::runtime_error(std::format("The gltf file {} does not exist.", gltfPath));
+        throw std::runtime_error(
+            std::format("The gltf file {} does not exist.", gltfPath.native()));
     }
 
     cgltf_options                 options = {};
     cgltf_data*                   data = nullptr;
-    [[maybe_unused]] cgltf_result result = cgltf_parse_file(&options, gltfPath.data(), &data);
+    [[maybe_unused]] cgltf_result result = cgltf_parse_file(&options, gltfPath.c_str(), &data);
     assert(result == cgltf_result_success);
 
-    result = cgltf_load_buffers(&options, data, gltfPath.data());
+    result = cgltf_load_buffers(&options, data, gltfPath.c_str());
     assert(result == cgltf_result_success);
 
     std::vector<glm::mat4> meshTransforms(data->meshes_count, glm::mat4(1.0));
@@ -97,8 +102,10 @@ GltfModel::GltfModel(const std::string_view gltfPath)
     assert(data->scenes_count == 1);
 
     {
-        std::vector<glm::vec3>     positions;
-        std::vector<std::uint32_t> indices;
+        std::vector<glm::vec3>          positions;
+        std::vector<std::uint32_t>      indices;
+        std::vector<const cgltf_image*> baseColorImageAttributes;
+        VectorSet<const cgltf_image*>   uniqueBaseColorImages;
 
         const std::size_t meshCount = data->meshes_count;
         for (std::size_t meshIdx = 0; meshIdx < meshCount; ++meshIdx)
@@ -109,6 +116,19 @@ GltfModel::GltfModel(const std::string_view gltfPath)
                 const cgltf_primitive& primitive = mesh.primitives[primitiveIdx];
                 assert(primitive.type == cgltf_primitive_type_triangles);
 
+                assert(primitive.material);
+                assert(primitive.material->has_pbr_metallic_roughness);
+                const cgltf_pbr_metallic_roughness& pbrMetallicRoughness =
+                    primitive.material->pbr_metallic_roughness;
+
+                assert(pbrMetallicRoughness.base_color_texture.texture);
+                const cgltf_texture& baseColorTexture =
+                    *pbrMetallicRoughness.base_color_texture.texture;
+
+                assert(baseColorTexture.image);
+                const cgltf_image* const baseColorImage = baseColorTexture.image;
+                uniqueBaseColorImages.insert(baseColorImage);
+
                 const cgltf_accessor* const indexAccessor = primitive.indices;
                 assert(indexAccessor != nullptr);
                 assert(indexAccessor->type == cgltf_type_scalar);
@@ -118,13 +138,24 @@ GltfModel::GltfModel(const std::string_view gltfPath)
                 indices.resize(indexOffset + indexCount);
                 std::span<std::uint32_t> indicesSpan =
                     std::span(indices).subspan(indexOffset, indexCount);
-                for (std::size_t i = 0; i < indexCount; ++i)
+                assert((indexCount % 3) == 0);
+                for (std::size_t i = 0; i < indexCount; i += 3)
                 {
-                    std::uint32_t&              idx = indicesSpan[i];
-                    [[maybe_unused]] const bool readSuccess =
-                        cgltf_accessor_read_uint(indexAccessor, i, &idx, 1);
+                    std::uint32_t&        idx1 = indicesSpan[i];
+                    std::uint32_t&        idx2 = indicesSpan[i + 1];
+                    std::uint32_t&        idx3 = indicesSpan[i + 2];
+                    [[maybe_unused]] bool readSuccess =
+                        cgltf_accessor_read_uint(indexAccessor, i, &idx1, 1);
                     assert(readSuccess);
-                    idx += static_cast<std::uint32_t>(indexOffset);
+                    readSuccess = cgltf_accessor_read_uint(indexAccessor, i + 1, &idx2, 1);
+                    assert(readSuccess);
+                    readSuccess = cgltf_accessor_read_uint(indexAccessor, i + 2, &idx3, 1);
+                    assert(readSuccess);
+                    idx1 += static_cast<std::uint32_t>(indexOffset);
+                    idx2 += static_cast<std::uint32_t>(indexOffset);
+                    idx3 += static_cast<std::uint32_t>(indexOffset);
+
+                    baseColorImageAttributes.push_back(baseColorImage);
                 }
 
                 const cgltf_accessor* positionAccessor = nullptr;
@@ -168,9 +199,74 @@ GltfModel::GltfModel(const std::string_view gltfPath)
             const glm::vec3& p1 = positions[idx1];
             const glm::vec3& p2 = positions[idx2];
 
-            Triangle t{.v0 = p0, .v1 = p1, .v2 = p2};
-            assert(surfaceArea(t) > 0.00001f);
-            mTriangles.push_back(t);
+            Triangle tri{.v0 = p0, .v1 = p1, .v2 = p2};
+            assert(surfaceArea(tri) > 0.00001f);
+            mTriangles.push_back(tri);
+        }
+
+        auto bufferViewData =
+            [](const cgltf_buffer_view* const bufferView) -> std::span<const std::uint8_t> {
+            // NOTE: cgltf_buffer_view_data used as a reference for this function
+            assert(bufferView != nullptr);
+            const std::size_t byteLength = bufferView->size;
+
+            // See cgltf_buffer_view::data comment, overrides buffer->data if present
+            if (bufferView->data != nullptr)
+            {
+                const std::uint8_t* const bufferPtr =
+                    static_cast<const std::uint8_t*>(bufferView->data);
+                return std::span(bufferPtr, byteLength);
+            }
+
+            assert(bufferView->buffer != nullptr);
+            const std::size_t         bufferOffset = bufferView->offset;
+            const std::uint8_t* const bufferPtr =
+                static_cast<const std::uint8_t*>(bufferView->buffer->data);
+
+            return std::span(bufferPtr + bufferOffset, byteLength);
+        };
+
+        for (const cgltf_image* image : uniqueBaseColorImages)
+        {
+            if (image->buffer_view)
+            {
+                const auto pixelData = bufferViewData(image->buffer_view);
+                mBaseColorTextures.push_back(Texture::fromMemory(pixelData));
+            }
+            else
+            {
+                assert(image->uri);
+                const fs::path imagePath = gltfPath.parent_path() / image->uri;
+                if (!fs::exists(imagePath))
+                {
+                    throw std::runtime_error(
+                        std::format("The image {} does not exist.", imagePath.string()));
+                }
+
+                assert(fs::exists(imagePath));
+                const std::size_t fileSize = fs::file_size(imagePath);
+
+                std::ifstream file(imagePath, std::ios::binary);
+                assert(file.is_open());
+                std::vector<std::uint8_t> fileData(fileSize, 0);
+                file.read(reinterpret_cast<char*>(fileData.data()), fileSize);
+                mBaseColorTextures.push_back(Texture::fromMemory(std::span(fileData)));
+            }
+        }
+
+        // Replace each triangle's base color image attribute pointer with an index into a unique
+        // array of images.
+        assert(baseColorImageAttributes.size() == mTriangles.size());
+
+        for (const cgltf_image* image : baseColorImageAttributes)
+        {
+            const auto imageIter = uniqueBaseColorImages.find(image);
+            assert(imageIter != uniqueBaseColorImages.end());
+            const auto distance = std::distance(uniqueBaseColorImages.begin(), imageIter);
+            assert(distance >= 0);
+            const std::size_t textureIdx = static_cast<std::size_t>(distance);
+            assert(textureIdx < mBaseColorTextures.size());
+            mBaseColorTextureIndices.push_back(textureIdx);
         }
     }
 
