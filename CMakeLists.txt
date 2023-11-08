@@ -89,3 +89,13 @@ add_custom_command(
     $<TARGET_FILE_DIR:tests>/Duck.glb
     COMMENT "Copying $<TARGET_FILE_DIR:tests>/Duck.glb"
 )
+
+add_executable(textractor src/textractor/main.cpp)
+target_link_libraries(textractor PRIVATE common glm::glm)
+add_custom_command(
+    TARGET textractor POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+    ${CMAKE_SOURCE_DIR}/assets/Duck.glb
+    $<TARGET_FILE_DIR:textractor>/Duck.glb
+    COMMENT "Copying $<TARGET_FILE_DIR:textractor>/Duck.glb"
+)
