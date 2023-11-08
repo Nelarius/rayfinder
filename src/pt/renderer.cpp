@@ -412,6 +412,7 @@ Renderer::Renderer(
 
 Renderer::~Renderer()
 {
+    ImGui_ImplWGPU_Shutdown();
     renderPipelineSafeRelease(renderPipeline);
     renderPipeline = nullptr;
     bindGroupSafeRelease(sceneBindGroup);
