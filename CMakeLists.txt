@@ -23,7 +23,8 @@ set(COMMON_SOURCE_FILES
     cgltf.c
     gltf_model.cpp
     ray_intersection.cpp
-    stb_image.c)
+    stb_image.c
+    texture.cpp)
 list(TRANSFORM COMMON_SOURCE_FILES PREPEND src/common/)
 
 add_library(common ${COMMON_SOURCE_FILES})
