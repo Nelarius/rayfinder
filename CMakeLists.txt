@@ -76,7 +76,8 @@ set(TESTS_SOURCE_FILES
     angle.cpp
     bvh.cpp
     gltf.cpp
-    intersection.cpp)
+    intersection.cpp
+    vector_set.cpp)
 list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
 
 add_executable(tests ${TESTS_SOURCE_FILES})
