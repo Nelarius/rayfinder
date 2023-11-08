@@ -23,6 +23,10 @@ FetchContent_Declare(glm GIT_REPOSITORY "https://github.com/g-truc/glm"
 FetchContent_Declare(imgui GIT_REPOSITORY "https://github.com/ocornut/imgui"
     GIT_TAG c6e0284ac58b3f205c95365478888f7b53b077e2) # v1.89.9
 
+FetchContent_Declare(stb
+    GIT_REPOSITORY "https://github.com/nothings/stb"
+    GIT_TAG beebb24b945efdea3b9bba23affb8eb3ba8982e7) # Oct 12, 2023
+
 FetchContent_Declare(webgpu
     GIT_REPOSITORY "https://github.com/eliemichel/WebGPU-distribution"
     GIT_TAG 1058c7eba4fdad74adb87192eede272c0c69c39e) # dawn-branch, 2023-09-04
@@ -48,6 +52,10 @@ message(STATUS "Fetcing imgui...")
 FetchContent_MakeAvailable(imgui)
 set(IMGUI_SOURCE_DIR ${imgui_SOURCE_DIR})
 
+message(STATUS "Fetching stb...")
+FetchContent_MakeAvailable(stb)
+set(STB_SOURCE_DIR ${stb_SOURCE_DIR})
+
 message(STATUS "Fetching WebGPU...")
 FetchContent_MakeAvailable(webgpu)
 
@@ -69,3 +77,6 @@ add_library(imgui STATIC
 )
 target_include_directories(imgui PUBLIC ${IMGUI_SOURCE_DIR} ${IMGUI_SOURCE_DIR}/backends)
 target_link_libraries(imgui PRIVATE glfw webgpu)
+
+#stb
+set(STB_INCLUDE_DIR ${STB_SOURCE_DIR} CACHE INTERNAL "stb Include Directory")

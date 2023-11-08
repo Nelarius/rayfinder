@@ -22,11 +22,12 @@ set(COMMON_SOURCE_FILES
     camera.cpp
     cgltf.c
     gltf_model.cpp
-    ray_intersection.cpp)
+    ray_intersection.cpp
+    stb_image.c)
 list(TRANSFORM COMMON_SOURCE_FILES PREPEND src/common/)
 
 add_library(common ${COMMON_SOURCE_FILES})
-target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE_DIR})
+target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE_DIR} ${STB_INCLUDE_DIR})
 target_link_libraries(common PRIVATE glm::glm)
 
 # pt
