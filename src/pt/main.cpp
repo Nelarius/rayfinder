@@ -58,9 +58,6 @@ int main()
             float        vfovDegrees = 80.0f;
             while (!glfwWindowShouldClose(window.ptr()))
             {
-                // Non-standard Dawn way to ensure that Dawn checks that whether the async operation
-                // is actually done and calls the callback.
-                wgpuDeviceTick(gpuContext.device);
                 glfwPollEvents();
 
                 // Resize
@@ -73,10 +70,18 @@ int main()
                     }
                 }
 
-                // ImGui
+                // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
+                // TODO: implement some kind of pending buffer map queue and tick them here
+                while (wgpuBufferGetMapState(renderer.queryResolveBuffer) !=
+                       WGPUBufferMapState_Unmapped)
+                {
+                    wgpuDeviceTick(gpuContext.device);
+                }
 
                 renderer.beginFrame();
                 window.beginFrame();
+
+                // ImGui
 
                 {
                     ImGui::Begin("Settings");

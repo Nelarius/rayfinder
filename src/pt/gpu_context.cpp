@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <glfw3webgpu.h>
 
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -171,8 +172,25 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     glfwGetFramebufferSize(window, &framebufferSize.x, &framebufferSize.y);
 
     instance = []() -> WGPUInstance {
+        // GPU timers are an unsafe API and are disabled by default due to exposing client
+        // information. E.g. `ValidationTest::SetUp()` in
+        // `src/dawn/tests/unittests/validation/ValidationTest.cpp` contains an example of how this
+        // works.
+        const char*               allowUnsafeApisToggle = "allow_unsafe_apis";
+        WGPUDawnTogglesDescriptor instanceToggles = {
+            .chain =
+                WGPUChainedStruct{
+                    .next = nullptr,
+                    .sType = WGPUSType_DawnTogglesDescriptor,
+                },
+            .enabledTogglesCount = 1,
+            .enabledToggles = &allowUnsafeApisToggle,
+            .disabledTogglesCount = 0,
+            .disabledToggles = nullptr,
+        };
+
         const WGPUInstanceDescriptor instanceDesc{
-            .nextInChain = nullptr,
+            .nextInChain = &instanceToggles.chain,
         };
         return wgpuCreateInstance(&instanceDesc);
     }();
@@ -217,11 +235,15 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     }
 
     device = [this, &requiredLimits]() -> WGPUDevice {
+        const std::array<WGPUFeatureName, 1> requiredFeatures{
+            WGPUFeatureName_TimestampQueryInsidePasses,
+        };
+
         const WGPUDeviceDescriptor deviceDesc{
             .nextInChain = nullptr,
             .label = "Device",
-            .requiredFeaturesCount = 0,
-            .requiredFeatures = nullptr,
+            .requiredFeaturesCount = requiredFeatures.size(),
+            .requiredFeatures = requiredFeatures.data(),
             .requiredLimits = &requiredLimits,
             .defaultQueue = WGPUQueueDescriptor{.nextInChain = nullptr, .label = "Default queue"},
             .deviceLostCallback = onDeviceLost,

@@ -83,6 +83,24 @@ struct RenderParamsLayout
     }
 };
 
+void bufferSafeRelease(const WGPUBuffer buffer)
+{
+    if (buffer)
+    {
+        wgpuBufferDestroy(buffer);
+        wgpuBufferRelease(buffer);
+    }
+}
+
+void querySetSafeRelease(const WGPUQuerySet querySet)
+{
+    if (querySet)
+    {
+        wgpuQuerySetDestroy(querySet);
+        wgpuQuerySetRelease(querySet);
+    }
+}
+
 void bindGroupSafeRelease(const WGPUBindGroup bindGroup)
 {
     if (bindGroup)
@@ -124,6 +142,9 @@ Renderer::Renderer(
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           std::span<const Triangle>(bvh.triangles)),
       sceneBindGroup(nullptr),
+      querySet(nullptr),
+      queryBuffer(nullptr),
+      queryResolveBuffer(nullptr),
       renderPipeline(nullptr),
       currentRenderParams(rendererDesc.renderParams),
       frameCount(0)
@@ -399,6 +420,40 @@ Renderer::Renderer(
         renderPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
     }
 
+    // Timestamp query sets
+
+    {
+        // The number of timestamps we want to query. Each timestamp is a 64-bit unsigned integer.
+        const std::uint32_t timestampCount = 2u;
+
+        const WGPUQuerySetDescriptor querySetDesc{
+            .nextInChain = nullptr,
+            .label = "renderpass timestamp query set",
+            .type = WGPUQueryType_Timestamp,
+            .count = timestampCount,
+            .pipelineStatistics = nullptr,
+            .pipelineStatisticsCount = 0u};
+        querySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
+
+        const WGPUBufferDescriptor queryBufferDesc{
+            .nextInChain = nullptr,
+            .label = "renderpass timestamp query buffer",
+            .usage = WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc,
+            .size = sizeof(std::uint64_t) * timestampCount,
+            .mappedAtCreation = false,
+        };
+        queryBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &queryBufferDesc);
+
+        const WGPUBufferDescriptor queryResolveDesc{
+            .nextInChain = nullptr,
+            .label = "renderpass timestamp query resolve buffer",
+            .usage = WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead,
+            .size = sizeof(std::uint64_t) * timestampCount,
+            .mappedAtCreation = false,
+        };
+        queryResolveBuffer = wgpuDeviceCreateBuffer(gpuContext.device, &queryResolveDesc);
+    }
+
     {
         const int               swapchainFramesInFlight = 3;
         const WGPUTextureFormat depthStencilTextureFormat = WGPUTextureFormat_Undefined;
@@ -415,6 +470,12 @@ Renderer::~Renderer()
     ImGui_ImplWGPU_Shutdown();
     renderPipelineSafeRelease(renderPipeline);
     renderPipeline = nullptr;
+    bufferSafeRelease(queryResolveBuffer);
+    queryResolveBuffer = nullptr;
+    bufferSafeRelease(queryBuffer);
+    queryBuffer = nullptr;
+    querySetSafeRelease(querySet);
+    querySet = nullptr;
     bindGroupSafeRelease(sceneBindGroup);
     sceneBindGroup = nullptr;
     bindGroupSafeRelease(renderParamsBindGroup);
@@ -494,7 +555,10 @@ void Renderer::render(const GpuContext& gpuContext)
             wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 2, sceneBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
+
+            wgpuRenderPassEncoderWriteTimestamp(renderPassEncoder, querySet, 0);
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
+            wgpuRenderPassEncoderWriteTimestamp(renderPassEncoder, querySet, 1);
         }
 
         ImGui::Render();
@@ -502,6 +566,10 @@ void Renderer::render(const GpuContext& gpuContext)
 
         wgpuRenderPassEncoderEnd(renderPassEncoder);
     }
+
+    wgpuCommandEncoderResolveQuerySet(encoder, querySet, 0, 2, queryBuffer, 0);
+    wgpuCommandEncoderCopyBufferToBuffer(
+        encoder, queryBuffer, 0, queryResolveBuffer, 0, sizeof(std::uint64_t) * 2);
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -513,5 +581,32 @@ void Renderer::render(const GpuContext& gpuContext)
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
 
     wgpuTextureViewRelease(nextTexture);
+
+    // Map query timers
+    wgpuBufferMapAsync(
+        queryResolveBuffer,
+        WGPUMapMode_Read,
+        0,
+        sizeof(std::uint64_t) * 2,
+        [](const WGPUBufferMapAsyncStatus status, void* const userdata) -> void {
+            if (status == WGPUBufferMapAsyncStatus_Success)
+            {
+                const WGPUBuffer queryBuffer = *reinterpret_cast<const WGPUBuffer*>(userdata);
+                const void*      bufferData =
+                    wgpuBufferGetConstMappedRange(queryBuffer, 0, 2 * sizeof(std::uint64_t));
+                assert(bufferData);
+                const std::uint64_t* const timestamps =
+                    static_cast<const std::uint64_t*>(bufferData);
+                const std::uint64_t timestampDelta = timestamps[1] - timestamps[0];
+                std::fprintf(stdout, "Draw time: %f ms\n", timestampDelta / 1000000.0f);
+
+                wgpuBufferUnmap(queryBuffer);
+            }
+            else
+            {
+                std::fprintf(stderr, "Failed to map query buffer\n");
+            }
+        },
+        &queryResolveBuffer);
 }
 } // namespace pt
