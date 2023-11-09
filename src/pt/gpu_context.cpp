@@ -1,3 +1,4 @@
+#include "configuration.hpp"
 #include "gpu_context.hpp"
 
 #include <common/platform.hpp>
