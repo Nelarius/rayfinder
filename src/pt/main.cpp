@@ -71,7 +71,7 @@ int main()
 
                 // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
                 // TODO: implement some kind of pending buffer map queue and tick them here
-                while (wgpuBufferGetMapState(renderer.queryResolveBuffer) !=
+                while (wgpuBufferGetMapState(renderer.timestampBuffer.handle()) !=
                        WGPUBufferMapState_Unmapped)
                 {
                     wgpuDeviceTick(gpuContext.device);

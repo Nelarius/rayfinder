@@ -37,8 +37,8 @@ struct Renderer
     GpuBuffer          triangleBuffer;
     WGPUBindGroup      sceneBindGroup;
     WGPUQuerySet       querySet;
-    WGPUBuffer         queryBuffer;
-    WGPUBuffer         queryResolveBuffer;
+    GpuBuffer          queryBuffer;
+    GpuBuffer          timestampBuffer;
     WGPURenderPipeline renderPipeline;
 
     RenderParameters currentRenderParams;
