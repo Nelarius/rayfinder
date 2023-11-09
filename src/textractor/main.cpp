@@ -9,13 +9,13 @@ int main()
     const pt::GltfModel model("Duck.glb");
 
     const auto baseColorTextures = model.baseColorTextures();
-    for (std::size_t i = 0; i < baseColorTextures.size(); ++i)
+    for (std::size_t textureIdx = 0; textureIdx < baseColorTextures.size(); ++textureIdx)
     {
-        const auto& texture = baseColorTextures[i];
+        const auto& texture = baseColorTextures[textureIdx];
         const auto  dimensions = texture.dimensions();
         const auto  pixels = texture.pixels();
 
-        const std::string filename = "base_color_texture_" + std::to_string(i) + ".ppm";
+        const std::string filename = "base_color_texture_" + std::to_string(textureIdx) + ".ppm";
         std::ofstream     file(filename, std::ios::out | std::ios::binary);
         assert(file.is_open());
         // Outputs binary PPM image format, https://netpbm.sourceforge.net/doc/ppm.html

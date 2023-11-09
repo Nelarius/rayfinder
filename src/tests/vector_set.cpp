@@ -2,6 +2,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cstring>
 
 SCENARIO("Insert into VectorSet", "[vector_set]")
