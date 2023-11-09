@@ -136,7 +136,8 @@ bool rayIntersectBvh(
                 // Check for intersection with primitives in BVH node
                 for (std::size_t idx = 0; idx < node.triangleCount; ++idx)
                 {
-                    const Triangle& triangle = bvh.triangles[node.trianglesOffset + idx];
+                    const Triangle& triangle = reinterpret_cast<const Triangle&>(
+                        bvh.positions[node.trianglesOffset + idx]);
                     if (rayIntersectTriangle(ray, triangle, rayTMax, intersect))
                     {
                         rayTMax = intersect.t;

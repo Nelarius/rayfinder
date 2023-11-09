@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
+#include <limits>
 
 namespace pt
 {
@@ -55,9 +57,13 @@ void initInteriorNode(
 void buildLeafNode(
     BvhNode&                            node,
     const Aabb&                         nodeAabb,
-    const std::span<const Triangle>     triangles,
+    const std::span<const Positions>    positions,
+    const std::span<const Normals>      normals,
+    const std::span<const TexCoords>    texCoords,
     const std::span<const BvhPrimitive> bvhPrimitives,
-    std::span<Triangle>                 orderedTriangles,
+    std::span<Positions>                orderedPositions,
+    std::span<Normals>                  orderedNormals,
+    std::span<TexCoords>                orderedTexCoords,
     const std::size_t                   orderedTrianglesOffset)
 {
     const std::size_t trianglesOffset = orderedTrianglesOffset;
@@ -65,7 +71,9 @@ void buildLeafNode(
     for (std::size_t spanIdx = 0; spanIdx < triangleCount; ++spanIdx)
     {
         const std::size_t triangleIdx = bvhPrimitives[spanIdx].triangleIdx;
-        orderedTriangles[trianglesOffset + spanIdx] = triangles[triangleIdx];
+        orderedPositions[trianglesOffset + spanIdx] = positions[triangleIdx];
+        orderedNormals[trianglesOffset + spanIdx] = normals[triangleIdx];
+        orderedTexCoords[trianglesOffset + spanIdx] = texCoords[triangleIdx];
     }
     assert(trianglesOffset < std::numeric_limits<std::uint32_t>::max());
     assert(triangleCount < std::numeric_limits<std::uint32_t>::max());
@@ -77,13 +85,19 @@ void buildLeafNode(
 }
 
 std::size_t buildRecursive(
-    const std::span<const Triangle> triangles,
-    std::span<BvhPrimitive>         bvhPrimitives,
-    std::vector<BvhNode>&           bvhNodes,
-    std::vector<Triangle>&          orderedTriangles,
-    const std::size_t               orderedTrianglesOffset)
+    const std::span<const Positions> positions,
+    const std::span<const Normals>   normals,
+    const std::span<const TexCoords> texCoords,
+    std::span<BvhPrimitive>          bvhPrimitives,
+    std::vector<BvhNode>&            bvhNodes,
+    std::vector<Positions>&          orderedPositions,
+    std::vector<Normals>&            orderedNormals,
+    std::vector<TexCoords>&          orderedTexCoords,
+    const std::size_t                orderedTrianglesOffset)
 {
-    assert(triangles.size() == orderedTriangles.size());
+    assert(positions.size() == orderedPositions.size());
+    assert(normals.size() == orderedNormals.size());
+    assert(texCoords.size() == orderedTexCoords.size());
     assert(bvhPrimitives.size() >= 1);
 
     // Insert new node in memory. Even though we don't reference it yet, recursive function calls
@@ -112,9 +126,13 @@ std::size_t buildRecursive(
         buildLeafNode(
             bvhNodes[currentNodeIdx],
             nodeAabb,
-            triangles,
+            positions,
+            normals,
+            texCoords,
             bvhPrimitives,
-            orderedTriangles,
+            orderedPositions,
+            orderedNormals,
+            orderedTexCoords,
             orderedTrianglesOffset);
         return currentNodeIdx;
     }
@@ -224,9 +242,13 @@ std::size_t buildRecursive(
                 buildLeafNode(
                     bvhNodes[currentNodeIdx],
                     nodeAabb,
-                    triangles,
+                    positions,
+                    normals,
+                    texCoords,
                     bvhPrimitives,
-                    orderedTriangles,
+                    orderedPositions,
+                    orderedNormals,
+                    orderedTexCoords,
                     orderedTrianglesOffset);
                 return currentNodeIdx;
             }
@@ -236,16 +258,24 @@ std::size_t buildRecursive(
     // Build children recursively
 
     buildRecursive(
-        triangles,
+        positions,
+        normals,
+        texCoords,
         bvhPrimitives.subspan(0, splitIdx),
         bvhNodes,
-        orderedTriangles,
+        orderedPositions,
+        orderedNormals,
+        orderedTexCoords,
         orderedTrianglesOffset);
     const std::size_t secondChildOffset = buildRecursive(
-        triangles,
+        positions,
+        normals,
+        texCoords,
         bvhPrimitives.subspan(splitIdx),
         bvhNodes,
-        orderedTriangles,
+        orderedPositions,
+        orderedNormals,
+        orderedTexCoords,
         orderedTrianglesOffset + splitIdx);
 
     assert(splitAxis <= 2);
@@ -260,15 +290,23 @@ std::size_t buildRecursive(
 }
 } // namespace
 
-Bvh buildBvh(std::span<const Triangle> triangles)
+Bvh buildBvh(
+    std::span<const Positions> positions,
+    std::span<const Normals>   normals,
+    std::span<const TexCoords> texCoords)
 {
-    assert(!triangles.empty());
+    assert(!positions.empty());
+    assert(!normals.empty());
+    assert(!texCoords.empty());
+    assert(positions.size() == normals.size());
+    assert(positions.size() == texCoords.size());
 
+    const std::size_t         numTriangles = positions.size();
     std::vector<BvhPrimitive> bvhPrimitives;
-    bvhPrimitives.reserve(triangles.size());
-    for (std::size_t idx = 0; idx < triangles.size(); ++idx)
+    bvhPrimitives.reserve(positions.size());
+    for (std::size_t idx = 0; idx < numTriangles; ++idx)
     {
-        const Triangle& tri = triangles[idx];
+        const Triangle& tri = reinterpret_cast<const Triangle&>(positions[idx]);
         const Aabb      triAabb = aabb(tri);
         bvhPrimitives.push_back(BvhPrimitive{
             .aabb = triAabb,
@@ -277,15 +315,28 @@ Bvh buildBvh(std::span<const Triangle> triangles)
         });
     }
 
-    std::vector<Triangle> orderedTriangles(triangles.size());
-    std::vector<BvhNode>  bvhNodes;
+    std::vector<Positions> orderedPositions(numTriangles);
+    std::vector<Normals>   orderedNormals(numTriangles);
+    std::vector<TexCoords> orderedTexCoords(numTriangles);
+    std::vector<BvhNode>   bvhNodes;
     bvhNodes.reserve(1024);
 
-    buildRecursive(triangles, bvhPrimitives, bvhNodes, orderedTriangles, 0);
+    buildRecursive(
+        positions,
+        normals,
+        texCoords,
+        bvhPrimitives,
+        bvhNodes,
+        orderedPositions,
+        orderedNormals,
+        orderedTexCoords,
+        0);
 
     return Bvh{
         .nodes = std::move(bvhNodes),
-        .triangles = std::move(orderedTriangles),
+        .positions = std::move(orderedPositions),
+        .normals = std::move(orderedNormals),
+        .texCoords = std::move(orderedTexCoords),
     };
 }
 } // namespace pt

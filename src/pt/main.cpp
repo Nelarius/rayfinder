@@ -27,7 +27,7 @@ int main()
 
     {
         const pt::GltfModel model("Duck.glb");
-        const pt::Bvh       bvh = pt::buildBvh(model.triangles());
+        const pt::Bvh bvh = pt::buildBvh(model.positions(), model.normals(), model.texCoords());
 
         pt::FlyCameraController cameraController;
         pt::GpuContext          gpuContext(window.ptr(), pt::Renderer::wgpuRequiredLimits);

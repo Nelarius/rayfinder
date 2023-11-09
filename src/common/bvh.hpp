@@ -3,7 +3,6 @@
 #include "geometry.hpp"
 
 #include <cstdint>
-#include <limits>
 #include <span>
 #include <vector>
 
@@ -21,9 +20,14 @@ struct BvhNode
 
 struct Bvh
 {
-    std::vector<BvhNode>  nodes;
-    std::vector<Triangle> triangles;
+    std::vector<BvhNode>   nodes;
+    std::vector<Positions> positions;
+    std::vector<Normals>   normals;
+    std::vector<TexCoords> texCoords;
 };
 
-Bvh buildBvh(std::span<const Triangle> triangles);
+Bvh buildBvh(
+    std::span<const Positions> positions,
+    std::span<const Normals>   normals,
+    std::span<const TexCoords> texCoords);
 } // namespace pt

@@ -30,12 +30,13 @@ bool bruteForceRayIntersectModel(
 TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 {
     GltfModel model("Duck.glb");
-    REQUIRE_FALSE(model.triangles().empty());
-    const std::span<const Triangle> triangles = model.triangles();
+    REQUIRE_FALSE(model.positions().empty());
+    const std::span<const Triangle> triangles = std::span<const Triangle>(
+        reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
 
-    const Bvh bvh = buildBvh(model.triangles());
+    const Bvh bvh = buildBvh(model.positions(), model.normals(), model.texCoords());
     REQUIRE_FALSE(bvh.nodes.empty());
-    REQUIRE_FALSE(bvh.triangles.empty());
+    REQUIRE_FALSE(bvh.positions.empty());
 
     const Camera camera = [&triangles]() -> Camera {
         const Aabb modelAabb = [&triangles]() -> Aabb {

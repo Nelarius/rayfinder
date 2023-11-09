@@ -70,7 +70,9 @@ void traverseNodeHierarchy(
 } // namespace
 
 GltfModel::GltfModel(const fs::path gltfPath)
-    : mTriangles(),
+    : mPositions(),
+      mNormals(),
+      mTexCoords(),
       mBaseColorTextureIndices(),
       mBaseColorTextures()
 {
@@ -104,6 +106,8 @@ GltfModel::GltfModel(const fs::path gltfPath)
 
     {
         std::vector<glm::vec3>          positions;
+        std::vector<glm::vec3>          normals;
+        std::vector<glm::vec2>          texCoords;
         std::vector<std::uint32_t>      indices;
         std::vector<const cgltf_image*> baseColorImageAttributes;
         VectorSet<const cgltf_image*>   uniqueBaseColorImages;
@@ -161,6 +165,8 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 }
 
                 const cgltf_accessor* positionAccessor = nullptr;
+                const cgltf_accessor* normalAccessor = nullptr;
+                const cgltf_accessor* texCoordAccessor = nullptr;
 
                 const std::size_t attributeCount = primitive.attributes_count;
                 for (std::size_t i = 0; i < attributeCount; ++i)
@@ -170,19 +176,46 @@ GltfModel::GltfModel(const fs::path gltfPath)
                     {
                         positionAccessor = attribute.data;
                     }
+                    else if (attribute.type == cgltf_attribute_type_normal)
+                    {
+                        normalAccessor = attribute.data;
+                    }
+                    else if (attribute.type == cgltf_attribute_type_texcoord)
+                    {
+                        texCoordAccessor = attribute.data;
+                    }
                 }
 
                 assert(positionAccessor != nullptr);
                 assert(positionAccessor->type == cgltf_type_vec3);
                 assert(positionAccessor->component_type == cgltf_component_type_r_32f);
 
-                const std::size_t positionCount = positionAccessor->count;
-                positions.resize(vertexOffset + positionCount);
-                for (std::size_t idx = 0; idx < positionCount; ++idx)
+                assert(normalAccessor != nullptr);
+                assert(normalAccessor->type == cgltf_type_vec3);
+                assert(normalAccessor->component_type == cgltf_component_type_r_32f);
+
+                assert(texCoordAccessor != nullptr);
+                assert(texCoordAccessor->type == cgltf_type_vec2);
+                assert(texCoordAccessor->component_type == cgltf_component_type_r_32f);
+
+                assert(positionAccessor->count == normalAccessor->count);
+                assert(positionAccessor->count == texCoordAccessor->count);
+                const std::size_t vertexCount = positionAccessor->count;
+                positions.resize(vertexOffset + vertexCount);
+                normals.resize(vertexOffset + vertexCount);
+                texCoords.resize(vertexOffset + vertexCount);
+                for (std::size_t idx = 0; idx < vertexCount; ++idx)
                 {
-                    glm::vec3             position;
+                    glm::vec3  position;
+                    glm::vec3& normal = normals[vertexOffset + idx];
+                    glm::vec2& texCoord = texCoords[vertexOffset + idx];
+
                     [[maybe_unused]] bool readSuccess =
                         cgltf_accessor_read_float(positionAccessor, idx, &position.x, 3);
+                    assert(readSuccess);
+                    readSuccess = cgltf_accessor_read_float(normalAccessor, idx, &normal.x, 3);
+                    assert(readSuccess);
+                    readSuccess = cgltf_accessor_read_float(texCoordAccessor, idx, &texCoord.x, 2);
                     assert(readSuccess);
 
                     positions[vertexOffset + idx] =
@@ -191,7 +224,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
             }
         }
 
-        mTriangles.reserve(indices.size() / 3);
+        mPositions.reserve(indices.size() / 3);
         for (std::size_t i = 0; i < indices.size(); i += 3)
         {
             const std::uint32_t idx0 = indices[i + 0];
@@ -202,9 +235,19 @@ GltfModel::GltfModel(const fs::path gltfPath)
             const glm::vec3& p1 = positions[idx1];
             const glm::vec3& p2 = positions[idx2];
 
-            Triangle tri{.v0 = p0, .v1 = p1, .v2 = p2};
-            assert(surfaceArea(tri) > 0.00001f);
-            mTriangles.push_back(tri);
+            Positions tri{.v0 = p0, .v1 = p1, .v2 = p2};
+            // TODO: filter degenerate positions? using a set of indices?
+            mPositions.push_back(tri);
+
+            const glm::vec3& n0 = normals[idx0];
+            const glm::vec3& n1 = normals[idx1];
+            const glm::vec3& n2 = normals[idx2];
+            mNormals.push_back(Normals{.n0 = n0, .n1 = n1, .n2 = n2});
+
+            const glm::vec2& uv0 = texCoords[idx0];
+            const glm::vec2& uv1 = texCoords[idx1];
+            const glm::vec2& uv2 = texCoords[idx2];
+            mTexCoords.push_back(TexCoords{.uv0 = uv0, .uv1 = uv1, .uv2 = uv2});
         }
 
         auto bufferViewData =
@@ -259,7 +302,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
 
         // Replace each triangle's base color image attribute pointer with an index into a unique
         // array of images.
-        assert(baseColorImageAttributes.size() == mTriangles.size());
+        assert(baseColorImageAttributes.size() == mPositions.size());
         for (const cgltf_image* image : baseColorImageAttributes)
         {
             const auto imageIter = uniqueBaseColorImages.find(image);
