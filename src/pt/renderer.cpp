@@ -146,6 +146,16 @@ Renderer::Renderer(
           "triangles buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           std::span<const Positions>(bvh.positions)),
+      normalsBuffer(
+          gpuContext.device,
+          "normals buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+          std::span<const Normals>(bvh.normals)),
+      texCoordsBuffer(
+          gpuContext.device,
+          "tex coords buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+          std::span<const TexCoords>(bvh.texCoords)),
       sceneBindGroup(nullptr),
       querySet(nullptr),
       queryBuffer(
@@ -319,9 +329,11 @@ Renderer::Renderer(
 
         // scene bind group layout
 
-        const std::array<WGPUBindGroupLayoutEntry, 2> sceneBindGroupLayoutEntries{
+        const std::array<WGPUBindGroupLayoutEntry, 4> sceneBindGroupLayoutEntries{
             bvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
             triangleBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            normalsBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
+            texCoordsBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
         };
 
         const WGPUBindGroupLayoutDescriptor sceneBindGroupLayoutDesc{
@@ -380,9 +392,11 @@ Renderer::Renderer(
 
         // scene bind group
 
-        const std::array<WGPUBindGroupEntry, 2> sceneBindGroupEntries{
+        const std::array<WGPUBindGroupEntry, 4> sceneBindGroupEntries{
             bvhNodeBuffer.bindGroupEntry(0),
             triangleBuffer.bindGroupEntry(1),
+            normalsBuffer.bindGroupEntry(2),
+            texCoordsBuffer.bindGroupEntry(3),
         };
 
         const WGPUBindGroupDescriptor sceneBindGroupDesc{

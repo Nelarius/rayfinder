@@ -31,6 +31,8 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 // Annotating these as read causes validation failures.
 @group(2) @binding(0) var<storage, read_write> bvhNodes: array<BvhNode>;
 @group(2) @binding(1) var<storage, read_write> triangles: array<Triangle>;
+@group(2) @binding(2) var<storage, read_write> normals: array<array<vec3f, 3>>;
+@group(2) @binding(3) var<storage, read_write> texCoords: array<array<vec2f, 3>>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
@@ -102,7 +104,7 @@ struct Ray {
 
 struct Intersection {
     p: vec3f,
-    n: vec3f,
+    b: vec3f,
     t: f32,
 }
 
@@ -114,8 +116,17 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var color = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
 
     var intersection = Intersection();
-    if rayIntersectBvh(ray, T_MAX, &intersection) {
-        color = 0.5f * (vec3f(1f, 1f, 1f) + intersection.n);
+    var triangleIdx = 0u;
+    if rayIntersectBvh(ray, T_MAX, &intersection, &triangleIdx) {
+        let b = intersection.b;
+
+        let tnorms = normals[triangleIdx];
+        let n = b[0] * tnorms[0] + b[1] * tnorms[1] + b[2] * tnorms[2];
+        color = 0.5f * (vec3f(1f, 1f, 1f) + n);
+
+        // let uvs = texCoords[triangleIdx];
+        // let uv = b[0] * uvs[0] + b[1] * uvs[1] + b[2] * uvs[2];
+        // color = vec3f(uv.rg, 0f);
     }
 
     return color;
@@ -128,7 +139,7 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
     return Ray(origin, direction);
 }
 
-fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
+fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>, triangleIdx: ptr<function, u32>) -> bool {
     let intersector = rayAabbIntersector(ray);
     var toVisitOffset = 0u;
     var currentNodeIdx = 0u;
@@ -145,6 +156,7 @@ fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> 
                     let triangle: Triangle = triangles[node.trianglesOffset + idx];
                     if rayIntersectTriangle(ray, triangle, tmax, hit) {
                         tmax = (*hit).t;
+                        *triangleIdx = node.trianglesOffset + idx;
                         didIntersect = true;
                     }
                 }
@@ -253,11 +265,13 @@ fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, I
     let t = invDet * dot(e2, q);
 
     if t > EPSILON && t < tmax {
-        *hit = Intersection(
-            rayPointAtParameter(ray, t),    // p
-            normalize(cross(e1, e2)),       // n
-            t                               // t
-        );
+        // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection.html
+        // e1 = v1 - v0
+        // e2 = v2 - v0
+        // -> p = v0 + u * e1 + v * e2
+        let p = tri.v0 + u * e1 + v * e2;
+        let b = vec3f(1f - u - v, u, v);
+        *hit = Intersection(p, b, t);
         return true;
     } else {
         return false;
