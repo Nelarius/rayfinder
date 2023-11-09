@@ -83,7 +83,23 @@ int main()
                 // ImGui
 
                 {
-                    ImGui::Begin("Settings");
+                    ImGui::Begin("pt");
+
+                    ImGui::Text("Performance");
+                    {
+                        const float drawAverageMs = renderer.averageDrawDurationMs();
+                        const float renderAverageMs = renderer.averageRenderpassDurationMs();
+                        ImGui::Text(
+                            "render pass draw: %.2f ms (%.1f FPS)",
+                            drawAverageMs,
+                            1000.0f / drawAverageMs);
+                        ImGui::Text(
+                            "render pass: %.2f ms (%.1f FPS)",
+                            renderAverageMs,
+                            1000.0f / renderAverageMs);
+                    }
+                    ImGui::Separator();
+
                     ImGui::Text("Parameters");
                     ImGui::SliderFloat(
                         "camera speed",

@@ -4,10 +4,11 @@
 
 #include <common/camera.hpp>
 #include <common/extent.hpp>
+#include <webgpu/webgpu.h>
 
 #include <cstddef>
 #include <cstdint>
-#include <webgpu/webgpu.h>
+#include <deque>
 
 namespace pt
 {
@@ -44,12 +45,27 @@ struct Renderer
     RenderParameters currentRenderParams;
     std::uint32_t    frameCount;
 
+    std::deque<std::uint64_t> drawDurationsNs;
+    std::deque<std::uint64_t> renderPassDurationsNs;
+
+    struct TimestampBufferMapContext
+    {
+        GpuBuffer*                 timestampBuffer = nullptr;
+        std::deque<std::uint64_t>* drawDurationsNs = nullptr;
+        std::deque<std::uint64_t>* renderPassDurationsNs = nullptr;
+    };
+
+    TimestampBufferMapContext timestampBufferMapContext;
+
     Renderer(const RendererDescriptor&, const GpuContext&, const Bvh& bvh);
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);
     void beginFrame();
     void render(const GpuContext&);
+
+    float averageDrawDurationMs() const;
+    float averageRenderpassDurationMs() const;
 
     static constexpr WGPURequiredLimits wgpuRequiredLimits{
         .nextInChain = nullptr,

@@ -235,7 +235,8 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     }
 
     device = [this, &requiredLimits]() -> WGPUDevice {
-        const std::array<WGPUFeatureName, 1> requiredFeatures{
+        const std::array<WGPUFeatureName, 2> requiredFeatures{
+            WGPUFeatureName_TimestampQuery,
             WGPUFeatureName_TimestampQueryInsidePasses,
         };
 
