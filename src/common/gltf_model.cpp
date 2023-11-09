@@ -77,15 +77,16 @@ GltfModel::GltfModel(const fs::path gltfPath)
     if (!fs::exists(gltfPath))
     {
         throw std::runtime_error(
-            std::format("The gltf file {} does not exist.", gltfPath.native()));
+            std::format("The gltf file {} does not exist.", gltfPath.string().c_str()));
     }
 
     cgltf_options                 options = {};
     cgltf_data*                   data = nullptr;
-    [[maybe_unused]] cgltf_result result = cgltf_parse_file(&options, gltfPath.c_str(), &data);
+    [[maybe_unused]] cgltf_result result =
+        cgltf_parse_file(&options, gltfPath.string().c_str(), &data);
     assert(result == cgltf_result_success);
 
-    result = cgltf_load_buffers(&options, data, gltfPath.c_str());
+    result = cgltf_load_buffers(&options, data, gltfPath.string().c_str());
     assert(result == cgltf_result_success);
 
     std::vector<glm::mat4> meshTransforms(data->meshes_count, glm::mat4(1.0));
@@ -243,11 +244,11 @@ GltfModel::GltfModel(const fs::path gltfPath)
                         std::format("The image {} does not exist.", imagePath.string()));
                 }
 
-                assert(fs::exists(imagePath));
-                const std::size_t fileSize = fs::file_size(imagePath);
-
+                const std::size_t fileSize = static_cast<std::size_t>(fs::file_size(imagePath));
+                assert(fileSize > 0);
                 std::ifstream file(imagePath, std::ios::binary);
                 assert(file.is_open());
+
                 std::vector<std::uint8_t> fileData(fileSize, 0);
                 file.read(reinterpret_cast<char*>(fileData.data()), fileSize);
                 mBaseColorTextures.push_back(Texture::fromMemory(std::span(fileData)));

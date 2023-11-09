@@ -11,9 +11,9 @@ int main()
     const auto baseColorTextures = model.baseColorTextures();
     for (std::size_t i = 0; i < baseColorTextures.size(); ++i)
     {
-        const pt::Texture& texture = baseColorTextures[i];
-        const auto         dimensions = texture.dimensions();
-        const auto         pixels = texture.pixels();
+        const auto& texture = baseColorTextures[i];
+        const auto  dimensions = texture.dimensions();
+        const auto  pixels = texture.pixels();
 
         const std::string filename = "base_color_texture_" + std::to_string(i) + ".ppm";
         std::ofstream     file(filename, std::ios::out | std::ios::binary);
