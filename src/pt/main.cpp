@@ -9,7 +9,6 @@
 #include <cassert>
 #include <chrono>
 #include <cstdio>
-#include <thread>
 
 #include <GLFW/glfw3.h>
 #include <glfw3webgpu.h>
@@ -140,8 +139,6 @@ int main()
                 }
 
                 wgpuSwapChainPresent(gpuContext.swapChain);
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(16));
             }
         }
     }
