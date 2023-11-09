@@ -1,7 +1,9 @@
+#include "configuration.hpp"
 #include "gpu_context.hpp"
 #include "renderer.hpp"
 
 #include <common/bvh.hpp>
+#include <common/platform.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -544,9 +546,13 @@ void Renderer::render(const GpuContext& gpuContext)
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
 
+#ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
             wgpuRenderPassEncoderWriteTimestamp(renderPassEncoder, querySet, 2);
+#endif
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
+#if TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
             wgpuRenderPassEncoderWriteTimestamp(renderPassEncoder, querySet, 3);
+#endif
         }
 
         ImGui::Render();
@@ -584,35 +590,37 @@ void Renderer::render(const GpuContext& gpuContext)
                 TimestampBufferMapContext& timestampBufferMapContext =
                     *reinterpret_cast<TimestampBufferMapContext*>(userdata);
                 assert(timestampBufferMapContext.timestampBuffer);
-                assert(timestampBufferMapContext.drawDurationsNs);
-                assert(timestampBufferMapContext.renderPassDurationsNs);
-                GpuBuffer& timestampBuffer = *timestampBufferMapContext.timestampBuffer;
-                std::deque<std::uint64_t>& drawDurations =
-                    *timestampBufferMapContext.drawDurationsNs;
-                std::deque<std::uint64_t>& renderPassDurations =
-                    *timestampBufferMapContext.renderPassDurationsNs;
-
+                GpuBuffer&  timestampBuffer = *timestampBufferMapContext.timestampBuffer;
                 const void* bufferData = wgpuBufferGetConstMappedRange(
                     timestampBuffer.handle(), 0, sizeof(TimestampsLayout));
                 assert(bufferData);
 
                 const TimestampsLayout* const timestamps =
                     reinterpret_cast<const TimestampsLayout*>(bufferData);
-                const std::uint64_t drawDelta = timestamps->drawEnd - timestamps->drawBegin;
+
+                assert(timestampBufferMapContext.renderPassDurationsNs);
+                std::deque<std::uint64_t>& renderPassDurations =
+                    *timestampBufferMapContext.renderPassDurationsNs;
                 const std::uint64_t renderPassDelta =
                     timestamps->renderPassEnd - timestamps->renderPassBegin;
-
-                drawDurations.push_back(drawDelta);
-                if (drawDurations.size() > 30)
-                {
-                    drawDurations.pop_front();
-                }
 
                 renderPassDurations.push_back(renderPassDelta);
                 if (renderPassDurations.size() > 30)
                 {
                     renderPassDurations.pop_front();
                 }
+
+#ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
+                assert(timestampBufferMapContext.drawDurationsNs);
+                std::deque<std::uint64_t>& drawDurations =
+                    *timestampBufferMapContext.drawDurationsNs;
+                const std::uint64_t drawDelta = timestamps->drawEnd - timestamps->drawBegin;
+                drawDurations.push_back(drawDelta);
+                if (drawDurations.size() > 30)
+                {
+                    drawDurations.pop_front();
+                }
+#endif
 
                 wgpuBufferUnmap(timestampBuffer.handle());
             }
@@ -626,6 +634,11 @@ void Renderer::render(const GpuContext& gpuContext)
 
 float Renderer::averageDrawDurationMs() const
 {
+    if (drawDurationsNs.empty())
+    {
+        return 0.0f;
+    }
+
     const std::uint64_t sum =
         std::accumulate(drawDurationsNs.begin(), drawDurationsNs.end(), std::uint64_t(0));
     return 0.000001f * static_cast<float>(sum) / drawDurationsNs.size();
@@ -633,6 +646,11 @@ float Renderer::averageDrawDurationMs() const
 
 float Renderer::averageRenderpassDurationMs() const
 {
+    if (renderPassDurationsNs.empty())
+    {
+        return 0.0f;
+    }
+
     const std::uint64_t sum = std::accumulate(
         renderPassDurationsNs.begin(), renderPassDurationsNs.end(), std::uint64_t(0));
     return 0.000001f * static_cast<float>(sum) / renderPassDurationsNs.size();

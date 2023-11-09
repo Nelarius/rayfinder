@@ -1,5 +1,7 @@
 #include "gpu_context.hpp"
 
+#include <common/platform.hpp>
+
 #include <GLFW/glfw3.h>
 #include <glfw3webgpu.h>
 
@@ -235,10 +237,16 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     }
 
     device = [this, &requiredLimits]() -> WGPUDevice {
+#ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
         const std::array<WGPUFeatureName, 2> requiredFeatures{
             WGPUFeatureName_TimestampQuery,
             WGPUFeatureName_TimestampQueryInsidePasses,
         };
+#else
+        const std::array<WGPUFeatureName, 1> requiredFeatures{
+            WGPUFeatureName_TimestampQuery,
+        };
+#endif
 
         const WGPUDeviceDescriptor deviceDesc{
             .nextInChain = nullptr,
