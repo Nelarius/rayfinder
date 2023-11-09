@@ -134,27 +134,28 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 assert(indexAccessor != nullptr);
                 assert(indexAccessor->type == cgltf_type_scalar);
 
-                const std::size_t indexOffset = static_cast<std::uint32_t>(positions.size());
+                const std::size_t vertexOffset = positions.size();
+                const std::size_t indexOffset = indices.size();
                 const std::size_t indexCount = indexAccessor->count;
                 indices.resize(indexOffset + indexCount);
-                std::span<std::uint32_t> indicesSpan =
-                    std::span(indices).subspan(indexOffset, indexCount);
+                assert(indices.size() % 3 == 0);
                 assert((indexCount % 3) == 0);
+                auto subindices = std::span(indices).subspan(indexOffset, indexCount);
                 for (std::size_t i = 0; i < indexCount; i += 3)
                 {
-                    std::uint32_t&        idx1 = indicesSpan[i];
-                    std::uint32_t&        idx2 = indicesSpan[i + 1];
-                    std::uint32_t&        idx3 = indicesSpan[i + 2];
+                    std::uint32_t&        idx1 = subindices[i + 0];
+                    std::uint32_t&        idx2 = subindices[i + 1];
+                    std::uint32_t&        idx3 = subindices[i + 2];
                     [[maybe_unused]] bool readSuccess =
-                        cgltf_accessor_read_uint(indexAccessor, i, &idx1, 1);
+                        cgltf_accessor_read_uint(indexAccessor, i + 0, &idx1, 1);
                     assert(readSuccess);
                     readSuccess = cgltf_accessor_read_uint(indexAccessor, i + 1, &idx2, 1);
                     assert(readSuccess);
                     readSuccess = cgltf_accessor_read_uint(indexAccessor, i + 2, &idx3, 1);
                     assert(readSuccess);
-                    idx1 += static_cast<std::uint32_t>(indexOffset);
-                    idx2 += static_cast<std::uint32_t>(indexOffset);
-                    idx3 += static_cast<std::uint32_t>(indexOffset);
+                    idx1 += static_cast<std::uint32_t>(vertexOffset);
+                    idx2 += static_cast<std::uint32_t>(vertexOffset);
+                    idx3 += static_cast<std::uint32_t>(vertexOffset);
 
                     baseColorImageAttributes.push_back(baseColorImage);
                 }
@@ -176,7 +177,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 assert(positionAccessor->component_type == cgltf_component_type_r_32f);
 
                 const std::size_t positionCount = positionAccessor->count;
-                positions.resize(indexOffset + positionCount);
+                positions.resize(vertexOffset + positionCount);
                 for (std::size_t idx = 0; idx < positionCount; ++idx)
                 {
                     glm::vec3             position;
@@ -184,7 +185,8 @@ GltfModel::GltfModel(const fs::path gltfPath)
                         cgltf_accessor_read_float(positionAccessor, idx, &position.x, 3);
                     assert(readSuccess);
 
-                    positions[idx] = meshTransforms[meshIdx] * glm::vec4(position, 1.0f);
+                    positions[vertexOffset + idx] =
+                        meshTransforms[meshIdx] * glm::vec4(position, 1.0f);
                 }
             }
         }
@@ -258,7 +260,6 @@ GltfModel::GltfModel(const fs::path gltfPath)
         // Replace each triangle's base color image attribute pointer with an index into a unique
         // array of images.
         assert(baseColorImageAttributes.size() == mTriangles.size());
-
         for (const cgltf_image* image : baseColorImageAttributes)
         {
             const auto imageIter = uniqueBaseColorImages.find(image);
