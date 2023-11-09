@@ -11,7 +11,7 @@ Camera createCamera(
     const float     aspectRatio)
 {
     const float theta = vfov.as_radians();
-    const float halfHeight = glm::tan(0.5f * theta);
+    const float halfHeight = focusDistance * glm::tan(0.5f * theta);
     const float halfWidth = aspectRatio * halfHeight;
 
     const glm::vec3 w = glm::normalize(lookAt - origin);

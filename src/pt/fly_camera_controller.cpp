@@ -121,7 +121,7 @@ glm::vec3 FlyCameraController::generateCameraRayDir(
     const MousePos&    pos) const
 {
     const float aspect = aspectRatio(mWindowSize);
-    const float halfHeight = std::tan(0.5f * mVfov.as_radians());
+    const float halfHeight = mFocusDistance * std::tan(0.5f * mVfov.as_radians());
     const float halfWidth = aspect * halfHeight;
 
     // UV coordinates in [0, 1] range with (0, 0) in the top-left corner.

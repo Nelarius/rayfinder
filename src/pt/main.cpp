@@ -54,7 +54,7 @@ int main()
 
         {
             pt::Extent2i curFramebufferSize = window.resolution();
-            float        vfovDegrees = 80.0f;
+            float        vfovDegrees = 70.0f;
             while (!glfwWindowShouldClose(window.ptr()))
             {
                 glfwPollEvents();
