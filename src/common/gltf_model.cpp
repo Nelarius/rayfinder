@@ -309,7 +309,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
             assert(imageIter != uniqueBaseColorImages.end());
             const auto distance = std::distance(uniqueBaseColorImages.begin(), imageIter);
             assert(distance >= 0);
-            const std::size_t textureIdx = static_cast<std::size_t>(distance);
+            const auto textureIdx = static_cast<std::uint32_t>(distance);
             assert(textureIdx < mBaseColorTextures.size());
             mBaseColorTextureIndices.push_back(textureIdx);
         }
