@@ -10,7 +10,7 @@
 #include <span>
 #include <vector>
 
-namespace pt
+namespace nlrs
 {
 class GltfModel
 {
@@ -34,4 +34,4 @@ private:
 
     std::vector<Texture> mBaseColorTextures;
 };
-} // namespace pt
+} // namespace nlrs

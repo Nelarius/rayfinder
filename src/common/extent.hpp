@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace pt
+namespace nlrs
 {
 template<typename T>
 struct Extent2
@@ -40,4 +40,4 @@ constexpr bool operator==(const Extent2<T>& lhs, const Extent2<T>& rhs) noexcept
 {
     return lhs.x == rhs.x && lhs.y == rhs.y;
 }
-} // namespace pt
+} // namespace nlrs

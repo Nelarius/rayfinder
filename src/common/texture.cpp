@@ -6,7 +6,7 @@
 #include <cassert>
 #include <iterator>
 
-namespace pt
+namespace nlrs
 {
 Texture Texture::fromMemory(std::span<const std::uint8_t> data)
 {
@@ -61,4 +61,4 @@ Texture Texture::fromMemory(std::span<const std::uint8_t> data)
         std::move(pixelVec),
         Dimensions{static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)});
 }
-} // namespace pt
+} // namespace nlrs

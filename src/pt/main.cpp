@@ -20,48 +20,48 @@ inline constexpr int defaultWindowHeight = 480;
 
 int main()
 {
-    pt::Window window{pt::WindowDescriptor{
-        .windowSize = pt::Extent2i{defaultWindowWidth, defaultWindowHeight},
+    nlrs::Window window{nlrs::WindowDescriptor{
+        .windowSize = nlrs::Extent2i{defaultWindowWidth, defaultWindowHeight},
         .title = "pt-playground 🛝",
     }};
 
     {
-        const pt::GltfModel model("Duck.glb");
-        const pt::Bvh bvh = pt::buildBvh(model.positions(), model.normals(), model.texCoords());
+        const nlrs::GltfModel model("Duck.glb");
+        const nlrs::Bvh bvh = nlrs::buildBvh(model.positions(), model.normals(), model.texCoords());
 
-        pt::FlyCameraController cameraController;
-        pt::GpuContext          gpuContext(window.ptr(), pt::Renderer::wgpuRequiredLimits);
+        nlrs::FlyCameraController cameraController;
+        nlrs::GpuContext          gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);
 
         {
-            const pt::BvhNode& rootNode = bvh.nodes[0];
-            const glm::vec3    rootCentroid = centroid(rootNode.aabb);
+            const nlrs::BvhNode& rootNode = bvh.nodes[0];
+            const glm::vec3      rootCentroid = centroid(rootNode.aabb);
 
             cameraController.lookAt(rootCentroid);
         }
 
-        const pt::RendererDescriptor rendererDesc{
-            .renderParams = [&window, &cameraController]() -> pt::RenderParameters {
-                const pt::Extent2i framebufferSize = window.resolution();
-                return pt::RenderParameters{
-                    .framebufferSize = pt::Extent2u(framebufferSize),
+        const nlrs::RendererDescriptor rendererDesc{
+            .renderParams = [&window, &cameraController]() -> nlrs::RenderParameters {
+                const nlrs::Extent2i framebufferSize = window.resolution();
+                return nlrs::RenderParameters{
+                    .framebufferSize = nlrs::Extent2u(framebufferSize),
                     .camera = cameraController.getCamera(),
                 };
             }(),
             .maxFramebufferSize = window.largestMonitorResolution(),
         };
 
-        pt::Renderer renderer(rendererDesc, gpuContext, bvh);
+        nlrs::Renderer renderer(rendererDesc, gpuContext, bvh);
 
         {
-            pt::Extent2i curFramebufferSize = window.resolution();
-            float        vfovDegrees = 70.0f;
+            nlrs::Extent2i curFramebufferSize = window.resolution();
+            float          vfovDegrees = 70.0f;
             while (!glfwWindowShouldClose(window.ptr()))
             {
                 glfwPollEvents();
 
                 // Resize
                 {
-                    const pt::Extent2i newFramebufferSize = window.resolution();
+                    const nlrs::Extent2i newFramebufferSize = window.resolution();
                     if (newFramebufferSize != curFramebufferSize)
                     {
                         curFramebufferSize = newFramebufferSize;
@@ -109,14 +109,14 @@ int main()
                         "%.2f",
                         ImGuiSliderFlags_Logarithmic);
                     ImGui::SliderFloat("camera vfov", &vfovDegrees, 10.0f, 120.0f);
-                    cameraController.vfov() = pt::Angle::degrees(vfovDegrees);
+                    cameraController.vfov() = nlrs::Angle::degrees(vfovDegrees);
 
                     ImGui::Separator();
                     ImGui::Text("Scene");
                     {
-                        const pt::BvhNode& rootNode = bvh.nodes[0];
-                        const glm::vec3    rootCenter = centroid(rootNode.aabb);
-                        const glm::vec3    camPos = cameraController.position();
+                        const nlrs::BvhNode& rootNode = bvh.nodes[0];
+                        const glm::vec3      rootCenter = centroid(rootNode.aabb);
+                        const glm::vec3      camPos = cameraController.position();
                         ImGui::Text(
                             "camera position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
                         ImGui::Text(
@@ -147,7 +147,7 @@ int main()
                 // Render
 
                 {
-                    const pt::RenderParameters renderParams{
+                    const nlrs::RenderParameters renderParams{
                         .camera = cameraController.getCamera(),
                     };
                     renderer.setRenderParameters(renderParams);

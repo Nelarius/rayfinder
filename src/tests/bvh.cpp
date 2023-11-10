@@ -7,7 +7,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 
-using namespace pt;
+using namespace nlrs;
 
 bool bruteForceRayIntersectModel(
     const Ray&                      ray,

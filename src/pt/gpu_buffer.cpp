@@ -1,6 +1,6 @@
 #include "gpu_buffer.hpp"
 
-namespace pt
+namespace nlrs
 {
 namespace
 {
@@ -151,4 +151,4 @@ WGPUBindGroupEntry GpuBuffer::bindGroupEntry(const std::uint32_t binding) const
         .textureView = nullptr,
     };
 }
-} // namespace pt
+} // namespace nlrs

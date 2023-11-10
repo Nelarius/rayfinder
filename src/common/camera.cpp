@@ -1,6 +1,6 @@
 #include "camera.hpp"
 
-namespace pt
+namespace nlrs
 {
 Camera createCamera(
     const glm::vec3 origin,
@@ -45,4 +45,4 @@ Ray generateCameraRay(const Camera& camera, const float u, const float v)
 
     return Ray{.origin = origin, .direction = glm::normalize(direction)};
 }
-} // namespace pt
+} // namespace nlrs

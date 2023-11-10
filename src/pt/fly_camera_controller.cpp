@@ -5,7 +5,7 @@
 #include <cassert>
 #include <cmath>
 
-namespace pt
+namespace nlrs
 {
 Camera FlyCameraController::getCamera() const
 {
@@ -138,4 +138,4 @@ glm::vec3 FlyCameraController::generateCameraRayDir(
 
     return glm::normalize(pointOnPlane - mPosition);
 }
-} // namespace pt
+} // namespace nlrs

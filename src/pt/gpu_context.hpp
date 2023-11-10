@@ -6,7 +6,7 @@
 
 struct GLFWwindow;
 
-namespace pt
+namespace nlrs
 {
 struct GpuContext
 {
@@ -24,4 +24,4 @@ struct GpuContext
 
     constexpr static WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 };
-} // namespace pt
+} // namespace nlrs

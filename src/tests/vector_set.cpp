@@ -9,7 +9,7 @@ SCENARIO("Insert into VectorSet", "[vector_set]")
 {
     GIVEN("an empty VectorSet")
     {
-        pt::VectorSet<int> s;
+        nlrs::VectorSet<int> s;
 
         THEN("the size is zero and s is empty")
         {
@@ -57,7 +57,7 @@ SCENARIO("Inserting an element into non-empty VectorSet", "[vector_set]")
 {
     GIVEN("a VectorSet with elements")
     {
-        pt::VectorSet<int> s({1, 5, 10});
+        nlrs::VectorSet<int> s({1, 5, 10});
 
         WHEN("inserting in the middle of the range")
         {
@@ -98,7 +98,7 @@ SCENARIO("Erasing an element from VectorSet", "[vector_set]")
 {
     GIVEN("a VectorSet with some values")
     {
-        pt::VectorSet<int> s({1, 2, 3});
+        nlrs::VectorSet<int> s({1, 2, 3});
 
         WHEN("erasing an element by the key value")
         {
@@ -128,8 +128,8 @@ SCENARIO("Erasing an element from VectorSet", "[vector_set]")
 
 TEST_CASE("Instantiating with pointers works", "[vector_set]")
 {
-    const std::array<int, 2>  ints{1, 2};
-    pt::VectorSet<const int*> s({&ints[0], &ints[1]});
+    const std::array<int, 2>    ints{1, 2};
+    nlrs::VectorSet<const int*> s({&ints[0], &ints[1]});
 
     REQUIRE_FALSE(s.empty());
     REQUIRE(s.size() == 2);

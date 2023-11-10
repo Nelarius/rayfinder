@@ -8,7 +8,7 @@
 #include <format>
 #include <stdexcept>
 
-namespace pt
+namespace nlrs
 {
 int Window::glfwRefCount = 0;
 
@@ -113,4 +113,4 @@ void Window::beginFrame()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 }
-} // namespace pt
+} // namespace nlrs

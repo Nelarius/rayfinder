@@ -4,7 +4,7 @@
 #include <span>
 #include <vector>
 
-namespace pt
+namespace nlrs
 {
 class Texture
 {
@@ -36,4 +36,4 @@ private:
     std::vector<Pixel> mPixels;
     Dimensions         mDimensions;
 };
-} // namespace pt
+} // namespace nlrs

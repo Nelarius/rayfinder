@@ -13,7 +13,7 @@
 #include <format>
 #include <stdexcept>
 
-namespace pt
+namespace nlrs
 {
 namespace
 {
@@ -319,4 +319,4 @@ void GpuContext::resizeFramebuffer(const Extent2i& newSize)
     swapChainSafeRelease(swapChain);
     swapChain = createSwapChain(device, surface, swapChainFormat, newSize);
 }
-} // namespace pt
+} // namespace nlrs

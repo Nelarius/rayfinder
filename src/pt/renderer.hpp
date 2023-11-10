@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <deque>
 
-namespace pt
+namespace nlrs
 {
 struct Bvh;
 struct GpuContext;
@@ -108,4 +108,4 @@ struct Renderer
             },
     };
 };
-} // namespace pt
+} // namespace nlrs

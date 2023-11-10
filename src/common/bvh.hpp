@@ -6,7 +6,7 @@
 #include <span>
 #include <vector>
 
-namespace pt
+namespace nlrs
 {
 // 48-byte size BvhNode, for 16-byte aligned GPU memory.
 struct BvhNode
@@ -30,4 +30,4 @@ Bvh buildBvh(
     std::span<const Positions> positions,
     std::span<const Normals>   normals,
     std::span<const TexCoords> texCoords);
-} // namespace pt
+} // namespace nlrs

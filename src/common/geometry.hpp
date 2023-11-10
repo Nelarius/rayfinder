@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <limits>
 
-namespace pt
+namespace nlrs
 {
 // Vector elements are 16-byte aligned, for GPU memory.
 struct Aabb
@@ -137,4 +137,4 @@ inline Aabb aabb(const Triangle& triangle)
         glm::min(glm::min(triangle.v0, triangle.v1), triangle.v2),
         glm::max(glm::max(triangle.v0, triangle.v1), triangle.v2));
 }
-} // namespace pt
+} // namespace nlrs

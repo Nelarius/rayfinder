@@ -1,5 +1,5 @@
 #include <common/platform.hpp>
 
-#if PT_PLATFORM == PT_WINDOWS
+#if NLRS_PLATFORM == NLRS_WINDOWS
 #define TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED 1
 #endif

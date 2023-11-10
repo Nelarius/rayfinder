@@ -6,7 +6,7 @@
 
 struct GLFWwindow;
 
-namespace pt
+namespace nlrs
 {
 struct WindowDescriptor
 {
@@ -42,4 +42,4 @@ private:
 
     static int glfwRefCount;
 };
-} // namespace pt
+} // namespace nlrs

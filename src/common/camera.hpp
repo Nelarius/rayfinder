@@ -5,7 +5,7 @@
 
 #include <glm/glm.hpp>
 
-namespace pt
+namespace nlrs
 {
 struct Camera
 {
@@ -28,4 +28,4 @@ Camera createCamera(
 // (u, v) are in [0, 1] range, where (0, 0) is the lower left corner and (1, 1) is the upper right
 // corner.
 Ray generateCameraRay(const Camera& camera, float u, float v);
-} // namespace pt
+} // namespace nlrs

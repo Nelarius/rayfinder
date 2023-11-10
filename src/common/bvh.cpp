@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <limits>
 
-namespace pt
+namespace nlrs
 {
 namespace
 {
@@ -339,4 +339,4 @@ Bvh buildBvh(
         .texCoords = std::move(orderedTexCoords),
     };
 }
-} // namespace pt
+} // namespace nlrs

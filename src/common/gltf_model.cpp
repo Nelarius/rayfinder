@@ -20,7 +20,7 @@
 
 namespace fs = std::filesystem;
 
-namespace pt
+namespace nlrs
 {
 namespace
 {
@@ -317,4 +317,4 @@ GltfModel::GltfModel(const fs::path gltfPath)
 
     cgltf_free(data);
 }
-} // namespace pt
+} // namespace nlrs

@@ -10,7 +10,7 @@
 
 struct GLFWwindow;
 
-namespace pt
+namespace nlrs
 {
 struct FlyCameraController
 {
@@ -73,4 +73,4 @@ private:
     Orientation cameraOrientation() const;
     glm::vec3   generateCameraRayDir(const Orientation&, const MousePos&) const;
 };
-} // namespace pt
+} // namespace nlrs

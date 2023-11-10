@@ -10,7 +10,7 @@
 #include <span>
 #include <stdexcept>
 
-namespace pt
+namespace nlrs
 {
 // A wrapper around WGPUBuffer with unique ownership semantics.
 class GpuBuffer
@@ -91,4 +91,4 @@ GpuBuffer::GpuBuffer(
     std::memcpy(mappedData, data.data(), mByteSize);
     wgpuBufferUnmap(mBuffer);
 }
-} // namespace pt
+} // namespace nlrs

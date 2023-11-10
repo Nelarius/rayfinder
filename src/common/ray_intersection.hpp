@@ -2,7 +2,7 @@
 
 #include <glm/glm.hpp>
 
-namespace pt
+namespace nlrs
 {
 struct Aabb;
 struct Bvh;
@@ -39,4 +39,4 @@ bool rayIntersectBvh(
     float         rayTMax,
     Intersection& intersect,
     BvhStats*     stats = nullptr);
-} // namespace pt
+} // namespace nlrs

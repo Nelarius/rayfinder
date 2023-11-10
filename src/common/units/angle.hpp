@@ -2,7 +2,7 @@
 
 #include <numbers>
 
-namespace pt
+namespace nlrs
 {
 class Angle
 {
@@ -26,4 +26,4 @@ private:
 
     float mRadians = 0.0f;
 };
-} // namespace pt
+} // namespace nlrs

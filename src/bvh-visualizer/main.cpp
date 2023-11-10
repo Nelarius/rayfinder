@@ -10,14 +10,14 @@
 #include <cstdint>
 #include <iostream>
 
-using namespace pt;
+using namespace nlrs;
 
 inline constexpr Extent2i imageSize = Extent2i{1280, 720};
 
 int main()
 {
-    const pt::GltfModel model("Duck.glb");
-    const pt::Bvh       bvh = pt::buildBvh(model.positions(), model.normals(), model.texCoords());
+    const nlrs::GltfModel model("Duck.glb");
+    const nlrs::Bvh bvh = nlrs::buildBvh(model.positions(), model.normals(), model.texCoords());
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];

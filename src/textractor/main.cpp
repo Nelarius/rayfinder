@@ -6,7 +6,7 @@
 
 int main()
 {
-    const pt::GltfModel model("Duck.glb");
+    const nlrs::GltfModel model("Duck.glb");
 
     const auto baseColorTextures = model.baseColorTextures();
     for (std::size_t textureIdx = 0; textureIdx < baseColorTextures.size(); ++textureIdx)

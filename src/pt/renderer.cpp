@@ -24,7 +24,7 @@
 #include <string>
 #include <tuple>
 
-namespace pt
+namespace nlrs
 {
 namespace
 {
@@ -669,4 +669,4 @@ float Renderer::averageRenderpassDurationMs() const
         renderPassDurationsNs.begin(), renderPassDurationsNs.end(), std::uint64_t(0));
     return 0.000001f * static_cast<float>(sum) / renderPassDurationsNs.size();
 }
-} // namespace pt
+} // namespace nlrs

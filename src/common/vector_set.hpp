@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace pt
+namespace nlrs
 {
 // An STL-like set, implemented with a sorted std::vector.
 template<typename Key, typename Compare = std::less<Key>>
@@ -160,4 +160,4 @@ constexpr bool VectorSet<K, C>::contains(T&& key) const noexcept
 {
     return std::binary_search(m_data.begin(), m_data.end(), std::forward<T>(key), m_compare);
 }
-} // namespace pt
+} // namespace nlrs

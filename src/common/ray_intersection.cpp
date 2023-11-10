@@ -6,7 +6,7 @@
 #include <cassert>
 #include <cstdint>
 
-namespace pt
+namespace nlrs
 {
 bool rayIntersectTriangle(
     const Ray&      ray,
@@ -182,4 +182,4 @@ bool rayIntersectBvh(
 
     return didIntersect;
 }
-} // namespace pt
+} // namespace nlrs
