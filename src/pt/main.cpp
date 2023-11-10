@@ -51,7 +51,7 @@ int main()
             .maxFramebufferSize = window.largestMonitorResolution(),
         };
 
-        nlrs::Renderer renderer(rendererDesc, gpuContext, bvh);
+        nlrs::Renderer renderer(rendererDesc, gpuContext, bvh, model);
 
         {
             nlrs::Extent2i curFramebufferSize = window.resolution();

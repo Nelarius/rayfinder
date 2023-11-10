@@ -33,6 +33,9 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(2) @binding(1) var<storage, read_write> triangles: array<Triangle>;
 @group(2) @binding(2) var<storage, read_write> normals: array<array<vec3f, 3>>;
 @group(2) @binding(3) var<storage, read_write> texCoords: array<array<vec2f, 3>>;
+@group(2) @binding(4) var<storage, read_write> textureDescriptorIndices: array<u32>;
+@group(2) @binding(5) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
+@group(2) @binding(6) var<storage, read_write> textures: array<array<f32, 4>>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
@@ -120,13 +123,10 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     if rayIntersectBvh(ray, T_MAX, &intersection, &triangleIdx) {
         let b = intersection.b;
 
-        let tnorms = normals[triangleIdx];
-        let n = b[0] * tnorms[0] + b[1] * tnorms[1] + b[2] * tnorms[2];
-        color = 0.5f * (vec3f(1f, 1f, 1f) + n);
-
-        // let uvs = texCoords[triangleIdx];
-        // let uv = b[0] * uvs[0] + b[1] * uvs[1] + b[2] * uvs[2];
-        // color = vec3f(uv.rg, 0f);
+        let uvs = texCoords[triangleIdx];
+        let uv = b[0] * uvs[0] + b[1] * uvs[1] + b[2] * uvs[2];
+        let textureDesc = textureDescriptors[textureDescriptorIndices[triangleIdx]];
+        color = textureLookup(textureDesc, uv);
     }
 
     return color;
@@ -278,9 +278,22 @@ fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, I
     }
 }
 
-@must_use
-fn rayPointAtParameter(ray: Ray, t: f32) -> vec3f {
-    return ray.origin + t * ray.direction;
+struct TextureDescriptor {
+    width: u32,
+    height: u32,
+    offset: u32,
+}
+
+fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3<f32> {
+    let u = clamp(uv.x, 0f, 1f);
+    let v = clamp(uv.y, 0f, 1f);
+
+    let j = u32(u * f32(desc.width));
+    let i = u32(v * f32(desc.height));
+    let idx = i * desc.width + j;
+
+    let elem = textures[desc.offset + idx];
+    return vec3(elem[0u], elem[1u], elem[2u]);
 }
 
 @must_use

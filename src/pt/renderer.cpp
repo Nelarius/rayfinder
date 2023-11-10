@@ -3,6 +3,7 @@
 #include "renderer.hpp"
 
 #include <common/bvh.hpp>
+#include <common/gltf_model.hpp>
 #include <common/platform.hpp>
 
 #include <glm/glm.hpp>
@@ -12,6 +13,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <deque>
 #include <format>
@@ -126,7 +128,8 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 Renderer::Renderer(
     const RendererDescriptor& rendererDesc,
     const GpuContext&         gpuContext,
-    const Bvh&                bvh)
+    const Bvh&                bvh,
+    const GltfModel&          model)
     : vertexBuffer(),
       uniformsBuffer(),
       uniformsBindGroup(nullptr),
@@ -156,6 +159,13 @@ Renderer::Renderer(
           "tex coords buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           std::span<const TexCoords>(bvh.texCoords)),
+      textureDescriptorIndicesBuffer(
+          gpuContext.device,
+          "texture descriptor indices buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+          std::span<const std::uint32_t>(bvh.textureIndices)),
+      textureDescriptorBuffer(),
+      textureBuffer(),
       sceneBindGroup(nullptr),
       querySet(nullptr),
       queryBuffer(
@@ -203,6 +213,66 @@ Renderer::Renderer(
             std::span<const std::uint8_t>(
                 reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
                 sizeof(glm::mat4)));
+    }
+
+    {
+        struct TextureDescriptor
+        {
+            std::uint32_t width, height, offset;
+        };
+        // Ensure matches layout of `TextureDescriptor` definition in shader.
+        std::vector<TextureDescriptor> textureDescriptors;
+        textureDescriptors.reserve(bvh.textureIndices.size());
+
+        std::vector<Texture::Pixel> textureData;
+        textureData.reserve(67108864);
+
+        // Texture descriptors and texture data need to appended in the order of the model's
+        // baseColorTextures. The model's baseColorTextureIndices index into that array, and we want
+        // to use the same indices to index into the texture descriptor array.
+        //
+        // Summary:
+        // baseColorTextureIndices -> baseColorTextures becomes
+        // textureDescriptorIndices -> textureDescriptor -> textureData lookup
+
+        for (const Texture& baseColorTexture : model.baseColorTextures())
+        {
+            const auto dimensions = baseColorTexture.dimensions();
+            const auto pixels = baseColorTexture.pixels();
+
+            const std::uint32_t width = dimensions.width;
+            const std::uint32_t height = dimensions.height;
+            const std::uint32_t offset = static_cast<std::uint32_t>(textureData.size());
+
+            textureData.resize(textureData.size() + pixels.size());
+            std::memcpy(
+                textureData.data() + offset, pixels.data(), pixels.size() * sizeof(Texture::Pixel));
+
+            textureDescriptors.push_back({width, height, offset});
+        }
+
+        textureDescriptorBuffer = GpuBuffer(
+            gpuContext.device,
+            "texture descriptor buffer",
+            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+            std::span<const TextureDescriptor>(textureDescriptors));
+
+        const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::Pixel);
+        const std::size_t maxStorageBufferBindingSize =
+            static_cast<std::size_t>(wgpuRequiredLimits.limits.maxStorageBufferBindingSize);
+        if (textureDataNumBytes > maxStorageBufferBindingSize)
+        {
+            throw std::runtime_error(std::format(
+                "Texture buffer size ({}) exceeds maxStorageBufferBindingSize ({}).",
+                textureDataNumBytes,
+                maxStorageBufferBindingSize));
+        }
+
+        textureBuffer = GpuBuffer(
+            gpuContext.device,
+            "texture buffer",
+            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+            std::span<const Texture::Pixel>(textureData));
     }
 
     {
@@ -329,11 +399,14 @@ Renderer::Renderer(
 
         // scene bind group layout
 
-        const std::array<WGPUBindGroupLayoutEntry, 4> sceneBindGroupLayoutEntries{
+        const std::array<WGPUBindGroupLayoutEntry, 7> sceneBindGroupLayoutEntries{
             bvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
             triangleBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
             normalsBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
             texCoordsBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
+            textureDescriptorIndicesBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
+            textureDescriptorBuffer.bindGroupLayoutEntry(5, WGPUShaderStage_Fragment),
+            textureBuffer.bindGroupLayoutEntry(6, WGPUShaderStage_Fragment),
         };
 
         const WGPUBindGroupLayoutDescriptor sceneBindGroupLayoutDesc{
@@ -392,11 +465,14 @@ Renderer::Renderer(
 
         // scene bind group
 
-        const std::array<WGPUBindGroupEntry, 4> sceneBindGroupEntries{
+        const std::array<WGPUBindGroupEntry, 7> sceneBindGroupEntries{
             bvhNodeBuffer.bindGroupEntry(0),
             triangleBuffer.bindGroupEntry(1),
             normalsBuffer.bindGroupEntry(2),
             texCoordsBuffer.bindGroupEntry(3),
+            textureDescriptorIndicesBuffer.bindGroupEntry(4),
+            textureDescriptorBuffer.bindGroupEntry(5),
+            textureBuffer.bindGroupEntry(6),
         };
 
         const WGPUBindGroupDescriptor sceneBindGroupDesc{

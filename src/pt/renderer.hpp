@@ -13,6 +13,7 @@
 namespace nlrs
 {
 struct Bvh;
+class GltfModel;
 struct GpuContext;
 
 struct RenderParameters
@@ -38,6 +39,9 @@ struct Renderer
     GpuBuffer          triangleBuffer;
     GpuBuffer          normalsBuffer;
     GpuBuffer          texCoordsBuffer;
+    GpuBuffer          textureDescriptorIndicesBuffer;
+    GpuBuffer          textureDescriptorBuffer;
+    GpuBuffer          textureBuffer;
     WGPUBindGroup      sceneBindGroup;
     WGPUQuerySet       querySet;
     GpuBuffer          queryBuffer;
@@ -59,7 +63,7 @@ struct Renderer
 
     TimestampBufferMapContext timestampBufferMapContext;
 
-    Renderer(const RendererDescriptor&, const GpuContext&, const Bvh& bvh);
+    Renderer(const RendererDescriptor&, const GpuContext&, const Bvh& bvh, const GltfModel& model);
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);
@@ -79,16 +83,16 @@ struct Renderer
                 .maxTextureArrayLayers = 0,
                 .maxBindGroups = 2,
                 .maxBindGroupsPlusVertexBuffers = 0,
-                .maxBindingsPerBindGroup = 1,
+                .maxBindingsPerBindGroup = 7,
                 .maxDynamicUniformBuffersPerPipelineLayout = 0,
                 .maxDynamicStorageBuffersPerPipelineLayout = 0,
                 .maxSampledTexturesPerShaderStage = 0,
                 .maxSamplersPerShaderStage = 0,
-                .maxStorageBuffersPerShaderStage = 0,
+                .maxStorageBuffersPerShaderStage = 7,
                 .maxStorageTexturesPerShaderStage = 0,
                 .maxUniformBuffersPerShaderStage = 1,
                 .maxUniformBufferBindingSize = 80,
-                .maxStorageBufferBindingSize = 132710400, // 4K resolution RGBA32F buffer,
+                .maxStorageBufferBindingSize = 1 << 28, // 256 MiB
                 .minUniformBufferOffsetAlignment = 256,
                 .minStorageBufferOffsetAlignment = 256,
                 .maxVertexBuffers = 1,

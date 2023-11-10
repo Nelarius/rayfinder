@@ -88,6 +88,7 @@ GpuBuffer::GpuBuffer(
     // https://www.w3.org/TR/webgpu/#dom-gpubufferdescriptor-mappedatcreation
 
     void* const mappedData = wgpuBufferGetMappedRange(mBuffer, 0, mByteSize);
+    assert(mappedData);
     std::memcpy(mappedData, data.data(), mByteSize);
     wgpuBufferUnmap(mBuffer);
 }
