@@ -4,7 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
-#include <iterator>
+#include <cstring>
 
 namespace nlrs
 {
@@ -12,53 +12,31 @@ Texture Texture::fromMemory(std::span<const std::uint8_t> data)
 {
     int width;
     int height;
-    int channelCount;
+    int sourceChannels;
 
+    const int desiredChannels = 4;
+    // NOTE: desired channels results in rgb output, regardless of number of source channels.
+    // If desiredChannels is 0, then sourceChannels is used as the number of channels.
     unsigned char* const pixelData = stbi_load_from_memory(
-        data.data(), static_cast<int>(data.size()), &width, &height, &channelCount, 0);
+        data.data(),
+        static_cast<int>(data.size()),
+        &width,
+        &height,
+        &sourceChannels,
+        desiredChannels);
 
-    assert(channelCount == 3 || channelCount == 4);
+    assert(sourceChannels == 3 || sourceChannels == 4);
     assert(pixelData != nullptr);
 
-    const std::size_t  numPixels = static_cast<std::size_t>(width * height);
-    std::vector<Pixel> pixelVec;
-    pixelVec.reserve(numPixels);
+    const std::size_t numPixels = static_cast<std::size_t>(width * height);
 
-    if (channelCount == 3)
-    {
-        using RgbU8 = std::uint8_t[3];
-
-        const RgbU8* pixels = reinterpret_cast<const RgbU8*>(pixelData);
-        std::transform(
-            pixels, pixels + numPixels, std::back_inserter(pixelVec), [](const RgbU8& p) -> Pixel {
-                return Pixel{
-                    .r = static_cast<float>(p[0]) / 255.0f,
-                    .g = static_cast<float>(p[1]) / 255.0f,
-                    .b = static_cast<float>(p[2]) / 255.0f,
-                    .a = 1.0f,
-                };
-            });
-    }
-    else if (channelCount == 4)
-    {
-        using RgbaU8 = std::uint8_t[4];
-
-        const RgbaU8* pixels = reinterpret_cast<const RgbaU8*>(pixelData);
-        std::transform(
-            pixels, pixels + numPixels, std::back_inserter(pixelVec), [](const RgbaU8& p) -> Pixel {
-                return Pixel{
-                    .r = static_cast<float>(p[0]) / 255.0f,
-                    .g = static_cast<float>(p[1]) / 255.0f,
-                    .b = static_cast<float>(p[2]) / 255.0f,
-                    .a = static_cast<float>(p[3]) / 255.0f,
-                };
-            });
-    }
+    std::vector<RgbaPixel> pixels(numPixels, 0);
+    std::memcpy(pixels.data(), pixelData, numPixels * sizeof(RgbaPixel));
 
     stbi_image_free(pixelData);
 
     return Texture(
-        std::move(pixelVec),
+        std::move(pixels),
         Dimensions{static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)});
 }
 } // namespace nlrs

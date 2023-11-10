@@ -27,11 +27,10 @@ int main()
             for (std::uint32_t j = 0; j < dimensions.width; ++j)
             {
                 const std::size_t idx = i * dimensions.width + j;
-                const auto        pixel = pixels[idx];
-
-                const auto r = static_cast<std::uint8_t>(pixel.r * 255.0f);
-                const auto g = static_cast<std::uint8_t>(pixel.g * 255.0f);
-                const auto b = static_cast<std::uint8_t>(pixel.b * 255.0f);
+                const auto        rgba = pixels[idx];
+                const auto        r = static_cast<std::uint8_t>(rgba & 0xFFU);
+                const auto        g = static_cast<std::uint8_t>((rgba >> 8) & 0xFFU);
+                const auto        b = static_cast<std::uint8_t>((rgba >> 16) & 0xFFU);
 
                 file << r << g << b;
             }

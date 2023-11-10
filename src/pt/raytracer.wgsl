@@ -35,7 +35,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(2) @binding(3) var<storage, read_write> texCoords: array<array<vec2f, 3>>;
 @group(2) @binding(4) var<storage, read_write> textureDescriptorIndices: array<u32>;
 @group(2) @binding(5) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
-@group(2) @binding(6) var<storage, read_write> textures: array<array<f32, 4>>;
+@group(2) @binding(6) var<storage, read_write> textures: array<u32>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
@@ -284,7 +284,7 @@ struct TextureDescriptor {
     offset: u32,
 }
 
-fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3<f32> {
+fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
     let u = clamp(uv.x, 0f, 1f);
     let v = clamp(uv.y, 0f, 1f);
 
@@ -292,8 +292,8 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3<f32> {
     let i = u32(v * f32(desc.height));
     let idx = i * desc.width + j;
 
-    let elem = textures[desc.offset + idx];
-    return vec3(elem[0u], elem[1u], elem[2u]);
+    let rgba = textures[desc.offset + idx];
+    return vec3f(f32(rgba & 0xffu), f32((rgba >> 8u) & 0xffu), f32((rgba >> 16u) & 0xffu)) / 255f;
 }
 
 @must_use

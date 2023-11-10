@@ -224,7 +224,7 @@ Renderer::Renderer(
         std::vector<TextureDescriptor> textureDescriptors;
         textureDescriptors.reserve(bvh.textureIndices.size());
 
-        std::vector<Texture::Pixel> textureData;
+        std::vector<Texture::RgbaPixel> textureData;
         textureData.reserve(67108864);
 
         // Texture descriptors and texture data need to appended in the order of the model's
@@ -246,7 +246,9 @@ Renderer::Renderer(
 
             textureData.resize(textureData.size() + pixels.size());
             std::memcpy(
-                textureData.data() + offset, pixels.data(), pixels.size() * sizeof(Texture::Pixel));
+                textureData.data() + offset,
+                pixels.data(),
+                pixels.size() * sizeof(Texture::RgbaPixel));
 
             textureDescriptors.push_back({width, height, offset});
         }
@@ -257,7 +259,7 @@ Renderer::Renderer(
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
             std::span<const TextureDescriptor>(textureDescriptors));
 
-        const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::Pixel);
+        const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::RgbaPixel);
         const std::size_t maxStorageBufferBindingSize =
             static_cast<std::size_t>(wgpuRequiredLimits.limits.maxStorageBufferBindingSize);
         if (textureDataNumBytes > maxStorageBufferBindingSize)
@@ -272,7 +274,7 @@ Renderer::Renderer(
             gpuContext.device,
             "texture buffer",
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-            std::span<const Texture::Pixel>(textureData));
+            std::span<const Texture::RgbaPixel>(textureData));
     }
 
     {
