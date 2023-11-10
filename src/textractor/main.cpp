@@ -2,11 +2,20 @@
 #include <common/texture.hpp>
 
 #include <cassert>
+#include <cstdio>
 #include <fstream>
 
-int main()
+void printHelp() { std::printf("Usage: textractor <input_gltf_file>\n"); }
+
+int main(int argc, char** argv)
 {
-    const nlrs::GltfModel model("Duck.glb");
+    if (argc != 2)
+    {
+        printHelp();
+        return 0;
+    }
+
+    nlrs::GltfModel model(argv[1]);
 
     const auto baseColorTextures = model.baseColorTextures();
     for (std::size_t textureIdx = 0; textureIdx < baseColorTextures.size(); ++textureIdx)

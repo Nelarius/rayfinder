@@ -14,9 +14,17 @@ using namespace nlrs;
 
 inline constexpr Extent2i imageSize = Extent2i{1280, 720};
 
-int main()
+void printHelp() { std::cout << "Usage: bvh-visualizer <input_gltf_file>\n" << std::endl; }
+
+int main(int argc, char** argv)
 {
-    const nlrs::GltfModel model("Duck.glb");
+    if (argc != 2)
+    {
+        printHelp();
+        return 0;
+    }
+
+    const nlrs::GltfModel model(argv[1]);
     const nlrs::Bvh       bvh = nlrs::buildBvh(
         model.positions(), model.normals(), model.texCoords(), model.baseColorTextureIndices());
 

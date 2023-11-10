@@ -18,15 +18,23 @@
 inline constexpr int defaultWindowWidth = 640;
 inline constexpr int defaultWindowHeight = 480;
 
-int main()
+void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
+
+int main(int argc, char** argv)
 {
+    if (argc != 2)
+    {
+        printHelp();
+        return 0;
+    }
+
     nlrs::Window window{nlrs::WindowDescriptor{
         .windowSize = nlrs::Extent2i{defaultWindowWidth, defaultWindowHeight},
         .title = "pt-playground 🛝",
     }};
 
     {
-        const nlrs::GltfModel model("Duck.glb");
+        const nlrs::GltfModel model(argv[1]);
         const nlrs::Bvh       bvh = nlrs::buildBvh(
             model.positions(), model.normals(), model.texCoords(), model.baseColorTextureIndices());
 
