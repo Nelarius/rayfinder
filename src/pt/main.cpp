@@ -27,7 +27,8 @@ int main()
 
     {
         const nlrs::GltfModel model("Duck.glb");
-        const nlrs::Bvh bvh = nlrs::buildBvh(model.positions(), model.normals(), model.texCoords());
+        const nlrs::Bvh       bvh = nlrs::buildBvh(
+            model.positions(), model.normals(), model.texCoords(), model.baseColorTextureIndices());
 
         nlrs::FlyCameraController cameraController;
         nlrs::GpuContext          gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);

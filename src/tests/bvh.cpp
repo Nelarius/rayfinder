@@ -34,7 +34,8 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
     const std::span<const Triangle> triangles = std::span<const Triangle>(
         reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
 
-    const Bvh bvh = buildBvh(model.positions(), model.normals(), model.texCoords());
+    const Bvh bvh = buildBvh(
+        model.positions(), model.normals(), model.texCoords(), model.baseColorTextureIndices());
     REQUIRE_FALSE(bvh.nodes.empty());
     REQUIRE_FALSE(bvh.positions.empty());
 

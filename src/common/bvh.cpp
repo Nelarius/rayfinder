@@ -55,16 +55,18 @@ void initInteriorNode(
 }
 
 void buildLeafNode(
-    BvhNode&                            node,
-    const Aabb&                         nodeAabb,
-    const std::span<const Positions>    positions,
-    const std::span<const Normals>      normals,
-    const std::span<const TexCoords>    texCoords,
-    const std::span<const BvhPrimitive> bvhPrimitives,
-    std::span<Positions>                orderedPositions,
-    std::span<Normals>                  orderedNormals,
-    std::span<TexCoords>                orderedTexCoords,
-    const std::size_t                   orderedTrianglesOffset)
+    BvhNode&                             node,
+    const Aabb&                          nodeAabb,
+    const std::span<const Positions>     positions,
+    const std::span<const Normals>       normals,
+    const std::span<const TexCoords>     texCoords,
+    const std::span<const std::uint32_t> textureIndices,
+    const std::span<const BvhPrimitive>  bvhPrimitives,
+    std::span<Positions>                 orderedPositions,
+    std::span<Normals>                   orderedNormals,
+    std::span<TexCoords>                 orderedTexCoords,
+    std::span<std::uint32_t>             orderedTextureIndices,
+    const std::size_t                    orderedTrianglesOffset)
 {
     const std::size_t trianglesOffset = orderedTrianglesOffset;
     const std::size_t triangleCount = bvhPrimitives.size();
@@ -74,6 +76,7 @@ void buildLeafNode(
         orderedPositions[trianglesOffset + spanIdx] = positions[triangleIdx];
         orderedNormals[trianglesOffset + spanIdx] = normals[triangleIdx];
         orderedTexCoords[trianglesOffset + spanIdx] = texCoords[triangleIdx];
+        orderedTextureIndices[trianglesOffset + spanIdx] = textureIndices[triangleIdx];
     }
     assert(trianglesOffset < std::numeric_limits<std::uint32_t>::max());
     assert(triangleCount < std::numeric_limits<std::uint32_t>::max());
@@ -85,15 +88,17 @@ void buildLeafNode(
 }
 
 std::size_t buildRecursive(
-    const std::span<const Positions> positions,
-    const std::span<const Normals>   normals,
-    const std::span<const TexCoords> texCoords,
-    std::span<BvhPrimitive>          bvhPrimitives,
-    std::vector<BvhNode>&            bvhNodes,
-    std::vector<Positions>&          orderedPositions,
-    std::vector<Normals>&            orderedNormals,
-    std::vector<TexCoords>&          orderedTexCoords,
-    const std::size_t                orderedTrianglesOffset)
+    const std::span<const Positions>     positions,
+    const std::span<const Normals>       normals,
+    const std::span<const TexCoords>     texCoords,
+    const std::span<const std::uint32_t> textureIndices,
+    std::span<BvhPrimitive>              bvhPrimitives,
+    std::vector<BvhNode>&                bvhNodes,
+    std::vector<Positions>&              orderedPositions,
+    std::vector<Normals>&                orderedNormals,
+    std::vector<TexCoords>&              orderedTexCoords,
+    std::vector<std::uint32_t>&          orderedTextureIndices,
+    const std::size_t                    orderedTrianglesOffset)
 {
     assert(positions.size() == orderedPositions.size());
     assert(normals.size() == orderedNormals.size());
@@ -129,10 +134,12 @@ std::size_t buildRecursive(
             positions,
             normals,
             texCoords,
+            textureIndices,
             bvhPrimitives,
             orderedPositions,
             orderedNormals,
             orderedTexCoords,
+            orderedTextureIndices,
             orderedTrianglesOffset);
         return currentNodeIdx;
     }
@@ -245,10 +252,12 @@ std::size_t buildRecursive(
                     positions,
                     normals,
                     texCoords,
+                    textureIndices,
                     bvhPrimitives,
                     orderedPositions,
                     orderedNormals,
                     orderedTexCoords,
+                    orderedTextureIndices,
                     orderedTrianglesOffset);
                 return currentNodeIdx;
             }
@@ -261,21 +270,25 @@ std::size_t buildRecursive(
         positions,
         normals,
         texCoords,
+        textureIndices,
         bvhPrimitives.subspan(0, splitIdx),
         bvhNodes,
         orderedPositions,
         orderedNormals,
         orderedTexCoords,
+        orderedTextureIndices,
         orderedTrianglesOffset);
     const std::size_t secondChildOffset = buildRecursive(
         positions,
         normals,
         texCoords,
+        textureIndices,
         bvhPrimitives.subspan(splitIdx),
         bvhNodes,
         orderedPositions,
         orderedNormals,
         orderedTexCoords,
+        orderedTextureIndices,
         orderedTrianglesOffset + splitIdx);
 
     assert(splitAxis <= 2);
@@ -291,9 +304,10 @@ std::size_t buildRecursive(
 } // namespace
 
 Bvh buildBvh(
-    std::span<const Positions> positions,
-    std::span<const Normals>   normals,
-    std::span<const TexCoords> texCoords)
+    std::span<const Positions>     positions,
+    std::span<const Normals>       normals,
+    std::span<const TexCoords>     texCoords,
+    std::span<const std::uint32_t> textureIndices)
 {
     assert(!positions.empty());
     assert(!normals.empty());
@@ -315,21 +329,24 @@ Bvh buildBvh(
         });
     }
 
-    std::vector<Positions> orderedPositions(numTriangles);
-    std::vector<Normals>   orderedNormals(numTriangles);
-    std::vector<TexCoords> orderedTexCoords(numTriangles);
-    std::vector<BvhNode>   bvhNodes;
-    bvhNodes.reserve(1024);
+    std::vector<Positions>     orderedPositions(numTriangles);
+    std::vector<Normals>       orderedNormals(numTriangles);
+    std::vector<TexCoords>     orderedTexCoords(numTriangles);
+    std::vector<std::uint32_t> orderedTextureIndices(numTriangles);
+    std::vector<BvhNode>       bvhNodes;
+    bvhNodes.reserve(2 << 19);
 
     buildRecursive(
         positions,
         normals,
         texCoords,
+        textureIndices,
         bvhPrimitives,
         bvhNodes,
         orderedPositions,
         orderedNormals,
         orderedTexCoords,
+        orderedTextureIndices,
         0);
 
     return Bvh{
@@ -337,6 +354,7 @@ Bvh buildBvh(
         .positions = std::move(orderedPositions),
         .normals = std::move(orderedNormals),
         .texCoords = std::move(orderedTexCoords),
+        .textureIndices = std::move(orderedTextureIndices),
     };
 }
 } // namespace nlrs

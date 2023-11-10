@@ -20,14 +20,16 @@ struct BvhNode
 
 struct Bvh
 {
-    std::vector<BvhNode>   nodes;
-    std::vector<Positions> positions;
-    std::vector<Normals>   normals;
-    std::vector<TexCoords> texCoords;
+    std::vector<BvhNode>       nodes;
+    std::vector<Positions>     positions;
+    std::vector<Normals>       normals;
+    std::vector<TexCoords>     texCoords;
+    std::vector<std::uint32_t> textureIndices;
 };
 
 Bvh buildBvh(
-    std::span<const Positions> positions,
-    std::span<const Normals>   normals,
-    std::span<const TexCoords> texCoords);
+    std::span<const Positions>     positions,
+    std::span<const Normals>       normals,
+    std::span<const TexCoords>     texCoords,
+    std::span<const std::uint32_t> textureIndices);
 } // namespace nlrs
