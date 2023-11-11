@@ -121,11 +121,12 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var intersection = Intersection();
     var triangleIdx = 0u;
     if rayIntersectBvh(ray, T_MAX, &intersection, &triangleIdx) {
-        let b = intersection.b;
-
-        let uvs = texCoords[triangleIdx];
-        let uv = b[0] * uvs[0] + b[1] * uvs[1] + b[2] * uvs[2];
         let textureDesc = textureDescriptors[textureDescriptorIndices[triangleIdx]];
+
+        let b = intersection.b;
+        let uvs = texCoords[triangleIdx];
+        let uv = b[0] * uvs[0].xy + b[1] * uvs[1].xy + b[2] * uvs[2].xy;
+
         color = textureLookup(textureDesc, uv);
     }
 

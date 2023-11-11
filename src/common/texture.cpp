@@ -15,8 +15,9 @@ Texture Texture::fromMemory(std::span<const std::uint8_t> data)
     int sourceChannels;
 
     const int desiredChannels = 4;
-    // NOTE: desired channels results in rgb output, regardless of number of source channels.
-    // If desiredChannels is 0, then sourceChannels is used as the number of channels.
+    // NOTE: desired channels results in RGBA output, regardless of number of source channels.
+    // Missing values are filled in -- e.g. when sourceChannels is 3, then the texture is opaque. If
+    // desiredChannels is 0, then sourceChannels is used as the number of channels.
     unsigned char* const pixelData = stbi_load_from_memory(
         data.data(),
         static_cast<int>(data.size()),
