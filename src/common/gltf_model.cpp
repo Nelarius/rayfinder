@@ -126,6 +126,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 const cgltf_pbr_metallic_roughness& pbrMetallicRoughness =
                     primitive.material->pbr_metallic_roughness;
 
+                assert(pbrMetallicRoughness.base_color_texture.texcoord == 0);
                 assert(pbrMetallicRoughness.base_color_texture.texture);
                 const cgltf_texture& baseColorTexture =
                     *pbrMetallicRoughness.base_color_texture.texture;
@@ -182,6 +183,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
                     }
                     else if (attribute.type == cgltf_attribute_type_texcoord)
                     {
+                        assert(!texCoordAccessor);
                         texCoordAccessor = attribute.data;
                     }
                 }
