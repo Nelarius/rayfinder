@@ -85,8 +85,8 @@ std::size_t buildRecursive(
     const std::span<const Positions> positions,
     std::span<BvhPrimitive>          bvhPrimitives,
     std::vector<BvhNode>&            bvhNodes,
-    std::vector<Positions>&          orderedPositions,
-    std::vector<std::size_t>&        positionIndices,
+    std::span<Positions>             orderedPositions,
+    std::span<std::size_t>           positionIndices,
     const std::size_t                orderedTrianglesOffset)
 {
     assert(positions.size() == orderedPositions.size());
