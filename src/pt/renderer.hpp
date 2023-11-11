@@ -2,24 +2,36 @@
 
 #include "gpu_buffer.hpp"
 
+#include <common/bvh.hpp>
 #include <common/camera.hpp>
 #include <common/extent.hpp>
+#include <common/geometry.hpp>
+#include <common/texture.hpp>
 #include <webgpu/webgpu.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <span>
 
 namespace nlrs
 {
-struct Bvh;
-class GltfModel;
 struct GpuContext;
 
 struct RenderParameters
 {
     Extent2u framebufferSize;
     Camera   camera;
+};
+
+struct Scene
+{
+    const Bvh&                     bvh;
+    std::span<const Positions>     positions;
+    std::span<const Normals>       normals;
+    std::span<const TexCoords>     texCoords;
+    std::span<const std::uint32_t> textureIndices;
+    std::span<const Texture>       baseColorTextures;
 };
 
 struct RendererDescriptor
@@ -63,7 +75,7 @@ struct Renderer
 
     TimestampBufferMapContext timestampBufferMapContext;
 
-    Renderer(const RendererDescriptor&, const GpuContext&, const Bvh& bvh, const GltfModel& model);
+    Renderer(const RendererDescriptor&, const GpuContext&, Scene);
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);

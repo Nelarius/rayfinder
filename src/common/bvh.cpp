@@ -55,28 +55,22 @@ void initInteriorNode(
 }
 
 void buildLeafNode(
-    BvhNode&                             node,
-    const Aabb&                          nodeAabb,
-    const std::span<const Positions>     positions,
-    const std::span<const Normals>       normals,
-    const std::span<const TexCoords>     texCoords,
-    const std::span<const std::uint32_t> textureIndices,
-    const std::span<const BvhPrimitive>  bvhPrimitives,
-    std::span<Positions>                 orderedPositions,
-    std::span<Normals>                   orderedNormals,
-    std::span<TexCoords>                 orderedTexCoords,
-    std::span<std::uint32_t>             orderedTextureIndices,
-    const std::size_t                    orderedTrianglesOffset)
+    BvhNode&                            node,
+    const Aabb&                         nodeAabb,
+    const std::span<const Positions>    positions,
+    const std::span<const BvhPrimitive> bvhPrimitives,
+    std::span<Positions>                orderedPositions,
+    std::span<std::size_t>              positionIndices,
+    const std::size_t                   orderedTrianglesOffset)
 {
     const std::size_t trianglesOffset = orderedTrianglesOffset;
     const std::size_t triangleCount = bvhPrimitives.size();
     for (std::size_t spanIdx = 0; spanIdx < triangleCount; ++spanIdx)
     {
-        const std::size_t triangleIdx = bvhPrimitives[spanIdx].triangleIdx;
-        orderedPositions[trianglesOffset + spanIdx] = positions[triangleIdx];
-        orderedNormals[trianglesOffset + spanIdx] = normals[triangleIdx];
-        orderedTexCoords[trianglesOffset + spanIdx] = texCoords[triangleIdx];
-        orderedTextureIndices[trianglesOffset + spanIdx] = textureIndices[triangleIdx];
+        const std::size_t newIdx = trianglesOffset + spanIdx;
+        const std::size_t sourceIdx = bvhPrimitives[spanIdx].triangleIdx;
+        orderedPositions[newIdx] = positions[sourceIdx];
+        positionIndices[sourceIdx] = newIdx;
     }
     assert(trianglesOffset < std::numeric_limits<std::uint32_t>::max());
     assert(triangleCount < std::numeric_limits<std::uint32_t>::max());
@@ -88,21 +82,14 @@ void buildLeafNode(
 }
 
 std::size_t buildRecursive(
-    const std::span<const Positions>     positions,
-    const std::span<const Normals>       normals,
-    const std::span<const TexCoords>     texCoords,
-    const std::span<const std::uint32_t> textureIndices,
-    std::span<BvhPrimitive>              bvhPrimitives,
-    std::vector<BvhNode>&                bvhNodes,
-    std::vector<Positions>&              orderedPositions,
-    std::vector<Normals>&                orderedNormals,
-    std::vector<TexCoords>&              orderedTexCoords,
-    std::vector<std::uint32_t>&          orderedTextureIndices,
-    const std::size_t                    orderedTrianglesOffset)
+    const std::span<const Positions> positions,
+    std::span<BvhPrimitive>          bvhPrimitives,
+    std::vector<BvhNode>&            bvhNodes,
+    std::vector<Positions>&          orderedPositions,
+    std::vector<std::size_t>&        positionIndices,
+    const std::size_t                orderedTrianglesOffset)
 {
     assert(positions.size() == orderedPositions.size());
-    assert(normals.size() == orderedNormals.size());
-    assert(texCoords.size() == orderedTexCoords.size());
     assert(bvhPrimitives.size() >= 1);
 
     // Insert new node in memory. Even though we don't reference it yet, recursive function calls
@@ -132,14 +119,9 @@ std::size_t buildRecursive(
             bvhNodes[currentNodeIdx],
             nodeAabb,
             positions,
-            normals,
-            texCoords,
-            textureIndices,
             bvhPrimitives,
             orderedPositions,
-            orderedNormals,
-            orderedTexCoords,
-            orderedTextureIndices,
+            positionIndices,
             orderedTrianglesOffset);
         return currentNodeIdx;
     }
@@ -250,14 +232,9 @@ std::size_t buildRecursive(
                     bvhNodes[currentNodeIdx],
                     nodeAabb,
                     positions,
-                    normals,
-                    texCoords,
-                    textureIndices,
                     bvhPrimitives,
                     orderedPositions,
-                    orderedNormals,
-                    orderedTexCoords,
-                    orderedTextureIndices,
+                    positionIndices,
                     orderedTrianglesOffset);
                 return currentNodeIdx;
             }
@@ -268,27 +245,17 @@ std::size_t buildRecursive(
 
     buildRecursive(
         positions,
-        normals,
-        texCoords,
-        textureIndices,
         bvhPrimitives.subspan(0, splitIdx),
         bvhNodes,
         orderedPositions,
-        orderedNormals,
-        orderedTexCoords,
-        orderedTextureIndices,
+        positionIndices,
         orderedTrianglesOffset);
     const std::size_t secondChildOffset = buildRecursive(
         positions,
-        normals,
-        texCoords,
-        textureIndices,
         bvhPrimitives.subspan(splitIdx),
         bvhNodes,
         orderedPositions,
-        orderedNormals,
-        orderedTexCoords,
-        orderedTextureIndices,
+        positionIndices,
         orderedTrianglesOffset + splitIdx);
 
     assert(splitAxis <= 2);
@@ -303,17 +270,9 @@ std::size_t buildRecursive(
 }
 } // namespace
 
-Bvh buildBvh(
-    std::span<const Positions>     positions,
-    std::span<const Normals>       normals,
-    std::span<const TexCoords>     texCoords,
-    std::span<const std::uint32_t> textureIndices)
+Bvh buildBvh(std::span<const Positions> positions)
 {
     assert(!positions.empty());
-    assert(!normals.empty());
-    assert(!texCoords.empty());
-    assert(positions.size() == normals.size());
-    assert(positions.size() == texCoords.size());
 
     const std::size_t         numTriangles = positions.size();
     std::vector<BvhPrimitive> bvhPrimitives;
@@ -329,32 +288,17 @@ Bvh buildBvh(
         });
     }
 
-    std::vector<Positions>     orderedPositions(numTriangles);
-    std::vector<Normals>       orderedNormals(numTriangles);
-    std::vector<TexCoords>     orderedTexCoords(numTriangles);
-    std::vector<std::uint32_t> orderedTextureIndices(numTriangles);
-    std::vector<BvhNode>       bvhNodes;
+    std::vector<Positions>   orderedPositions(numTriangles);
+    std::vector<std::size_t> positionIndices(numTriangles);
+    std::vector<BvhNode>     bvhNodes;
     bvhNodes.reserve(2 << 19);
 
-    buildRecursive(
-        positions,
-        normals,
-        texCoords,
-        textureIndices,
-        bvhPrimitives,
-        bvhNodes,
-        orderedPositions,
-        orderedNormals,
-        orderedTexCoords,
-        orderedTextureIndices,
-        0);
+    buildRecursive(positions, bvhPrimitives, bvhNodes, orderedPositions, positionIndices, 0);
 
     return Bvh{
         .nodes = std::move(bvhNodes),
         .positions = std::move(orderedPositions),
-        .normals = std::move(orderedNormals),
-        .texCoords = std::move(orderedTexCoords),
-        .textureIndices = std::move(orderedTextureIndices),
+        .positionIndices = std::move(positionIndices),
     };
 }
 } // namespace nlrs

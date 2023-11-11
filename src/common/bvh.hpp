@@ -2,7 +2,9 @@
 
 #include "geometry.hpp"
 
+#include <concepts>
 #include <cstdint>
+#include <cstddef>
 #include <span>
 #include <vector>
 
@@ -20,16 +22,26 @@ struct BvhNode
 
 struct Bvh
 {
-    std::vector<BvhNode>       nodes;
-    std::vector<Positions>     positions;
-    std::vector<Normals>       normals;
-    std::vector<TexCoords>     texCoords;
-    std::vector<std::uint32_t> textureIndices;
+    std::vector<BvhNode>   nodes;
+    std::vector<Positions> positions;
+    // The positions are sorted so that leaf nodes point to contiguous ranges of triangle
+    // attributes. `positionIndices` contains the new index of the position. It can be used to
+    // reorder the remaining triangle attributes to match the order of the positions.
+    std::vector<std::size_t> positionIndices;
 };
 
-Bvh buildBvh(
-    std::span<const Positions>     positions,
-    std::span<const Normals>       normals,
-    std::span<const TexCoords>     texCoords,
-    std::span<const std::uint32_t> textureIndices);
+Bvh buildBvh(std::span<const Positions> positions);
+
+template<std::copyable T>
+std::vector<T> reorderAttributes(
+    const std::span<const T>           attributes,
+    const std::span<const std::size_t> positionIndices)
+{
+    std::vector<T> reorderedAttributes(attributes.size());
+    for (std::size_t i = 0; i < attributes.size(); ++i)
+    {
+        reorderedAttributes[positionIndices[i]] = attributes[i];
+    }
+    return reorderedAttributes;
+}
 } // namespace nlrs

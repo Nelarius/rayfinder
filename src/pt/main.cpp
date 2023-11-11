@@ -34,32 +34,39 @@ int main(int argc, char** argv)
     }};
 
     {
-        const nlrs::GltfModel model(argv[1]);
-        const nlrs::Bvh       bvh = nlrs::buildBvh(
-            model.positions(), model.normals(), model.texCoords(), model.baseColorTextureIndices());
-
         nlrs::FlyCameraController cameraController;
         nlrs::GpuContext          gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);
 
-        {
-            const nlrs::BvhNode& rootNode = bvh.nodes[0];
-            const glm::vec3      rootCentroid = centroid(rootNode.aabb);
+        nlrs::Renderer renderer =
+            [&cameraController, &gpuContext, &window, argv]() -> nlrs::Renderer {
+            const nlrs::RendererDescriptor rendererDesc{
+                .renderParams = [&window, &cameraController]() -> nlrs::RenderParameters {
+                    const nlrs::Extent2i framebufferSize = window.resolution();
+                    return nlrs::RenderParameters{
+                        .framebufferSize = nlrs::Extent2u(framebufferSize),
+                        .camera = cameraController.getCamera(),
+                    };
+                }(),
+                .maxFramebufferSize = window.largestMonitorResolution(),
+            };
 
-            cameraController.lookAt(rootCentroid);
-        }
+            const nlrs::GltfModel model(argv[1]);
+            const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
+            const auto normals = nlrs::reorderAttributes(model.normals(), bvh.positionIndices);
+            const auto texCoords = nlrs::reorderAttributes(model.texCoords(), bvh.positionIndices);
+            const auto textureIndices =
+                nlrs::reorderAttributes(model.baseColorTextureIndices(), bvh.positionIndices);
 
-        const nlrs::RendererDescriptor rendererDesc{
-            .renderParams = [&window, &cameraController]() -> nlrs::RenderParameters {
-                const nlrs::Extent2i framebufferSize = window.resolution();
-                return nlrs::RenderParameters{
-                    .framebufferSize = nlrs::Extent2u(framebufferSize),
-                    .camera = cameraController.getCamera(),
-                };
-            }(),
-            .maxFramebufferSize = window.largestMonitorResolution(),
-        };
+            nlrs::Scene scene{
+                .bvh = bvh,
+                .normals = normals,
+                .texCoords = texCoords,
+                .textureIndices = textureIndices,
+                .baseColorTextures = model.baseColorTextures(),
+            };
 
-        nlrs::Renderer renderer(rendererDesc, gpuContext, bvh, model);
+            return nlrs::Renderer(rendererDesc, gpuContext, std::move(scene));
+        }();
 
         {
             nlrs::Extent2i curFramebufferSize = window.resolution();
@@ -123,16 +130,9 @@ int main(int argc, char** argv)
                     ImGui::Separator();
                     ImGui::Text("Scene");
                     {
-                        const nlrs::BvhNode& rootNode = bvh.nodes[0];
-                        const glm::vec3      rootCenter = centroid(rootNode.aabb);
-                        const glm::vec3      camPos = cameraController.position();
+                        const glm::vec3 camPos = cameraController.position();
                         ImGui::Text(
                             "camera position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
-                        ImGui::Text(
-                            "root centroid: (%.2f, %.2f, %.2f)",
-                            rootCenter.x,
-                            rootCenter.y,
-                            rootCenter.z);
                     }
 
                     ImGui::End();

@@ -128,8 +128,7 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 Renderer::Renderer(
     const RendererDescriptor& rendererDesc,
     const GpuContext&         gpuContext,
-    const Bvh&                bvh,
-    const GltfModel&          model)
+    const Scene               scene)
     : vertexBuffer(),
       uniformsBuffer(),
       uniformsBindGroup(nullptr),
@@ -143,27 +142,27 @@ Renderer::Renderer(
           gpuContext.device,
           "bvh nodes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const BvhNode>(bvh.nodes)),
+          std::span<const BvhNode>(scene.bvh.nodes)),
       triangleBuffer(
           gpuContext.device,
           "triangles buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const Positions>(bvh.positions)),
+          std::span<const Positions>(scene.bvh.positions)),
       normalsBuffer(
           gpuContext.device,
           "normals buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const Normals>(bvh.normals)),
+          std::span<const Normals>(scene.normals)),
       texCoordsBuffer(
           gpuContext.device,
           "tex coords buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const TexCoords>(bvh.texCoords)),
+          std::span<const TexCoords>(scene.texCoords)),
       textureDescriptorIndicesBuffer(
           gpuContext.device,
           "texture descriptor indices buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const std::uint32_t>(bvh.textureIndices)),
+          std::span<const std::uint32_t>(scene.textureIndices)),
       textureDescriptorBuffer(),
       textureBuffer(),
       sceneBindGroup(nullptr),
@@ -222,7 +221,7 @@ Renderer::Renderer(
         };
         // Ensure matches layout of `TextureDescriptor` definition in shader.
         std::vector<TextureDescriptor> textureDescriptors;
-        textureDescriptors.reserve(bvh.textureIndices.size());
+        textureDescriptors.reserve(scene.textureIndices.size());
 
         std::vector<Texture::RgbaPixel> textureData;
         textureData.reserve(67108864);
@@ -235,7 +234,7 @@ Renderer::Renderer(
         // baseColorTextureIndices -> baseColorTextures becomes
         // textureDescriptorIndices -> textureDescriptor -> textureData lookup
 
-        for (const Texture& baseColorTexture : model.baseColorTextures())
+        for (const Texture& baseColorTexture : scene.baseColorTextures)
         {
             const auto dimensions = baseColorTexture.dimensions();
             const auto pixels = baseColorTexture.pixels();

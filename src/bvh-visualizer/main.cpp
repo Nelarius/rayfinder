@@ -25,8 +25,7 @@ int main(int argc, char** argv)
     }
 
     const nlrs::GltfModel model(argv[1]);
-    const nlrs::Bvh       bvh = nlrs::buildBvh(
-        model.positions(), model.normals(), model.texCoords(), model.baseColorTextureIndices());
+    const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];
