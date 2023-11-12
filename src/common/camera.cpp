@@ -10,7 +10,7 @@ Camera createCamera(
     const Angle     vfov,
     const float     aspectRatio)
 {
-    const float theta = vfov.as_radians();
+    const float theta = vfov.asRadians();
     const float halfHeight = focusDistance * glm::tan(0.5f * theta);
     const float halfWidth = aspectRatio * halfHeight;
 
