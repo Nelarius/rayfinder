@@ -24,9 +24,11 @@ public:
 
     // Accessors
 
-    float&           speed() { return mSpeed; }
-    Angle&           vfov() { return mVfov; }
-    const glm::vec3& position() const { return mPosition; }
+    inline float&           speed() { return mSpeed; }
+    inline Angle&           vfov() { return mVfov; }
+    inline const glm::vec3& position() const { return mPosition; }
+    inline const Angle      yaw() const { return mYaw; }
+    inline const Angle      pitch() const { return mPitch; }
 
 private:
     // Camera orientation and physical characteristics
