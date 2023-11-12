@@ -107,6 +107,13 @@ struct Ray {
 
 struct Intersection {
     p: vec3f,
+    n: vec3f,
+    uv: vec2f,
+    triangleIdx: u32,
+}
+
+struct TriangleHit {
+    p: vec3f,
     b: vec3f,
     t: f32,
 }
@@ -119,14 +126,11 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var color = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
 
     var intersection = Intersection();
-    var triangleIdx = 0u;
-    if rayIntersectBvh(ray, T_MAX, &intersection, &triangleIdx) {
-        let textureDesc = textureDescriptors[textureDescriptorIndices[triangleIdx]];
+    if rayIntersectBvh(ray, T_MAX, &intersection) {
+        let idx = intersection.triangleIdx;
+        let textureDesc = textureDescriptors[textureDescriptorIndices[idx]];
 
-        let b = intersection.b;
-        let uvs = texCoords[triangleIdx];
-        let uv = b[0] * uvs[0].xy + b[1] * uvs[1].xy + b[2] * uvs[2].xy;
-
+        let uv = intersection.uv;
         color = textureLookup(textureDesc, uv);
     }
 
@@ -140,7 +144,7 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
     return Ray(origin, direction);
 }
 
-fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>, triangleIdx: ptr<function, u32>) -> bool {
+fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
     let intersector = rayAabbIntersector(ray);
     var toVisitOffset = 0u;
     var currentNodeIdx = 0u;
@@ -155,9 +159,22 @@ fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>, tri
             if node.triangleCount > 0u {
                 for (var idx = 0u; idx < node.triangleCount; idx = idx + 1u) {
                     let triangle: Triangle = triangles[node.trianglesOffset + idx];
-                    if rayIntersectTriangle(ray, triangle, tmax, hit) {
-                        tmax = (*hit).t;
-                        *triangleIdx = node.trianglesOffset + idx;
+                    var trihit: TriangleHit;
+                    if rayIntersectTriangle(ray, triangle, tmax, &trihit) {
+                        tmax = trihit.t;
+
+                        let b = trihit.b;
+
+                        let p = trihit.p;
+
+                        let triangleIdx = node.trianglesOffset + idx;
+                        let ns = normals[triangleIdx];
+                        let n = b[0] * ns[0] + b[1] * ns[1] + b[2] * ns[2];
+
+                        let uvs = texCoords[triangleIdx];
+                        let uv = b[0] * uvs[0].xy + b[1] * uvs[1].xy + b[2] * uvs[2].xy;
+
+                        *hit = Intersection(p, n, uv, triangleIdx);
                         didIntersect = true;
                     }
                 }
@@ -235,7 +252,7 @@ fn rayIntersectAabb(intersector: RayAabbIntersector, aabb: Aabb, rayTMax: f32) -
     return (tmin < rayTMax) && (tmax > 0.0);
 }
 
-fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, Intersection>) -> bool {
+fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, TriangleHit>) -> bool {
     // Mäller-Trumbore algorithm
     // https://en.wikipedia.org/wiki/Möller–Trumbore_intersection_algorithm
     let e1 = tri.v1 - tri.v0;
@@ -272,7 +289,7 @@ fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, I
         // -> p = v0 + u * e1 + v * e2
         let p = tri.v0 + u * e1 + v * e2;
         let b = vec3f(1f - u - v, u, v);
-        *hit = Intersection(p, b, t);
+        *hit = TriangleHit(p, b, t);
         return true;
     } else {
         return false;
