@@ -160,7 +160,8 @@ int main(int argc, char** argv)
 
                 {
                     const nlrs::RenderParameters renderParams{
-                        .camera = cameraController.getCamera(),
+                        nlrs::Extent2u(window.resolution()),
+                        cameraController.getCamera(),
                     };
                     renderer.setRenderParameters(renderParams);
                     renderer.render(gpuContext);
