@@ -59,9 +59,14 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 const EPSILON = 0.00001f;
 
 const PI = 3.1415927f;
+const FRAC_1_PI = 0.31830987f;
+const FRAC_PI_2 = 1.5707964f;
 
 const T_MIN = 0.001f;
 const T_MAX = 10000f;
+
+const NUM_BOUNCES = 4u;
+const UNIFORM_HEMISPHERE_MULTIPLIER = 2f * PI;
 
 struct RenderParams {
   frameData: FrameData,
@@ -94,6 +99,7 @@ struct BvhNode {
     splitAxis: u32,
 }
 
+// TODO: rename to positions
 struct Triangle {
     v0: vec3f,
     v1: vec3f,
@@ -121,17 +127,23 @@ struct TriangleHit {
 fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var ray = primaryRay;
 
-    let unitDirection = normalize(ray.direction);
-    let t = 0.5f * (unitDirection.y + 1f);
-    var color = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
-
-    var intersection = Intersection();
-    if rayIntersectBvh(ray, T_MAX, &intersection) {
-        let idx = intersection.triangleIdx;
-        let textureDesc = textureDescriptors[textureDescriptorIndices[idx]];
-
-        let uv = intersection.uv;
-        color = textureLookup(textureDesc, uv);
+    var color = vec3(0f);
+    var throughput = vec3(1f);
+    for (var bounces = 0u; bounces < NUM_BOUNCES; bounces += 1u) {
+        var intersection: Intersection;
+        if rayIntersectBvh(ray, T_MAX, &intersection) {
+            let p = intersection.p;
+            let scatterDirection = sampleLambertian(intersection, rngState);
+            let scatterThroughput = UNIFORM_HEMISPHERE_MULTIPLIER * evalLambertian(intersection, scatterDirection);
+            ray = Ray(p, scatterDirection);
+            throughput *= scatterThroughput;
+        } else {
+            let unitDirection = normalize(ray.direction);
+            let t = 0.5f * (unitDirection.y + 1f);
+            let skyColor = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
+            color += throughput * skyColor;
+            break;
+        }
     }
 
     return color;
@@ -142,6 +154,30 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
     let direction = camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin;
 
     return Ray(origin, direction);
+}
+
+fn sampleLambertian(hit: Intersection, rngState: ptr<function, u32>) -> vec3f {
+    let v = rngNextInUnitHemisphere(rngState);
+    let onb = pixarOnb(hit.n);
+    return onb * v;
+}
+
+fn evalLambertian(hit: Intersection, wi: vec3f) -> vec3f {
+    let textureDesc = textureDescriptors[textureDescriptorIndices[hit.triangleIdx]];
+    let uv = hit.uv;
+    let albedo = textureLookup(textureDesc, uv);
+    return albedo * FRAC_1_PI * max(EPSILON, dot(hit.n, wi));
+}
+
+fn pixarOnb(n: vec3<f32>) -> mat3x3<f32> {
+    // https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf
+    let s = select(-1f, 1f, n.z >= 0f);
+    let a = -1f / (s + n.z);
+    let b = n.x * n.y * a;
+    let u = vec3<f32>(1f + s * n.x * n.x * a, s * b, -s * n.x);
+    let v = vec3<f32>(b, s + n.y * n.y * a, -n.y);
+
+    return mat3x3<f32>(u, v, n);
 }
 
 fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
@@ -172,7 +208,7 @@ fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> 
                         let n = b[0] * ns[0] + b[1] * ns[1] + b[2] * ns[2];
 
                         let uvs = texCoords[triangleIdx];
-                        let uv = b[0] * uvs[0].xy + b[1] * uvs[1].xy + b[2] * uvs[2].xy;
+                        let uv = b[0] * uvs[0] + b[1] * uvs[1] + b[2] * uvs[2];
 
                         *hit = Intersection(p, n, uv, triangleIdx);
                         didIntersect = true;
@@ -302,6 +338,7 @@ struct TextureDescriptor {
     offset: u32,
 }
 
+@must_use
 fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
     let u = clamp(uv.x, 0f, 1f);
     let v = clamp(uv.y, 0f, 1f);
@@ -312,6 +349,21 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
 
     let rgba = textures[desc.offset + idx];
     return vec3f(f32(rgba & 0xffu), f32((rgba >> 8u) & 0xffu), f32((rgba >> 16u) & 0xffu)) / 255f;
+}
+
+@must_use
+fn rngNextInUnitHemisphere(state: ptr<function, u32>) -> vec3<f32> {
+    let r1 = rngNextFloat(state);
+    let r2 = rngNextFloat(state);
+
+    let phi = 2f * PI * r1;
+    let sinTheta = sqrt(1f - r2 * r2);
+
+    let x = cos(phi) * sinTheta;
+    let y = sin(phi) * sinTheta;
+    let z = r2;
+
+    return vec3(x, y, z);
 }
 
 @must_use
