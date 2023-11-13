@@ -71,8 +71,15 @@ int main(int argc, char** argv)
         {
             nlrs::Extent2i curFramebufferSize = window.resolution();
             float          vfovDegrees = 70.0f;
+            auto           lastTime = std::chrono::steady_clock::now();
             while (!glfwWindowShouldClose(window.ptr()))
             {
+                const auto  currentTime = std::chrono::steady_clock::now();
+                const float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(
+                                            currentTime - lastTime)
+                                            .count();
+                lastTime = currentTime;
+
                 glfwPollEvents();
 
                 // Resize
@@ -152,7 +159,7 @@ int main(int argc, char** argv)
                     // Skip input if ImGui captured input
                     if (!ImGui::GetIO().WantCaptureMouse)
                     {
-                        cameraController.update(window.ptr(), 0.0167f);
+                        cameraController.update(window.ptr(), deltaTime);
                     }
                 }
 
