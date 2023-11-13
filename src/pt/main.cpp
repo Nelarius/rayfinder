@@ -135,7 +135,7 @@ int main(int argc, char** argv)
                         const auto      camPitch = cameraController.pitch();
                         ImGui::Text("position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
                         ImGui::Text("yaw: %.2f", camYaw.asDegrees());
-                        ImGui::Text("pitch: %.2f", camPitch.asRadians());
+                        ImGui::Text("pitch: %.2f", camPitch.asDegrees());
                     }
 
                     ImGui::End();
