@@ -1,5 +1,5 @@
 struct Uniforms {
-    viewProjectionMatrix: mat4x4<f32>,
+    viewProjectionMatrix: mat4x4f,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -169,15 +169,15 @@ fn evalLambertian(hit: Intersection, wi: vec3f) -> vec3f {
     return albedo * FRAC_1_PI * max(EPSILON, dot(hit.n, wi));
 }
 
-fn pixarOnb(n: vec3<f32>) -> mat3x3<f32> {
+fn pixarOnb(n: vec3f) -> mat3x3f {
     // https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf
     let s = select(-1f, 1f, n.z >= 0f);
     let a = -1f / (s + n.z);
     let b = n.x * n.y * a;
-    let u = vec3<f32>(1f + s * n.x * n.x * a, s * b, -s * n.x);
-    let v = vec3<f32>(b, s + n.y * n.y * a, -n.y);
+    let u = vec3(1f + s * n.x * n.x * a, s * b, -s * n.x);
+    let v = vec3(b, s + n.y * n.y * a, -n.y);
 
-    return mat3x3<f32>(u, v, n);
+    return mat3x3(u, v, n);
 }
 
 fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
@@ -352,7 +352,7 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
 }
 
 @must_use
-fn rngNextInUnitHemisphere(state: ptr<function, u32>) -> vec3<f32> {
+fn rngNextInUnitHemisphere(state: ptr<function, u32>) -> vec3f {
     let r1 = rngNextFloat(state);
     let r2 = rngNextFloat(state);
 
