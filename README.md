@@ -28,16 +28,24 @@ $ cmake --build build-debug --target pt -- -j 32
 
 ### `bvh-visualizer`
 
-This executable loads a glTF file, builds a bounding volume hierarchy (BVH), and produces an image where each pixel is colored by the number of nodes visited for the pixel's primary ray. The image is printed in the PPM format to stdout.
+For validating that the bounding volume hierarchy (BVH) and it's intersection tests are computed correctly. This executable loads the specified glTF file, builds a BVH, and produces an image where each pixel is colored by the number of nodes visited for the pixel's primary ray. The image is printed in the PPM format to stdout.
 
 ```sh
-$ (cd build-release && ./bvh-visualizer) > duck.ppm
+$ ./build-release/bvh-visualizer assets/Duck.glb > duck.ppm
 ```
 
 ### `tests`
 
-To run the tests, the working directory has to be in the build folder, as some sample assets are copied there and used for tests.
+To run the tests, the working directory has to be in the build folder. The tests depend on assets which are copied to the build folder.
 
 ```sh
 $ (cd build-debug && ./tests)
+```
+
+### `textractor`
+
+For validating that textures are loaded correctly. Loads the specified glTF model and its base color textures, and dumps the textures into `.ppm` files.
+
+```sh
+$ ./build-release/textractor assets/Sponza.ppm
 ```
