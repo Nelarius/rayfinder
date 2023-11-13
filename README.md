@@ -11,6 +11,11 @@ An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn
 - [scratchapixel/moller-trumbore-ray-triangle-intersection](https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection.html)
 - _The Reference Path Tracer, Ray Tracing Gems II_ and associated code sample [boksajak/referencePT](https://github.com/boksajak/referencePT/)
   - Rng initialization
+- [Crash Course in BRDF implementation](https://boksajak.github.io/files/CrashCourseBRDF.pdf)
+  - BRDF interface
+  - Lambertian BRDF, `sampleLambertian`, `evalLambertian` 
+- [Building an Orthonormal Basis, Revisited](https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf)
+  - Robust orthonormal axis, implemented in the `pixarOnb` function
 
 ## Build
 
