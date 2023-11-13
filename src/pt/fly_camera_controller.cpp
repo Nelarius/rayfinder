@@ -111,7 +111,7 @@ FlyCameraController::Orientation FlyCameraController::cameraOrientation() const
         std::sin(mPitch.asRadians()),
         std::sin(mYaw.asRadians()) * std::cos(mPitch.asRadians())));
     const glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-    const glm::vec3 right = glm::cross(forward, worldUp);
+    const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
     const glm::vec3 up = glm::cross(right, forward);
     return Orientation{forward, right, up};
 }

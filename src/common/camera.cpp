@@ -14,18 +14,26 @@ Camera createCamera(
     const float halfHeight = focusDistance * glm::tan(0.5f * theta);
     const float halfWidth = aspectRatio * halfHeight;
 
-    const glm::vec3 w = glm::normalize(lookAt - origin);
-    const glm::vec3 v = glm::vec3(0.0f, 1.0f, 0.0f);
-    const glm::vec3 u = glm::cross(w, v);
+    const glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
-    const glm::vec3 lowerLeftCorner = origin - halfWidth * u - halfHeight * v + focusDistance * w;
+    const glm::vec3 forward = glm::normalize(lookAt - origin);
+    const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+    const glm::vec3 up = glm::cross(right, forward);
+
+    const glm::vec3 lowerLeftCorner =
+        origin - halfWidth * right - halfHeight * up + focusDistance * forward;
+
+    const glm::vec3 horizontal = 2.0f * halfWidth * right;
+    const glm::vec3 vertical = 2.0f * halfHeight * up;
+
+    const float lensRadius = 0.5f * aperture;
 
     return Camera{
         .origin = origin,
         .lowerLeftCorner = lowerLeftCorner,
-        .horizontal = 2.0f * halfWidth * u,
-        .vertical = 2.0f * halfHeight * v,
-        .lensRadius = 0.5f * aperture,
+        .horizontal = horizontal,
+        .vertical = vertical,
+        .lensRadius = lensRadius,
     };
 }
 
