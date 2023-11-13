@@ -2,6 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
+#include <algorithm> // std::clamp
 #include <cassert>
 #include <cmath>
 
@@ -84,8 +85,8 @@ void FlyCameraController::update(GLFWwindow* const window, const float dt)
             const float a2 = std::copysign(1.0f, y2) * std::acos(x2 / std::sqrt(x2 * x2 + y2 * y2));
 
             mYaw = mYaw + Angle::radians(a1 - a2);
-            mPitch = Angle::radians(glm::clamp(
-                mPitch.asRadians() + (p1 - p2), glm::radians(-89.0f), glm::radians(89.0f)));
+            mPitch = std::clamp(
+                mPitch + Angle::radians(p1 - p2), Angle::degrees(-89.0f), Angle::degrees(89.0f));
         }
     }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cassert>
+#include <cmath>
 #include <numbers>
 
 namespace nlrs
@@ -17,6 +19,12 @@ public:
     inline float asRadians() const { return mRadians; }
 
     Angle operator+(const Angle& rhs) const { return Angle(mRadians + rhs.mRadians); }
+    bool  operator<(const Angle& rhs) const
+    {
+        assert(!std::isnan(mRadians));
+        assert(!std::isnan(rhs.mRadians));
+        return mRadians < rhs.mRadians;
+    }
 
 private:
     Angle(float radians)
