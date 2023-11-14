@@ -10,9 +10,7 @@ namespace nlrs
 {
 struct GpuContext
 {
-    WGPUInstance  instance;
     WGPUSurface   surface;
-    WGPUAdapter   adapter;
     WGPUDevice    device;
     WGPUQueue     queue;
     WGPUSwapChain swapChain;

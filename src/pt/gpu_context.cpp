@@ -162,9 +162,7 @@ void swapChainSafeRelease(const WGPUSwapChain swapChain)
 } // namespace
 
 GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requiredLimits)
-    : instance(nullptr),
-      surface(nullptr),
-      adapter(nullptr),
+    : surface(nullptr),
       device(nullptr),
       queue(nullptr),
       swapChain(nullptr)
@@ -174,7 +172,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     Extent2i framebufferSize;
     glfwGetFramebufferSize(window, &framebufferSize.x, &framebufferSize.y);
 
-    instance = []() -> WGPUInstance {
+    const WGPUInstance instance = []() -> WGPUInstance {
         // GPU timers are an unsafe API and are disabled by default due to exposing client
         // information. E.g. `ValidationTest::SetUp()` in
         // `src/dawn/tests/unittests/validation/ValidationTest.cpp` contains an example of how this
@@ -208,7 +206,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     // code.
     surface = glfwGetWGPUSurface(instance, window);
 
-    adapter = [this]() -> WGPUAdapter {
+    const WGPUAdapter adapter = [instance]() -> WGPUAdapter {
         const WGPURequestAdapterOptions adapterOptions = {};
         WGPUAdapter                     adapter = nullptr;
 
@@ -234,10 +232,11 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
 
     if (!adapter)
     {
+        instanceSafeRelease(instance);
         throw std::runtime_error("Failed to create WGPUAdapter instance.");
     }
 
-    device = [this, &requiredLimits]() -> WGPUDevice {
+    device = [adapter, &requiredLimits]() -> WGPUDevice {
 #ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
         const std::array<WGPUFeatureName, 2> requiredFeatures{
             WGPUFeatureName_TimestampQuery,
@@ -284,6 +283,8 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
 
     if (!device)
     {
+        adapterSafeRelease(adapter);
+        instanceSafeRelease(instance);
         throw std::runtime_error("Failed to create WGPUDevice instance.");
     }
 
@@ -291,6 +292,9 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     wgpuQueueOnSubmittedWorkDone(queue, 0, onQueueWorkDone, nullptr);
 
     swapChain = createSwapChain(device, surface, swapChainFormat, framebufferSize);
+
+    adapterSafeRelease(adapter);
+    instanceSafeRelease(instance);
 }
 
 GpuContext::~GpuContext()
@@ -301,12 +305,8 @@ GpuContext::~GpuContext()
     queue = nullptr;
     deviceSafeRelease(device);
     device = nullptr;
-    adapterSafeRelease(adapter);
-    adapter = nullptr;
     surfaceSafeRelease(surface);
     surface = nullptr;
-    instanceSafeRelease(instance);
-    instance = nullptr;
 }
 
 void GpuContext::resizeFramebuffer(const Extent2i& newSize)
