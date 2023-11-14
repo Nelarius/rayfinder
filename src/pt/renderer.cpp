@@ -1,5 +1,6 @@
 #include "configuration.hpp"
 #include "gpu_context.hpp"
+#include "gui.hpp"
 #include "renderer.hpp"
 
 #include <common/bvh.hpp>
@@ -8,7 +9,6 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <imgui_impl_wgpu.h>
 
 #include <array>
 #include <cassert>
@@ -536,22 +536,10 @@ Renderer::Renderer(
             .pipelineStatisticsCount = 0u};
         querySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
     }
-
-    // ImGui
-    {
-        const int               swapchainFramesInFlight = 3;
-        const WGPUTextureFormat depthStencilTextureFormat = WGPUTextureFormat_Undefined;
-        ImGui_ImplWGPU_Init(
-            gpuContext.device,
-            swapchainFramesInFlight,
-            GpuContext::swapChainFormat,
-            depthStencilTextureFormat);
-    }
 }
 
 Renderer::~Renderer()
 {
-    ImGui_ImplWGPU_Shutdown();
     renderPipelineSafeRelease(renderPipeline);
     renderPipeline = nullptr;
     querySetSafeRelease(querySet);
@@ -569,9 +557,7 @@ void Renderer::setRenderParameters(const RenderParameters& renderParams)
     currentRenderParams = renderParams;
 }
 
-void Renderer::beginFrame() { ImGui_ImplWGPU_NewFrame(); }
-
-void Renderer::render(const GpuContext& gpuContext)
+void Renderer::render(const GpuContext& gpuContext, Gui& gui)
 {
     const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(gpuContext.swapChain);
     if (!nextTexture)
@@ -646,8 +632,7 @@ void Renderer::render(const GpuContext& gpuContext)
 #endif
         }
 
-        ImGui::Render();
-        ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), renderPassEncoder);
+        gui.render(renderPassEncoder);
 
         wgpuRenderPassEncoderEnd(renderPassEncoder);
     }

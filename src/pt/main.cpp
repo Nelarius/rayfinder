@@ -1,5 +1,6 @@
 #include "fly_camera_controller.hpp"
 #include "gpu_context.hpp"
+#include "gui.hpp"
 #include "renderer.hpp"
 #include "window.hpp"
 
@@ -36,6 +37,7 @@ int main(int argc, char** argv)
     {
         nlrs::FlyCameraController cameraController;
         nlrs::GpuContext          gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);
+        nlrs::Gui                 gui(window.ptr(), gpuContext);
 
         nlrs::Renderer renderer =
             [&cameraController, &gpuContext, &window, argv]() -> nlrs::Renderer {
@@ -100,8 +102,7 @@ int main(int argc, char** argv)
                     wgpuDeviceTick(gpuContext.device);
                 }
 
-                renderer.beginFrame();
-                window.beginFrame();
+                gui.beginFrame();
 
                 // ImGui
 
@@ -171,7 +172,7 @@ int main(int argc, char** argv)
                         cameraController.getCamera(),
                     };
                     renderer.setRenderParameters(renderParams);
-                    renderer.render(gpuContext);
+                    renderer.render(gpuContext, gui);
                 }
 
                 wgpuSwapChainPresent(gpuContext.swapChain);

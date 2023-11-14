@@ -17,6 +17,7 @@
 namespace nlrs
 {
 struct GpuContext;
+class Gui;
 
 struct RenderParameters
 {
@@ -79,8 +80,7 @@ struct Renderer
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);
-    void beginFrame();
-    void render(const GpuContext&);
+    void render(const GpuContext&, Gui&);
 
     float averageDrawDurationMs() const;
     float averageRenderpassDurationMs() const;

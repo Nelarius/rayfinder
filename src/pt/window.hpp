@@ -29,10 +29,6 @@ public:
     // Returns the largest monitor, in pixels, by pixel count.
     Extent2i largestMonitorResolution() const;
 
-    // Update loop
-
-    void beginFrame();
-
     // Raw access
 
     GLFWwindow* ptr() const { return mWindow; }

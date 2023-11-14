@@ -37,6 +37,7 @@ set(PT_SOURCE_FILES
     main.cpp
     gpu_buffer.cpp
     gpu_context.cpp
+    gui.cpp
     renderer.cpp
     window.cpp)
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
