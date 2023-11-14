@@ -124,6 +124,11 @@ struct TriangleHit {
     t: f32,
 }
 
+struct Scatter {
+    wi: vec3f,
+    throughput: vec3f,
+}
+
 fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var ray = primaryRay;
 
@@ -133,10 +138,9 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
         var intersection: Intersection;
         if rayIntersectBvh(ray, T_MAX, &intersection) {
             let p = intersection.p;
-            let scatterDirection = sampleLambertian(intersection, rngState);
-            let scatterThroughput = UNIFORM_HEMISPHERE_MULTIPLIER * evalLambertian(intersection, scatterDirection);
-            ray = Ray(p, scatterDirection);
-            throughput *= scatterThroughput;
+            let scatter = evalImplicitLambertian(intersection, rngState);
+            ray = Ray(p, scatter.wi);
+            throughput *= scatter.throughput;
         } else {
             let unitDirection = normalize(ray.direction);
             let t = 0.5f * (unitDirection.y + 1f);
@@ -156,17 +160,16 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
     return Ray(origin, direction);
 }
 
-fn sampleLambertian(hit: Intersection, rngState: ptr<function, u32>) -> vec3f {
-    let v = rngNextInUnitHemisphere(rngState);
+fn evalImplicitLambertian(hit: Intersection, rngState: ptr<function, u32>) -> Scatter {
+    let v = rngNextInCosineWeightedHemisphere(rngState);
     let onb = pixarOnb(hit.n);
-    return onb * v;
-}
+    let wi = onb * v;
 
-fn evalLambertian(hit: Intersection, wi: vec3f) -> vec3f {
     let textureDesc = textureDescriptors[textureDescriptorIndices[hit.triangleIdx]];
     let uv = hit.uv;
     let albedo = textureLookup(textureDesc, uv);
-    return albedo * FRAC_1_PI * max(EPSILON, dot(hit.n, wi));
+
+    return Scatter(wi, albedo);
 }
 
 fn pixarOnb(n: vec3f) -> mat3x3f {
@@ -352,16 +355,15 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
 }
 
 @must_use
-fn rngNextInUnitHemisphere(state: ptr<function, u32>) -> vec3f {
+fn rngNextInCosineWeightedHemisphere(state: ptr<function, u32>) -> vec3f {
     let r1 = rngNextFloat(state);
     let r2 = rngNextFloat(state);
+    let sqrtR2 = sqrt(r2);
 
+    let z = sqrt(1f - r2);
     let phi = 2f * PI * r1;
-    let sinTheta = sqrt(1f - r2 * r2);
-
-    let x = cos(phi) * sinTheta;
-    let y = sin(phi) * sinTheta;
-    let z = r2;
+    let x = cos(phi) * sqrtR2;
+    let y = sin(phi) * sqrtR2;
 
     return vec3(x, y, z);
 }

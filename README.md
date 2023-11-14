@@ -8,6 +8,7 @@ An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn
   - Great tool for checking correct memory layout
 - _Physically Based Rendering, fourth edition_
   - Bounding volume hierarchy
+  - Cosine-weighted hemisphere sampling method
 - [scratchapixel/moller-trumbore-ray-triangle-intersection](https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection.html)
 - _The Reference Path Tracer, Ray Tracing Gems II_ and associated code sample [boksajak/referencePT](https://github.com/boksajak/referencePT/)
   - Rng initialization
