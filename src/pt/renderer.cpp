@@ -819,4 +819,10 @@ float Renderer::averageRenderpassDurationMs() const
         renderPassDurationsNs.begin(), renderPassDurationsNs.end(), std::uint64_t(0));
     return 0.000001f * static_cast<float>(sum) / renderPassDurationsNs.size();
 }
+
+float Renderer::renderProgressPercentage() const
+{
+    return 100.0f * static_cast<float>(accumulatedSampleCount) /
+           static_cast<float>(currentRenderParams.samplingParams.numSamplesPerPixel);
+}
 } // namespace nlrs

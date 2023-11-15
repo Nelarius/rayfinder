@@ -98,6 +98,7 @@ struct Renderer
 
     float averageDrawDurationMs() const;
     float averageRenderpassDurationMs() const;
+    float renderProgressPercentage() const;
 
     static constexpr WGPURequiredLimits wgpuRequiredLimits{
         .nextInChain = nullptr,
