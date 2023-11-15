@@ -566,7 +566,10 @@ Renderer::~Renderer()
 
 void Renderer::setRenderParameters(const RenderParameters& renderParams)
 {
-    currentRenderParams = renderParams;
+    if (currentRenderParams != renderParams)
+    {
+        currentRenderParams = renderParams;
+    }
 }
 
 void Renderer::beginFrame() { ImGui_ImplWGPU_NewFrame(); }

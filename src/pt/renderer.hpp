@@ -22,6 +22,8 @@ struct RenderParameters
 {
     Extent2u framebufferSize;
     Camera   camera;
+
+    bool operator==(const RenderParameters& rhs) const noexcept = default;
 };
 
 struct Scene
