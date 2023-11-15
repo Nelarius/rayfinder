@@ -9,6 +9,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 
 #include <GLFW/glfw3.h>
@@ -42,14 +43,14 @@ int main(int argc, char** argv)
         nlrs::Renderer renderer =
             [&cameraController, &gpuContext, &window, argv]() -> nlrs::Renderer {
             const nlrs::RendererDescriptor rendererDesc{
-                .renderParams = [&window, &cameraController]() -> nlrs::RenderParameters {
+                [&window, &cameraController]() -> nlrs::RenderParameters {
                     const nlrs::Extent2i framebufferSize = window.resolution();
                     return nlrs::RenderParameters{
-                        .framebufferSize = nlrs::Extent2u(framebufferSize),
-                        .camera = cameraController.getCamera(),
-                    };
+                        nlrs::Extent2u(framebufferSize),
+                        cameraController.getCamera(),
+                        nlrs::SamplingParams()};
                 }(),
-                .maxFramebufferSize = window.largestMonitorResolution(),
+                window.largestMonitorResolution(),
             };
 
             const nlrs::GltfModel model(argv[1]);
@@ -73,6 +74,8 @@ int main(int argc, char** argv)
         {
             nlrs::Extent2i curFramebufferSize = window.resolution();
             float          vfovDegrees = 70.0f;
+            int            numSamplesPerPixel = 128;
+            int            numBounces = 4;
             auto           lastTime = std::chrono::steady_clock::now();
             while (!glfwWindowShouldClose(window.ptr()))
             {
@@ -109,10 +112,11 @@ int main(int argc, char** argv)
                 {
                     ImGui::Begin("pt");
 
-                    ImGui::Text("Performance");
+                    ImGui::Text("Renrerer stats");
                     {
                         const float drawAverageMs = renderer.averageDrawDurationMs();
                         const float renderAverageMs = renderer.averageRenderpassDurationMs();
+                        const float progressPercentage = renderer.renderProgressPercentage();
                         ImGui::Text(
                             "render pass draw: %.2f ms (%.1f FPS)",
                             drawAverageMs,
@@ -121,10 +125,28 @@ int main(int argc, char** argv)
                             "render pass: %.2f ms (%.1f FPS)",
                             renderAverageMs,
                             1000.0f / renderAverageMs);
+                        ImGui::Text("render progress: %.2f %%", progressPercentage);
                     }
                     ImGui::Separator();
 
                     ImGui::Text("Parameters");
+
+                    ImGui::Text("num samples:");
+                    ImGui::SameLine();
+                    ImGui::RadioButton("64", &numSamplesPerPixel, 64);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("128", &numSamplesPerPixel, 128);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("256", &numSamplesPerPixel, 256);
+
+                    ImGui::Text("num bounces:");
+                    ImGui::SameLine();
+                    ImGui::RadioButton("4", &numBounces, 4);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("8", &numBounces, 8);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("16", &numBounces, 16);
+
                     ImGui::SliderFloat(
                         "camera speed",
                         &cameraController.speed(),
@@ -170,6 +192,10 @@ int main(int argc, char** argv)
                     const nlrs::RenderParameters renderParams{
                         nlrs::Extent2u(window.resolution()),
                         cameraController.getCamera(),
+                        nlrs::SamplingParams{
+                            static_cast<std::uint32_t>(numSamplesPerPixel),
+                            static_cast<std::uint32_t>(numBounces),
+                        },
                     };
                     renderer.setRenderParameters(renderParams);
                     renderer.render(gpuContext, gui);

@@ -14,6 +14,8 @@ struct Camera
     glm::vec3 horizontal;
     glm::vec3 vertical;
     float     lensRadius;
+
+    bool operator==(const Camera& rhs) const noexcept = default;
 };
 
 // `aspectRatio` is defined as (width / height).

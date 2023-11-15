@@ -37,6 +37,9 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(2) @binding(5) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
 @group(2) @binding(6) var<storage, read_write> textures: array<u32>;
 
+// image bind group
+@group(3) @binding(0) var<storage, read_write> imageBuffer: array<vec3f>;
+
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let u = in.texCoord.x;
@@ -47,13 +50,24 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     let j = u32(u * f32(dimensions.x));
     let i = u32(v * f32(dimensions.y));
+    let idx = i * dimensions.x + j;
 
-    var rngState = initRng(vec2(j, i), dimensions, frameCount);
+    var accumulatedSampleCount = renderParams.samplingState.accumulatedSampleCount;
 
-    let primaryRay = generateCameraRay(renderParams.camera, &rngState, u, v);
-    let rgb = rayColor(primaryRay, &rngState);
+    if accumulatedSampleCount == 0u {
+        imageBuffer[idx] = vec3(0f);
+    }
 
-    return vec4f(rgb, 1f);
+    if accumulatedSampleCount < renderParams.samplingState.numSamplesPerPixel {
+        var rngState = initRng(vec2(j, i), dimensions, frameCount);
+        let uoffset = rngNextFloat(&rngState) / f32(dimensions.x);
+        let voffset = rngNextFloat(&rngState) / f32(dimensions.y);
+        let primaryRay = generateCameraRay(renderParams.camera, &rngState, u + uoffset, v + voffset);
+        imageBuffer[idx] += rayColor(primaryRay, &rngState);
+        accumulatedSampleCount += 1u;
+    }
+
+    return vec4f(imageBuffer[idx] / f32(accumulatedSampleCount), 1f);
 }
 
 const EPSILON = 0.00001f;
@@ -71,6 +85,7 @@ const UNIFORM_HEMISPHERE_MULTIPLIER = 2f * PI;
 struct RenderParams {
   frameData: FrameData,
   camera: Camera,
+  samplingState: SamplingState,
 }
 
 struct FrameData {
@@ -84,6 +99,12 @@ struct Camera {
     horizontal: vec3f,
     vertical: vec3f,
     lensRadius: f32,
+}
+
+struct SamplingState {
+    numSamplesPerPixel: u32,
+    numBounces: u32,
+    accumulatedSampleCount: u32,
 }
 
 struct Aabb {

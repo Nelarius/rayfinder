@@ -19,10 +19,21 @@ namespace nlrs
 struct GpuContext;
 class Gui;
 
+struct SamplingParams
+{
+    std::uint32_t numSamplesPerPixel = 128;
+    std::uint32_t numBounces = 4;
+
+    bool operator==(const SamplingParams& rhs) const noexcept = default;
+};
+
 struct RenderParameters
 {
-    Extent2u framebufferSize;
-    Camera   camera;
+    Extent2u       framebufferSize;
+    Camera         camera;
+    SamplingParams samplingParams;
+
+    bool operator==(const RenderParameters& rhs) const noexcept = default;
 };
 
 struct Scene
@@ -56,6 +67,8 @@ struct Renderer
     GpuBuffer          textureDescriptorBuffer;
     GpuBuffer          textureBuffer;
     WGPUBindGroup      sceneBindGroup;
+    GpuBuffer          imageBuffer;
+    WGPUBindGroup      imageBindGroup;
     WGPUQuerySet       querySet;
     GpuBuffer          queryBuffer;
     GpuBuffer          timestampBuffer;
@@ -63,6 +76,7 @@ struct Renderer
 
     RenderParameters currentRenderParams;
     std::uint32_t    frameCount;
+    std::uint32_t    accumulatedSampleCount;
 
     std::deque<std::uint64_t> drawDurationsNs;
     std::deque<std::uint64_t> renderPassDurationsNs;
@@ -84,6 +98,7 @@ struct Renderer
 
     float averageDrawDurationMs() const;
     float averageRenderpassDurationMs() const;
+    float renderProgressPercentage() const;
 
     static constexpr WGPURequiredLimits wgpuRequiredLimits{
         .nextInChain = nullptr,

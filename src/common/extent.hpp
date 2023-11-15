@@ -24,6 +24,11 @@ struct Extent2
           y(static_cast<T>(other.y))
     {
     }
+
+    constexpr bool operator==(const Extent2& rhs) const noexcept
+    {
+        return x == rhs.x && y == rhs.y;
+    }
 };
 
 using Extent2i = Extent2<std::int32_t>;

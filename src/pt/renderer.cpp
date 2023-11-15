@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -74,17 +75,38 @@ struct CameraLayout
     }
 };
 
+struct SamplingStateLayout
+{
+    std::uint32_t numSamplesPerPixel;
+    std::uint32_t numBounces;
+    std::uint32_t accumulatedSampleCount;
+    std::uint32_t padding;
+
+    SamplingStateLayout(
+        const SamplingParams& samplingParams,
+        const std::uint32_t   accumulatedSampleCount)
+        : numSamplesPerPixel(samplingParams.numSamplesPerPixel),
+          numBounces(samplingParams.numBounces),
+          accumulatedSampleCount(accumulatedSampleCount),
+          padding(0)
+    {
+    }
+};
+
 struct RenderParamsLayout
 {
-    FrameDataLayout frameData;
-    CameraLayout    camera;
+    FrameDataLayout     frameData;
+    CameraLayout        camera;
+    SamplingStateLayout samplingState;
 
     RenderParamsLayout(
         const Extent2u&         dimensions,
         const std::uint32_t     frameCount,
-        const RenderParameters& renderParams)
+        const RenderParameters& renderParams,
+        const std::uint32_t     accumulatedSampleCount)
         : frameData(dimensions, frameCount),
-          camera(renderParams.camera)
+          camera(renderParams.camera),
+          samplingState(renderParams.samplingParams, accumulatedSampleCount)
     {
     }
 };
@@ -166,6 +188,12 @@ Renderer::Renderer(
       textureDescriptorBuffer(),
       textureBuffer(),
       sceneBindGroup(nullptr),
+      imageBuffer(
+          gpuContext.device,
+          "image buffer",
+          WGPUBufferUsage_Storage,
+          sizeof(float[4]) * rendererDesc.maxFramebufferSize.x * rendererDesc.maxFramebufferSize.y),
+      imageBindGroup(nullptr),
       querySet(nullptr),
       queryBuffer(
           gpuContext.device,
@@ -180,6 +208,7 @@ Renderer::Renderer(
       renderPipeline(nullptr),
       currentRenderParams(rendererDesc.renderParams),
       frameCount(0),
+      accumulatedSampleCount(0),
       timestampBufferMapContext{&timestampBuffer, &drawDurationsNs, &renderPassDurationsNs}
 {
     {
@@ -420,12 +449,28 @@ Renderer::Renderer(
         const WGPUBindGroupLayout sceneBindGroupLayout =
             wgpuDeviceCreateBindGroupLayout(gpuContext.device, &sceneBindGroupLayoutDesc);
 
+        // image bind group layout
+
+        const WGPUBindGroupLayoutEntry imageBindGroupLayoutEntry =
+            imageBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
+
+        const WGPUBindGroupLayoutDescriptor imageBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "image bind group layout",
+            .entryCount = 1,
+            .entries = &imageBindGroupLayoutEntry,
+        };
+
+        const WGPUBindGroupLayout imageBindGroupLayout =
+            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &imageBindGroupLayoutDesc);
+
         // pipeline layout
 
-        std::array<WGPUBindGroupLayout, 3> bindGroupLayouts{
+        std::array<WGPUBindGroupLayout, 4> bindGroupLayouts{
             uniformsBindGroupLayout,
             renderParamsBindGroupLayout,
             sceneBindGroupLayout,
+            imageBindGroupLayout,
         };
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
@@ -484,6 +529,22 @@ Renderer::Renderer(
             .entries = sceneBindGroupEntries.data(),
         };
         sceneBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &sceneBindGroupDesc);
+
+        // image bind group
+
+        const WGPUBindGroupEntry imageBindGroupEntry = imageBuffer.bindGroupEntry(0);
+
+        const WGPUBindGroupDescriptor imageBindGroupDesc{
+            .nextInChain = nullptr,
+            .label = "image bind group",
+            .layout = imageBindGroupLayout,
+            .entryCount = 1,
+            .entries = &imageBindGroupEntry,
+        };
+
+        imageBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &imageBindGroupDesc);
+
+        // pipeline
 
         const WGPURenderPipelineDescriptor pipelineDesc{
             .nextInChain = nullptr,
@@ -544,6 +605,8 @@ Renderer::~Renderer()
     renderPipeline = nullptr;
     querySetSafeRelease(querySet);
     querySet = nullptr;
+    bindGroupSafeRelease(imageBindGroup);
+    imageBindGroup = nullptr;
     bindGroupSafeRelease(sceneBindGroup);
     sceneBindGroup = nullptr;
     bindGroupSafeRelease(renderParamsBindGroup);
@@ -554,7 +617,11 @@ Renderer::~Renderer()
 
 void Renderer::setRenderParameters(const RenderParameters& renderParams)
 {
-    currentRenderParams = renderParams;
+    if (currentRenderParams != renderParams)
+    {
+        currentRenderParams = renderParams;
+        accumulatedSampleCount = 0; // reset the temporal accumulation
+    }
 }
 
 void Renderer::render(const GpuContext& gpuContext, Gui& gui)
@@ -568,15 +635,20 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
     }
 
     {
-        // TODO: framebuffersize is now a part of render params struct, adjust constructor
-        const RenderParamsLayout renderParamsLayout(
-            currentRenderParams.framebufferSize, frameCount++, currentRenderParams);
+        assert(accumulatedSampleCount <= currentRenderParams.samplingParams.numSamplesPerPixel);
+        const RenderParamsLayout renderParamsLayout{
+            currentRenderParams.framebufferSize,
+            frameCount++,
+            currentRenderParams,
+            accumulatedSampleCount};
         wgpuQueueWriteBuffer(
             gpuContext.queue,
             renderParamsBuffer.handle(),
             0,
             &renderParamsLayout,
             sizeof(RenderParamsLayout));
+        accumulatedSampleCount = std::min(
+            accumulatedSampleCount + 1, currentRenderParams.samplingParams.numSamplesPerPixel);
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {
@@ -620,6 +692,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
             wgpuRenderPassEncoderSetBindGroup(
                 renderPassEncoder, 1, renderParamsBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 2, sceneBindGroup, 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 3, imageBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
 
@@ -730,5 +803,11 @@ float Renderer::averageRenderpassDurationMs() const
     const std::uint64_t sum = std::accumulate(
         renderPassDurationsNs.begin(), renderPassDurationsNs.end(), std::uint64_t(0));
     return 0.000001f * static_cast<float>(sum) / renderPassDurationsNs.size();
+}
+
+float Renderer::renderProgressPercentage() const
+{
+    return 100.0f * static_cast<float>(accumulatedSampleCount) /
+           static_cast<float>(currentRenderParams.samplingParams.numSamplesPerPixel);
 }
 } // namespace nlrs
