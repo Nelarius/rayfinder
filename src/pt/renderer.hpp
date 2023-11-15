@@ -18,10 +18,19 @@ namespace nlrs
 {
 struct GpuContext;
 
+struct SamplingParams
+{
+    std::uint32_t numSamplesPerPixel = 128;
+    std::uint32_t numBounces = 4;
+
+    bool operator==(const SamplingParams& rhs) const noexcept = default;
+};
+
 struct RenderParameters
 {
-    Extent2u framebufferSize;
-    Camera   camera;
+    Extent2u       framebufferSize;
+    Camera         camera;
+    SamplingParams samplingParams;
 
     bool operator==(const RenderParameters& rhs) const noexcept = default;
 };
@@ -66,6 +75,7 @@ struct Renderer
 
     RenderParameters currentRenderParams;
     std::uint32_t    frameCount;
+    std::uint32_t    accumulatedSampleCount;
 
     std::deque<std::uint64_t> drawDurationsNs;
     std::deque<std::uint64_t> renderPassDurationsNs;

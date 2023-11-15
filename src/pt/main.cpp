@@ -40,14 +40,14 @@ int main(int argc, char** argv)
         nlrs::Renderer renderer =
             [&cameraController, &gpuContext, &window, argv]() -> nlrs::Renderer {
             const nlrs::RendererDescriptor rendererDesc{
-                .renderParams = [&window, &cameraController]() -> nlrs::RenderParameters {
+                [&window, &cameraController]() -> nlrs::RenderParameters {
                     const nlrs::Extent2i framebufferSize = window.resolution();
                     return nlrs::RenderParameters{
-                        .framebufferSize = nlrs::Extent2u(framebufferSize),
-                        .camera = cameraController.getCamera(),
-                    };
+                        nlrs::Extent2u(framebufferSize),
+                        cameraController.getCamera(),
+                        nlrs::SamplingParams()};
                 }(),
-                .maxFramebufferSize = window.largestMonitorResolution(),
+                window.largestMonitorResolution(),
             };
 
             const nlrs::GltfModel model(argv[1]);
