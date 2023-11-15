@@ -60,7 +60,9 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     if accumulatedSampleCount < renderParams.samplingState.numSamplesPerPixel {
         var rngState = initRng(vec2(j, i), dimensions, frameCount);
-        let primaryRay = generateCameraRay(renderParams.camera, &rngState, u, v);
+        let uoffset = rngNextFloat(&rngState) / f32(dimensions.x);
+        let voffset = rngNextFloat(&rngState) / f32(dimensions.y);
+        let primaryRay = generateCameraRay(renderParams.camera, &rngState, u + uoffset, v + voffset);
         imageBuffer[idx] += rayColor(primaryRay, &rngState);
         accumulatedSampleCount += 1u;
     }
