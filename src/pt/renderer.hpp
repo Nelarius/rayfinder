@@ -57,6 +57,8 @@ struct Renderer
     GpuBuffer          textureDescriptorBuffer;
     GpuBuffer          textureBuffer;
     WGPUBindGroup      sceneBindGroup;
+    GpuBuffer          imageBuffer;
+    WGPUBindGroup      imageBindGroup;
     WGPUQuerySet       querySet;
     GpuBuffer          queryBuffer;
     GpuBuffer          timestampBuffer;

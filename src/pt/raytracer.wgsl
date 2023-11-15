@@ -37,6 +37,8 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(2) @binding(5) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
 @group(2) @binding(6) var<storage, read_write> textures: array<u32>;
 
+@group(3) @binding(0) var<storage, read_write> imageBuffer: array<vec3f>;
+
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let u = in.texCoord.x;
@@ -47,13 +49,13 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     let j = u32(u * f32(dimensions.x));
     let i = u32(v * f32(dimensions.y));
+    let idx = i * dimensions.x + j;
 
     var rngState = initRng(vec2(j, i), dimensions, frameCount);
 
     let primaryRay = generateCameraRay(renderParams.camera, &rngState, u, v);
-    let rgb = rayColor(primaryRay, &rngState);
-
-    return vec4f(rgb, 1f);
+    imageBuffer[idx] = rayColor(primaryRay, &rngState);
+    return vec4f(imageBuffer[idx], 1f);
 }
 
 const EPSILON = 0.00001f;

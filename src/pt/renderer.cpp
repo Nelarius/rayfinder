@@ -166,6 +166,12 @@ Renderer::Renderer(
       textureDescriptorBuffer(),
       textureBuffer(),
       sceneBindGroup(nullptr),
+      imageBuffer(
+          gpuContext.device,
+          "image buffer",
+          WGPUBufferUsage_Storage,
+          sizeof(float[4]) * rendererDesc.maxFramebufferSize.x * rendererDesc.maxFramebufferSize.y),
+      imageBindGroup(nullptr),
       querySet(nullptr),
       queryBuffer(
           gpuContext.device,
@@ -420,12 +426,28 @@ Renderer::Renderer(
         const WGPUBindGroupLayout sceneBindGroupLayout =
             wgpuDeviceCreateBindGroupLayout(gpuContext.device, &sceneBindGroupLayoutDesc);
 
+        // image bind group layout
+
+        const WGPUBindGroupLayoutEntry imageBindGroupLayoutEntry =
+            imageBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
+
+        const WGPUBindGroupLayoutDescriptor imageBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "image bind group layout",
+            .entryCount = 1,
+            .entries = &imageBindGroupLayoutEntry,
+        };
+
+        const WGPUBindGroupLayout imageBindGroupLayout =
+            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &imageBindGroupLayoutDesc);
+
         // pipeline layout
 
-        std::array<WGPUBindGroupLayout, 3> bindGroupLayouts{
+        std::array<WGPUBindGroupLayout, 4> bindGroupLayouts{
             uniformsBindGroupLayout,
             renderParamsBindGroupLayout,
             sceneBindGroupLayout,
+            imageBindGroupLayout,
         };
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
@@ -484,6 +506,22 @@ Renderer::Renderer(
             .entries = sceneBindGroupEntries.data(),
         };
         sceneBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &sceneBindGroupDesc);
+
+        // image bind group
+
+        const WGPUBindGroupEntry imageBindGroupEntry = imageBuffer.bindGroupEntry(0);
+
+        const WGPUBindGroupDescriptor imageBindGroupDesc{
+            .nextInChain = nullptr,
+            .label = "image bind group",
+            .layout = imageBindGroupLayout,
+            .entryCount = 1,
+            .entries = &imageBindGroupEntry,
+        };
+
+        imageBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &imageBindGroupDesc);
+
+        // pipeline
 
         const WGPURenderPipelineDescriptor pipelineDesc{
             .nextInChain = nullptr,
@@ -556,6 +594,8 @@ Renderer::~Renderer()
     renderPipeline = nullptr;
     querySetSafeRelease(querySet);
     querySet = nullptr;
+    bindGroupSafeRelease(imageBindGroup);
+    imageBindGroup = nullptr;
     bindGroupSafeRelease(sceneBindGroup);
     sceneBindGroup = nullptr;
     bindGroupSafeRelease(renderParamsBindGroup);
@@ -637,6 +677,7 @@ void Renderer::render(const GpuContext& gpuContext)
             wgpuRenderPassEncoderSetBindGroup(
                 renderPassEncoder, 1, renderParamsBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 2, sceneBindGroup, 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 3, imageBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
 
