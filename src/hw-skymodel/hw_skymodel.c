@@ -3,7 +3,6 @@
 #include "params_r.h"
 #include "params_g.h"
 #include "params_b.h"
-
 #include "radiances_r.h"
 #include "radiances_g.h"
 #include "radiances_b.h"
@@ -44,11 +43,11 @@ static void initParams(
     const float        albedo,
     const float        t)
 {
-    const size_t turbidityInt = (size_t)turbidity;      // turbidity.trunc() as usize;
-    const float  turbidityRem = fmodf(turbidity, 1.0f); // turbidity.fract();
+    const size_t turbidityInt = (size_t)turbidity;
+    const float  turbidityRem = fmodf(turbidity, 1.0f);
     assert(turbidityInt > 0);
-    const size_t turbidityMin = turbidityInt - 1; // turbidity_int.saturating_sub(1);
-    const size_t turbidityMax = turbidityInt < 9 ? turbidityInt : 9; // turbidity_int.min(9);
+    const size_t turbidityMin = turbidityInt - 1;
+    const size_t turbidityMax = turbidityInt < 9 ? turbidityInt : 9;
 
     const float* const p0 = data + (9 * 6 * turbidityMin);
     const float* const p1 = data + (9 * 6 * turbidityMax);
@@ -77,11 +76,11 @@ static void initRadiances(
     const float        albedo,
     const float        t)
 {
-    const size_t turbidity_int = (size_t)turbidity;      // turbidity.trunc() as usize;
-    const float  turbidity_rem = fmodf(turbidity, 1.0f); // turbidity.fract();
+    const size_t turbidity_int = (size_t)turbidity;
+    const float  turbidity_rem = fmodf(turbidity, 1.0f);
     assert(turbidity_int > 0);
-    const size_t turbidity_min = turbidity_int - 1; // turbidity_int.saturating_sub(1);
-    const size_t turbidity_max = turbidity_int < 9 ? turbidity_int : 9; // turbidity_int.min(9);
+    const size_t turbidity_min = turbidity_int - 1;
+    const size_t turbidity_max = turbidity_int < 9 ? turbidity_int : 9;
 
     const float* const p0 = data + (6 * turbidity_min);
     const float* const p1 = data + (6 * turbidity_max);
@@ -123,21 +122,6 @@ SkyStateResult skyStateNew(const SkyParams* const skyParams, SkyState* const sky
     {
         return SkyStateResult_AlbedoOutOfRange;
     }
-
-    // TODO: these could all be just regular floats
-    // TODO: would be great to be able to assert bounds
-    const float* paramsR = (float*)params_r;
-    // const size_t paramsRLen = params_r_len / sizeof(float);
-    const float* paramsG = (float*)params_g;
-    // const size_t paramsGLen = params_g_len / sizeof(float);
-    const float* paramsB = (float*)params_b;
-    // const size_t paramsBLen = params_b_len / sizeof(float);
-    const float* radiancesR = (float*)radiances_r;
-    // const size_t radiancesRLen = radiances_r_len / sizeof(float);
-    const float* radiancesG = (float*)radiances_g;
-    // const size_t radiancesGLen = radiances_g_len / sizeof(float);
-    const float* radiancesB = (float*)radiances_b;
-    // const size_t radiancesBLen = radiances_b_len / sizeof(float);
 
     // Init state.
 
