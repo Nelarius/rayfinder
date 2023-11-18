@@ -62,6 +62,7 @@ static void initParams(
 
     for (size_t i = 0; i < 9; ++i)
     {
+        outParams[i] = 0.0f;
         outParams[i] += s0 * quintic(p0 + i, 9, t);
         outParams[i] += s1 * quintic(p1 + i, 9, t);
         outParams[i] += s2 * quintic(p2 + i, 9, t);
@@ -92,6 +93,7 @@ static void initRadiances(
     const float s2 = albedo * (1.0 - turbidity_rem);
     const float s3 = albedo * turbidity_rem;
 
+    *outRadiance = 0.0f;
     *outRadiance += s0 * quintic(p0, 1, t);
     *outRadiance += s1 * quintic(p1, 1, t);
     *outRadiance += s2 * quintic(p2, 1, t);
