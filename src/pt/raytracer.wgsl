@@ -25,6 +25,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 
 // render params bind group
 @group(1) @binding(0) var<uniform> renderParams: RenderParams;
+@group(1) @binding(1) var<storage, read_write> skyState: SkyState;
 
 // scene bind group
 // TODO: these are `read` only buffers. How can I create a buffer layout type which allows this?
@@ -66,7 +67,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     }
 
     let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
-    let rgb = expose(estimator, 0.1f);
+    let rgb = expose(estimator, 0.17f);
 
     return vec4f(rgb, 1f);
 }
@@ -91,7 +92,6 @@ struct RenderParams {
   frameData: FrameData,
   camera: Camera,
   samplingState: SamplingState,
-  skyState: SkyState,
 }
 
 struct FrameData {
@@ -188,7 +188,7 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
         } else {
             // TODO: I don't think this needs to be normalized
             let v = normalize(ray.direction);
-            let s = renderParams.skyState.sunDirection;
+            let s = skyState.sunDirection;
 
             let theta = acos(v.y);
             let gamma = acos(clamp(dot(v, s), -1f, 1f));
@@ -217,17 +217,17 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
 
 @must_use
 fn radiance(theta: f32, gamma: f32, channel: u32) -> f32 {
-    let r = renderParams.skyState.radiances[channel];
+    let r = skyState.radiances[channel];
     let idx = 9u * channel;
-    let p0 = renderParams.skyState.params[idx + 0u];
-    let p1 = renderParams.skyState.params[idx + 1u];
-    let p2 = renderParams.skyState.params[idx + 2u];
-    let p3 = renderParams.skyState.params[idx + 3u];
-    let p4 = renderParams.skyState.params[idx + 4u];
-    let p5 = renderParams.skyState.params[idx + 5u];
-    let p6 = renderParams.skyState.params[idx + 6u];
-    let p7 = renderParams.skyState.params[idx + 7u];
-    let p8 = renderParams.skyState.params[idx + 8u];
+    let p0 = skyState.params[idx + 0u];
+    let p1 = skyState.params[idx + 1u];
+    let p2 = skyState.params[idx + 2u];
+    let p3 = skyState.params[idx + 3u];
+    let p4 = skyState.params[idx + 4u];
+    let p5 = skyState.params[idx + 5u];
+    let p6 = skyState.params[idx + 6u];
+    let p7 = skyState.params[idx + 7u];
+    let p8 = skyState.params[idx + 8u];
 
     let cosGamma = cos(gamma);
     let cosGamma2 = cosGamma * cosGamma;

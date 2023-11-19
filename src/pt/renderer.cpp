@@ -203,6 +203,11 @@ Renderer::Renderer(
           "render params buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(RenderParamsLayout)),
+      skyStateBuffer(
+          gpuContext.device,
+          "sky state buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
+          sizeof(SkyStateLayout)),
       renderParamsBindGroup(nullptr),
       bvhNodeBuffer(
           gpuContext.device,
@@ -449,14 +454,16 @@ Renderer::Renderer(
 
         // renderParams group layout
 
-        const WGPUBindGroupLayoutEntry renderParamsBindGroupLayoutEntry =
-            renderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
+        const std::array<WGPUBindGroupLayoutEntry, 2> renderParamsBindGroupLayoutEntries{
+            renderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            skyStateBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+        };
 
         const WGPUBindGroupLayoutDescriptor renderParamsBindGroupLayoutDesc{
             .nextInChain = nullptr,
             .label = "renderParams bind group layout",
-            .entryCount = 1,
-            .entries = &renderParamsBindGroupLayoutEntry,
+            .entryCount = renderParamsBindGroupLayoutEntries.size(),
+            .entries = renderParamsBindGroupLayoutEntries.data(),
         };
         const WGPUBindGroupLayout renderParamsBindGroupLayout =
             wgpuDeviceCreateBindGroupLayout(gpuContext.device, &renderParamsBindGroupLayoutDesc);
@@ -529,14 +536,17 @@ Renderer::Renderer(
 
         // renderParams bind group
 
-        const WGPUBindGroupEntry renderParamsBindGroupEntry = renderParamsBuffer.bindGroupEntry(0);
+        const std::array<WGPUBindGroupEntry, 2> renderParamsBindGroupEntries{
+            renderParamsBuffer.bindGroupEntry(0),
+            skyStateBuffer.bindGroupEntry(1),
+        };
 
         const WGPUBindGroupDescriptor renderParamsBindGroupDesc{
             .nextInChain = nullptr,
             .label = "image bind group",
             .layout = renderParamsBindGroupLayout,
-            .entryCount = 1,
-            .entries = &renderParamsBindGroupEntry,
+            .entryCount = renderParamsBindGroupEntries.size(),
+            .entries = renderParamsBindGroupEntries.data(),
         };
         renderParamsBindGroup =
             wgpuDeviceCreateBindGroup(gpuContext.device, &renderParamsBindGroupDesc);
@@ -679,6 +689,9 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
             sizeof(RenderParamsLayout));
         accumulatedSampleCount = std::min(
             accumulatedSampleCount + 1, currentRenderParams.samplingParams.numSamplesPerPixel);
+        const SkyStateLayout skyStateLayout{currentRenderParams.sky};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, skyStateBuffer.handle(), 0, &skyStateLayout, sizeof(SkyStateLayout));
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {

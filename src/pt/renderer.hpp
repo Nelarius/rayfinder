@@ -98,6 +98,7 @@ struct Renderer
     GpuBuffer          uniformsBuffer;
     WGPUBindGroup      uniformsBindGroup;
     GpuBuffer          renderParamsBuffer;
+    GpuBuffer          skyStateBuffer;
     WGPUBindGroup      renderParamsBindGroup;
     GpuBuffer          bvhNodeBuffer;
     GpuBuffer          positionAttributesBuffer;
@@ -153,7 +154,7 @@ struct Renderer
                 .maxDynamicStorageBuffersPerPipelineLayout = 0,
                 .maxSampledTexturesPerShaderStage = 0,
                 .maxSamplersPerShaderStage = 0,
-                .maxStorageBuffersPerShaderStage = 5,
+                .maxStorageBuffersPerShaderStage = 6,
                 .maxStorageTexturesPerShaderStage = 0,
                 .maxUniformBuffersPerShaderStage = 1,
                 .maxUniformBufferBindingSize = 80,
