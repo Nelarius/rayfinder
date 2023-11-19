@@ -13,7 +13,7 @@
 
 static const float PI = (float)M_PI;
 
-static float quintic(const float* const data, const size_t stride, const float t)
+static float quintic_9(const float* const data, const float t)
 {
     const float t2 = t * t;
     const float t3 = t2 * t;
@@ -27,11 +27,34 @@ static float quintic(const float* const data, const size_t stride, const float t
     const float inv_t5 = inv_t4 * inv_t;
 
     const float m0 = data[0] * inv_t5;
-    const float m1 = data[stride] * 5.0 * inv_t4 * t;
-    const float m2 = data[2 * stride] * 10.0 * inv_t3 * t2;
-    const float m3 = data[3 * stride] * 10.0 * inv_t2 * t3;
-    const float m4 = data[4 * stride] * 5.0 * inv_t * t4;
-    const float m5 = data[5 * stride] * t5;
+    const float m1 = data[9] * 5.0 * inv_t4 * t;
+    const float m2 = data[2 * 9] * 10.0 * inv_t3 * t2;
+    const float m3 = data[3 * 9] * 10.0 * inv_t2 * t3;
+    const float m4 = data[4 * 9] * 5.0 * inv_t * t4;
+    const float m5 = data[5 * 9] * t5;
+
+    return m0 + m1 + m2 + m3 + m4 + m5;
+}
+
+static float quintic_1(const float* const data, const float t)
+{
+    const float t2 = t * t;
+    const float t3 = t2 * t;
+    const float t4 = t2 * t2;
+    const float t5 = t4 * t;
+
+    const float inv_t = 1.0 - t;
+    const float inv_t2 = inv_t * inv_t;
+    const float inv_t3 = inv_t2 * inv_t;
+    const float inv_t4 = inv_t2 * inv_t2;
+    const float inv_t5 = inv_t4 * inv_t;
+
+    const float m0 = data[0] * inv_t5;
+    const float m1 = data[1] * 5.0 * inv_t4 * t;
+    const float m2 = data[2 * 1] * 10.0 * inv_t3 * t2;
+    const float m3 = data[3 * 1] * 10.0 * inv_t2 * t3;
+    const float m4 = data[4 * 1] * 5.0 * inv_t * t4;
+    const float m5 = data[5 * 1] * t5;
 
     return m0 + m1 + m2 + m3 + m4 + m5;
 }
@@ -62,10 +85,10 @@ static void initParams(
     for (size_t i = 0; i < 9; ++i)
     {
         outParams[i] = 0.0f;
-        outParams[i] += s0 * quintic(p0 + i, 9, t);
-        outParams[i] += s1 * quintic(p1 + i, 9, t);
-        outParams[i] += s2 * quintic(p2 + i, 9, t);
-        outParams[i] += s3 * quintic(p3 + i, 9, t);
+        outParams[i] += s0 * quintic_9(p0 + i, t);
+        outParams[i] += s1 * quintic_9(p1 + i, t);
+        outParams[i] += s2 * quintic_9(p2 + i, t);
+        outParams[i] += s3 * quintic_9(p3 + i, t);
     }
 }
 
@@ -93,10 +116,10 @@ static void initRadiances(
     const float s3 = albedo * turbidity_rem;
 
     *outRadiance = 0.0f;
-    *outRadiance += s0 * quintic(p0, 1, t);
-    *outRadiance += s1 * quintic(p1, 1, t);
-    *outRadiance += s2 * quintic(p2, 1, t);
-    *outRadiance += s3 * quintic(p3, 1, t);
+    *outRadiance += s0 * quintic_1(p0, t);
+    *outRadiance += s1 * quintic_1(p1, t);
+    *outRadiance += s2 * quintic_1(p2, t);
+    *outRadiance += s3 * quintic_1(p3, t);
 }
 
 SkyStateResult skyStateNew(const SkyParams* const skyParams, SkyState* const skyState)
