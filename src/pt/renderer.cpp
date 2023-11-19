@@ -6,12 +6,12 @@
 #include <common/bvh.hpp>
 #include <common/gltf_model.hpp>
 #include <common/platform.hpp>
+#include <hw-skymodel/hw_skymodel.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -20,6 +20,7 @@
 #include <format>
 #include <fstream>
 #include <limits>
+#include <numbers>
 #include <numeric>
 #include <span>
 #include <sstream>
@@ -29,6 +30,9 @@
 
 namespace nlrs
 {
+inline constexpr float PI = std::numbers::pi_v<float>;
+inline constexpr float DEGREES_TO_RADIANS = PI / 180.0f;
+
 namespace
 {
 struct Vertex
@@ -93,11 +97,50 @@ struct SamplingStateLayout
     }
 };
 
+struct SkyStateLayout
+{
+    float     params[27];
+    float     radiances[3];
+    float     padding1[2];
+    glm::vec3 sunDirection;
+    float     padding2;
+
+    SkyStateLayout(const Sky& sky)
+        : params{0},
+          radiances{0},
+          padding1{0.f, 0.f},
+          sunDirection(0.0f),
+          padding2(0.0f)
+    {
+        const float sunZenith = sky.sunZenithDegrees * DEGREES_TO_RADIANS;
+        const float sunAzimuth = sky.sunAzimuthDegrees * DEGREES_TO_RADIANS;
+
+        sunDirection = glm::normalize(glm::vec3(
+            std::sin(sunZenith) * std::cos(sunAzimuth),
+            std::cos(sunZenith),
+            -std::sin(sunZenith) * std::sin(sunAzimuth)));
+
+        const SkyParams skyParams{
+            .elevation = 0.5f * PI - sunZenith,
+            .turbidity = sky.turbidity,
+            .albedo = {sky.albedo[0], sky.albedo[1], sky.albedo[2]}};
+
+        SkyState                    skyState;
+        [[maybe_unused]] const auto r = skyStateNew(&skyParams, &skyState);
+        // TODO: exceptional error handling
+        assert(r == SkyStateResult_Success);
+
+        std::memcpy(params, skyState.params, sizeof(skyState.params));
+        std::memcpy(radiances, skyState.radiances, sizeof(skyState.radiances));
+    }
+};
+
 struct RenderParamsLayout
 {
     FrameDataLayout     frameData;
     CameraLayout        camera;
     SamplingStateLayout samplingState;
+    SkyStateLayout      skyState;
 
     RenderParamsLayout(
         const Extent2u&         dimensions,
@@ -106,7 +149,8 @@ struct RenderParamsLayout
         const std::uint32_t     accumulatedSampleCount)
         : frameData(dimensions, frameCount),
           camera(renderParams.camera),
-          samplingState(renderParams.samplingParams, accumulatedSampleCount)
+          samplingState(renderParams.samplingParams, accumulatedSampleCount),
+          skyState(renderParams.sky)
     {
     }
 };

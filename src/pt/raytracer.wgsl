@@ -67,7 +67,10 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
         accumulatedSampleCount += 1u;
     }
 
-    return vec4f(imageBuffer[idx] / f32(accumulatedSampleCount), 1f);
+    let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
+    let rgb = expose(estimator, 0.1f);
+
+    return vec4f(rgb, 1f);
 }
 
 const EPSILON = 0.00001f;
@@ -82,10 +85,15 @@ const T_MAX = 10000f;
 const NUM_BOUNCES = 4u;
 const UNIFORM_HEMISPHERE_MULTIPLIER = 2f * PI;
 
+const CHANNEL_R = 0u;
+const CHANNEL_G = 1u;
+const CHANNEL_B = 2u;
+
 struct RenderParams {
   frameData: FrameData,
   camera: Camera,
   samplingState: SamplingState,
+  skyState: SkyState,
 }
 
 struct FrameData {
@@ -106,6 +114,12 @@ struct SamplingState {
     numBounces: u32,
     accumulatedSampleCount: u32,
 }
+
+struct SkyState {
+    params: array<f32, 27>,
+    radiances: array<f32, 3>,
+    sunDirection: vec3<f32>,
+};
 
 struct Aabb {
     min: vec3f,
@@ -163,10 +177,21 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
             ray = Ray(p, scatter.wi);
             throughput *= scatter.throughput;
         } else {
-            let unitDirection = normalize(ray.direction);
-            let t = 0.5f * (unitDirection.y + 1f);
-            let skyColor = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
-            color += throughput * skyColor;
+            // TODO: I don't think this needs to be normalized
+            let v = normalize(ray.direction);
+            let s = renderParams.skyState.sunDirection;
+
+            let theta = acos(v.y);
+            let gamma = acos(clamp(dot(v, s), -1f, 1f));
+
+            let skyRadiance = vec3f(
+                radiance(theta, gamma, CHANNEL_R),
+                radiance(theta, gamma, CHANNEL_G),
+                radiance(theta, gamma, CHANNEL_B)
+            );
+
+            color += throughput * skyRadiance;
+
             break;
         }
     }
@@ -179,6 +204,41 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
     let direction = camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin;
 
     return Ray(origin, direction);
+}
+
+@must_use
+fn radiance(theta: f32, gamma: f32, channel: u32) -> f32 {
+    let r = renderParams.skyState.radiances[channel];
+    let idx = 9u * channel;
+    let p0 = renderParams.skyState.params[idx + 0u];
+    let p1 = renderParams.skyState.params[idx + 1u];
+    let p2 = renderParams.skyState.params[idx + 2u];
+    let p3 = renderParams.skyState.params[idx + 3u];
+    let p4 = renderParams.skyState.params[idx + 4u];
+    let p5 = renderParams.skyState.params[idx + 5u];
+    let p6 = renderParams.skyState.params[idx + 6u];
+    let p7 = renderParams.skyState.params[idx + 7u];
+    let p8 = renderParams.skyState.params[idx + 8u];
+
+    let cosGamma = cos(gamma);
+    let cosGamma2 = cosGamma * cosGamma;
+    let cosTheta = abs(cos(theta));
+
+    let expM = exp(p4 * gamma);
+    let rayM = cosGamma2;
+    let mieMLhs = 1.0 + cosGamma2;
+    let mieMRhs = pow(1.0 + p8 * p8 - 2.0 * p8 * cosGamma, 1.5f);
+    let mieM = mieMLhs / mieMRhs;
+    let zenith = sqrt(cosTheta);
+    let radianceLhs = 1.0 + p0 * exp(p1 / (cosTheta + 0.01));
+    let radianceRhs = p2 + p3 * expM + p5 * rayM + p6 * mieM + p7 * zenith;
+    let radianceDist = radianceLhs * radianceRhs;
+    return r * radianceDist;
+}
+
+@must_use
+fn expose(v: vec3f, exposure: f32) -> vec3f {
+    return vec3(2.0f) / (vec3(1.0f) + exp(-exposure * v)) - vec3(1.0f);
 }
 
 fn evalImplicitLambertian(hit: Intersection, rngState: ptr<function, u32>) -> Scatter {

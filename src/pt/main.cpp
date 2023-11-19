@@ -48,7 +48,8 @@ int main(int argc, char** argv)
                     return nlrs::RenderParameters{
                         nlrs::Extent2u(framebufferSize),
                         cameraController.getCamera(),
-                        nlrs::SamplingParams()};
+                        nlrs::SamplingParams(),
+                        nlrs::Sky()};
                 }(),
                 window.largestMonitorResolution(),
             };
@@ -72,11 +73,15 @@ int main(int argc, char** argv)
         }();
 
         {
-            nlrs::Extent2i curFramebufferSize = window.resolution();
-            float          vfovDegrees = 70.0f;
-            int            numSamplesPerPixel = 128;
-            int            numBounces = 4;
-            auto           lastTime = std::chrono::steady_clock::now();
+            nlrs::Extent2i       curFramebufferSize = window.resolution();
+            float                vfovDegrees = 70.0f;
+            int                  numSamplesPerPixel = 128;
+            int                  numBounces = 4;
+            float                sunZenithDegrees = 30.0f;
+            float                sunAzimuthDegrees = 0.0f;
+            float                skyTurbidity = 1.0f;
+            std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
+            auto                 lastTime = std::chrono::steady_clock::now();
             while (!glfwWindowShouldClose(window.ptr()))
             {
                 const auto  currentTime = std::chrono::steady_clock::now();
@@ -147,6 +152,9 @@ int main(int argc, char** argv)
                     ImGui::SameLine();
                     ImGui::RadioButton("16", &numBounces, 16);
 
+                    ImGui::SliderFloat("sun zenith", &sunZenithDegrees, 0.0f, 90.0f, "%.2f");
+                    ImGui::SliderFloat("sun azimuth", &sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
+
                     ImGui::SliderFloat(
                         "camera speed",
                         &cameraController.speed(),
@@ -195,6 +203,12 @@ int main(int argc, char** argv)
                         nlrs::SamplingParams{
                             static_cast<std::uint32_t>(numSamplesPerPixel),
                             static_cast<std::uint32_t>(numBounces),
+                        },
+                        nlrs::Sky{
+                            skyTurbidity,
+                            skyAlbedo,
+                            sunZenithDegrees,
+                            sunAzimuthDegrees,
                         },
                     };
                     renderer.setRenderParameters(renderParams);

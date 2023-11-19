@@ -9,6 +9,7 @@
 #include <common/texture.hpp>
 #include <webgpu/webgpu.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -24,7 +25,17 @@ struct SamplingParams
     std::uint32_t numSamplesPerPixel = 128;
     std::uint32_t numBounces = 4;
 
-    bool operator==(const SamplingParams& rhs) const noexcept = default;
+    bool operator==(const SamplingParams&) const noexcept = default;
+};
+
+struct Sky
+{
+    float                turbidity = 1.0f;
+    std::array<float, 3> albedo = {1.0f, 1.0f, 1.0f};
+    float                sunZenithDegrees = 30.0f;
+    float                sunAzimuthDegrees = 0.0f;
+
+    bool operator==(const Sky&) const noexcept = default;
 };
 
 struct RenderParameters
@@ -32,8 +43,9 @@ struct RenderParameters
     Extent2u       framebufferSize;
     Camera         camera;
     SamplingParams samplingParams;
+    Sky            sky;
 
-    bool operator==(const RenderParameters& rhs) const noexcept = default;
+    bool operator==(const RenderParameters&) const noexcept = default;
 };
 
 struct Scene
