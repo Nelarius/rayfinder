@@ -21,7 +21,7 @@ typedef struct SkyState
     float radiances[3];
 } SkyState;
 
-typedef enum
+typedef enum SkyStateResult
 {
     SkyStateResult_Success,
     SkyStateResult_ElevationOutOfRange,
@@ -33,7 +33,7 @@ typedef enum
 // any of the sky params are out of range.
 SkyStateResult skyStateNew(const SkyParams* skyParams, SkyState* skyState);
 
-typedef enum
+typedef enum Channel
 {
     Channel_R,
     Channel_G,
