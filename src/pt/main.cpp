@@ -112,7 +112,7 @@ int main(int argc, char** argv)
                 {
                     ImGui::Begin("pt");
 
-                    ImGui::Text("Renrerer stats");
+                    ImGui::Text("Renderer stats");
                     {
                         const float drawAverageMs = renderer.averageDrawDurationMs();
                         const float renderAverageMs = renderer.averageRenderpassDurationMs();
