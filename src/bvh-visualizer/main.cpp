@@ -24,8 +24,22 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    const nlrs::GltfModel model(argv[1]);
-    const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
+    static_assert(
+        sizeof(Positions) == sizeof(Triangle), "Positions and Triangle must have the same layout");
+    static_assert(
+        offsetof(Positions, v0) == offsetof(Triangle, v0),
+        "Positions and Triangle must have the same layout");
+    static_assert(
+        offsetof(Positions, v1) == offsetof(Triangle, v1),
+        "Positions and Triangle must have the same layout");
+    static_assert(
+        offsetof(Positions, v2) == offsetof(Triangle, v2),
+        "Positions and Triangle must have the same layout");
+
+    const nlrs::GltfModel           model(argv[1]);
+    const std::span<const Triangle> triangles = std::span<const Triangle>(
+        reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
+    const nlrs::Bvh bvh = nlrs::buildBvh(triangles);
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];

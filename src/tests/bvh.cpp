@@ -29,19 +29,33 @@ bool bruteForceRayIntersectModel(
 
 TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 {
+    static_assert(
+        sizeof(Positions) == sizeof(Triangle), "Positions and Triangle must have the same layout");
+    static_assert(
+        offsetof(Positions, v0) == offsetof(Triangle, v0),
+        "Positions and Triangle must have the same layout");
+    static_assert(
+        offsetof(Positions, v1) == offsetof(Triangle, v1),
+        "Positions and Triangle must have the same layout");
+    static_assert(
+        offsetof(Positions, v2) == offsetof(Triangle, v2),
+        "Positions and Triangle must have the same layout");
+
     GltfModel model("Duck.glb");
     REQUIRE_FALSE(model.positions().empty());
-    const std::span<const Triangle> triangles = std::span<const Triangle>(
-        reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
 
-    const Bvh bvh = buildBvh(model.positions());
+    const Bvh bvh = [&model]() -> Bvh {
+        const std::span<const Triangle> triangles = std::span<const Triangle>(
+            reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
+        return buildBvh(triangles);
+    }();
     REQUIRE_FALSE(bvh.nodes.empty());
-    REQUIRE_FALSE(bvh.positions.empty());
+    REQUIRE_FALSE(bvh.triangles.empty());
 
-    const Camera camera = [&triangles]() -> Camera {
-        const Aabb modelAabb = [&triangles]() -> Aabb {
+    const Camera camera = [&bvh]() -> Camera {
+        const Aabb modelAabb = [&bvh]() -> Aabb {
             Aabb aabb;
-            for (const Triangle& tri : triangles)
+            for (const Triangle& tri : bvh.triangles)
             {
                 aabb = merge(aabb, tri.v0);
                 aabb = merge(aabb, tri.v1);
@@ -82,7 +96,7 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 
             Intersection bruteForceIntersection;
             const bool   didIntersect =
-                bruteForceRayIntersectModel(ray, triangles, rayTMax, bruteForceIntersection);
+                bruteForceRayIntersectModel(ray, bvh.triangles, rayTMax, bruteForceIntersection);
             Intersection bvhIntersection;
             const bool   bvhDidIntersect = rayIntersectBvh(ray, bvh, rayTMax, bvhIntersection);
 
