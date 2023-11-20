@@ -60,11 +60,36 @@ int main(int argc, char** argv)
             const auto textureIndices =
                 nlrs::reorderAttributes(model.baseColorTextureIndices(), bvh.positionIndices);
 
+            assert(bvh.positions.size() == normals.size());
+            assert(normals.size() == texCoords.size());
+            assert(normals.size() == textureIndices.size());
+            std::vector<nlrs::PositionAttribute> positionAttributes;
+            std::vector<nlrs::VertexAttributes>  vertexAttributes;
+            positionAttributes.reserve(bvh.positions.size());
+            vertexAttributes.reserve(bvh.positions.size());
+            for (std::size_t i = 0; i < normals.size(); ++i)
+            {
+                const auto& ps = bvh.positions[i];
+                const auto& ns = normals[i];
+                const auto& uvs = texCoords[i];
+                const auto  textureIdx = textureIndices[i];
+
+                positionAttributes.push_back(
+                    nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
+                vertexAttributes.push_back(nlrs::VertexAttributes{
+                    .n0 = ns.n0,
+                    .n1 = ns.n1,
+                    .n2 = ns.n2,
+                    .uv0 = uvs.uv0,
+                    .uv1 = uvs.uv1,
+                    .uv2 = uvs.uv2,
+                    .textureIdx = textureIdx});
+            }
+
             nlrs::Scene scene{
                 .bvh = bvh,
-                .normals = normals,
-                .texCoords = texCoords,
-                .textureIndices = textureIndices,
+                .positionAttributes = positionAttributes,
+                .vertexAttributes = vertexAttributes,
                 .baseColorTextures = model.baseColorTextures(),
             };
 

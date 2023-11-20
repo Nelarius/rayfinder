@@ -30,12 +30,10 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 // TODO: these are `read` only buffers. How can I create a buffer layout type which allows this?
 // Annotating these as read causes validation failures.
 @group(2) @binding(0) var<storage, read_write> bvhNodes: array<BvhNode>;
-@group(2) @binding(1) var<storage, read_write> triangles: array<Triangle>;
-@group(2) @binding(2) var<storage, read_write> normals: array<array<vec3f, 3>>;
-@group(2) @binding(3) var<storage, read_write> texCoords: array<array<vec2f, 3>>;
-@group(2) @binding(4) var<storage, read_write> textureDescriptorIndices: array<u32>;
-@group(2) @binding(5) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
-@group(2) @binding(6) var<storage, read_write> textures: array<u32>;
+@group(2) @binding(1) var<storage, read_write> positionAttributes: array<Positions>;
+@group(2) @binding(2) var<storage, read_write> vertexAttributes: array<VertexAttributes>;
+@group(2) @binding(3) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
+@group(2) @binding(4) var<storage, read_write> textures: array<u32>;
 
 // image bind group
 @group(3) @binding(0) var<storage, read_write> imageBuffer: array<vec3f>;
@@ -120,11 +118,22 @@ struct BvhNode {
     splitAxis: u32,
 }
 
-// TODO: rename to positions
-struct Triangle {
-    v0: vec3f,
-    v1: vec3f,
-    v2: vec3f,
+struct Positions {
+    p0: vec3f,
+    p1: vec3f,
+    p2: vec3f,
+}
+
+struct VertexAttributes {
+    n0: vec3f,
+    n1: vec3f,
+    n2: vec3f,
+
+    uv0: vec2f,
+    uv1: vec2f,
+    uv2: vec2f,
+
+    textureDescriptorIdx: u32,
 }
 
 struct Ray {
@@ -136,7 +145,7 @@ struct Intersection {
     p: vec3f,
     n: vec3f,
     uv: vec2f,
-    triangleIdx: u32,
+    textureDescriptorIdx: u32,
 }
 
 struct TriangleHit {
@@ -186,7 +195,7 @@ fn evalImplicitLambertian(hit: Intersection, rngState: ptr<function, u32>) -> Sc
     let onb = pixarOnb(hit.n);
     let wi = onb * v;
 
-    let textureDesc = textureDescriptors[textureDescriptorIndices[hit.triangleIdx]];
+    let textureDesc = textureDescriptors[hit.textureDescriptorIdx];
     let uv = hit.uv;
     let albedo = textureLookup(textureDesc, uv);
 
@@ -218,7 +227,7 @@ fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> 
         if rayIntersectAabb(intersector, node.aabb, tmax) {
             if node.triangleCount > 0u {
                 for (var idx = 0u; idx < node.triangleCount; idx = idx + 1u) {
-                    let triangle: Triangle = triangles[node.trianglesOffset + idx];
+                    let triangle: Positions = positionAttributes[node.trianglesOffset + idx];
                     var trihit: TriangleHit;
                     if rayIntersectTriangle(ray, triangle, tmax, &trihit) {
                         tmax = trihit.t;
@@ -228,13 +237,15 @@ fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> 
                         let p = trihit.p;
 
                         let triangleIdx = node.trianglesOffset + idx;
-                        let ns = normals[triangleIdx];
-                        let n = b[0] * ns[0] + b[1] * ns[1] + b[2] * ns[2];
+                        let vert = vertexAttributes[triangleIdx];
 
-                        let uvs = texCoords[triangleIdx];
-                        let uv = b[0] * uvs[0] + b[1] * uvs[1] + b[2] * uvs[2];
+                        let n = b[0] * vert.n0 + b[1] * vert.n1 + b[2] * vert.n2;
 
-                        *hit = Intersection(p, n, uv, triangleIdx);
+                        let uv = b[0] * vert.uv0 + b[1] * vert.uv1 + b[2] * vert.uv2;
+
+                        let textureDescriptorIdx = vertexAttributes[triangleIdx].textureDescriptorIdx;
+
+                        *hit = Intersection(p, n, uv, textureDescriptorIdx);
                         didIntersect = true;
                     }
                 }
@@ -312,11 +323,11 @@ fn rayIntersectAabb(intersector: RayAabbIntersector, aabb: Aabb, rayTMax: f32) -
     return (tmin < rayTMax) && (tmax > 0.0);
 }
 
-fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, TriangleHit>) -> bool {
+fn rayIntersectTriangle(ray: Ray, tri: Positions, tmax: f32, hit: ptr<function, TriangleHit>) -> bool {
     // Mäller-Trumbore algorithm
     // https://en.wikipedia.org/wiki/Möller–Trumbore_intersection_algorithm
-    let e1 = tri.v1 - tri.v0;
-    let e2 = tri.v2 - tri.v0;
+    let e1 = tri.p1 - tri.p0;
+    let e2 = tri.p2 - tri.p0;
 
     let h = cross(ray.direction, e2);
     let det = dot(e1, h);
@@ -326,7 +337,7 @@ fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, T
     }
 
     let invDet = 1.0f / det;
-    let s = ray.origin - tri.v0;
+    let s = ray.origin - tri.p0;
     let u = invDet * dot(s, h);
 
     if u < 0.0f || u > 1.0f {
@@ -347,7 +358,7 @@ fn rayIntersectTriangle(ray: Ray, tri: Triangle, tmax: f32, hit: ptr<function, T
         // e1 = v1 - v0
         // e2 = v2 - v0
         // -> p = v0 + u * e1 + v * e2
-        let p = tri.v0 + u * e1 + v * e2;
+        let p = tri.p0 + u * e1 + v * e2;
         let b = vec3f(1f - u - v, u, v);
         *hit = TriangleHit(p, b, t);
         return true;
