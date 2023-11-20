@@ -33,9 +33,9 @@ public:
 private:
     // Camera orientation and physical characteristics
 
-    glm::vec3 mPosition = glm::vec3(8.0f, 2.8f, -8.3f);
-    Angle     mYaw = Angle::degrees(25.0f);
-    Angle     mPitch = Angle::degrees(-5.0f);
+    glm::vec3 mPosition = glm::vec3(1.22f, 1.25f, -1.25f);
+    Angle     mYaw = Angle::degrees(129.64f);
+    Angle     mPitch = Angle::degrees(-13.73f);
     Angle     mVfov = Angle::degrees(80.0f);
     float     mAperture = 0.8f;
     float     mFocusDistance = 10.0f;
