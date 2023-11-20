@@ -25,63 +25,12 @@ struct Aabb
     }
 };
 
-// Contains the vertex positions of a triangle. Has 16-byte alignment for use as a storage buffer of
-// array<array<vec3f, 3>>.
-struct Positions
-{
-    glm::vec3 v0;
-    float     pad0;
-    glm::vec3 v1;
-    float     pad1;
-    glm::vec3 v2;
-    float     pad2;
-};
-
-// Contains the vertex normals of a triangle. Has 16-byte alignment for use as a storage buffer of
-// array<array<vec3f, 3>>.
-struct Normals
-{
-    glm::vec3 n0;
-    float     pad0;
-    glm::vec3 n1;
-    float     pad1;
-    glm::vec3 n2;
-    float     pad2;
-};
-
-// Contains the vertex texture coordinates of a triangle. Has 8-byte alignment for use as a storage
-// buffer of array<array<vec2f, 3>>.
-struct TexCoords
-{
-    glm::vec2 uv0;
-    glm::vec2 uv1;
-    glm::vec2 uv2;
-};
-
-// Contains the vertex positions of a triangle. Is intended to have the same layout as the Positions
-// struct.
 struct Triangle
 {
     glm::vec3 v0;
-    float     pad0;
     glm::vec3 v1;
-    float     pad1;
     glm::vec3 v2;
-    float     pad2;
 };
-
-static_assert(
-    sizeof(Positions) == sizeof(Triangle),
-    "Positions and Triangle must have the same layout");
-static_assert(
-    offsetof(Positions, v0) == offsetof(Triangle, v0),
-    "Positions and Triangle must have the same layout");
-static_assert(
-    offsetof(Positions, v1) == offsetof(Triangle, v1),
-    "Positions and Triangle must have the same layout");
-static_assert(
-    offsetof(Positions, v2) == offsetof(Triangle, v2),
-    "Positions and Triangle must have the same layout");
 
 struct Ray
 {

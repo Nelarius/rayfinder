@@ -209,26 +209,16 @@ Renderer::Renderer(
           "bvh nodes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           std::span<const BvhNode>(scene.bvh.nodes)),
-      triangleBuffer(
+      positionAttributesBuffer(
           gpuContext.device,
-          "triangles buffer",
+          "position attributes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const Positions>(scene.bvh.positions)),
-      normalsBuffer(
+          std::span<const PositionAttribute>(scene.positionAttributes)),
+      vertexAttributesBuffer(
           gpuContext.device,
-          "normals buffer",
+          "vertex attributes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const Normals>(scene.normals)),
-      texCoordsBuffer(
-          gpuContext.device,
-          "tex coords buffer",
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const TexCoords>(scene.texCoords)),
-      textureDescriptorIndicesBuffer(
-          gpuContext.device,
-          "texture descriptor indices buffer",
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const std::uint32_t>(scene.textureIndices)),
+          std::span<const VertexAttributes>(scene.vertexAttributes)),
       textureDescriptorBuffer(),
       textureBuffer(),
       sceneBindGroup(nullptr),
@@ -294,7 +284,7 @@ Renderer::Renderer(
         };
         // Ensure matches layout of `TextureDescriptor` definition in shader.
         std::vector<TextureDescriptor> textureDescriptors;
-        textureDescriptors.reserve(scene.textureIndices.size());
+        textureDescriptors.reserve(scene.baseColorTextures.size());
 
         std::vector<Texture::RgbaPixel> textureData;
         textureData.reserve(67108864);
@@ -473,14 +463,12 @@ Renderer::Renderer(
 
         // scene bind group layout
 
-        const std::array<WGPUBindGroupLayoutEntry, 7> sceneBindGroupLayoutEntries{
+        const std::array<WGPUBindGroupLayoutEntry, 5> sceneBindGroupLayoutEntries{
             bvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            triangleBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
-            normalsBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
-            texCoordsBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
-            textureDescriptorIndicesBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
-            textureDescriptorBuffer.bindGroupLayoutEntry(5, WGPUShaderStage_Fragment),
-            textureBuffer.bindGroupLayoutEntry(6, WGPUShaderStage_Fragment),
+            positionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            vertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
+            textureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
+            textureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
         };
 
         const WGPUBindGroupLayoutDescriptor sceneBindGroupLayoutDesc{
@@ -555,14 +543,12 @@ Renderer::Renderer(
 
         // scene bind group
 
-        const std::array<WGPUBindGroupEntry, 7> sceneBindGroupEntries{
+        const std::array<WGPUBindGroupEntry, 5> sceneBindGroupEntries{
             bvhNodeBuffer.bindGroupEntry(0),
-            triangleBuffer.bindGroupEntry(1),
-            normalsBuffer.bindGroupEntry(2),
-            texCoordsBuffer.bindGroupEntry(3),
-            textureDescriptorIndicesBuffer.bindGroupEntry(4),
-            textureDescriptorBuffer.bindGroupEntry(5),
-            textureBuffer.bindGroupEntry(6),
+            positionAttributesBuffer.bindGroupEntry(1),
+            vertexAttributesBuffer.bindGroupEntry(2),
+            textureDescriptorBuffer.bindGroupEntry(3),
+            textureBuffer.bindGroupEntry(4),
         };
 
         const WGPUBindGroupDescriptor sceneBindGroupDesc{

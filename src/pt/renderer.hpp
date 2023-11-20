@@ -48,14 +48,42 @@ struct RenderParameters
     bool operator==(const RenderParameters&) const noexcept = default;
 };
 
+struct PositionAttribute
+{
+    glm::vec3 p0;   // offset: 0, size: 12
+    float     pad0; // offset: 12, size: 4
+    glm::vec3 p1;   // offset: 16, size: 12
+    float     pad1; // offset: 28, size: 4
+    glm::vec3 p2;   // offset: 32, size: 12
+    float     pad2; // offset: 44, size: 4
+};
+
+struct VertexAttributes
+{
+    // Normals
+    glm::vec3 n0;   // offset 0, size: 12
+    float     pad0; // offset 12, size: 4
+    glm::vec3 n1;   // offset 16, size: 12
+    float     pad1; // offset 28, size: 4
+    glm::vec3 n2;   // offset 32, size: 12
+    float     pad2; // offset 44, size: 4
+
+    // Texture coordinates
+    glm::vec2 uv0; // offset 48, size: 8
+    glm::vec2 uv1; // offset 56, size: 8
+    glm::vec2 uv2; // offset 64, size: 8
+
+    // Texture index
+    std::uint32_t textureIdx; // offset 72, size: 4
+    std::uint32_t pad3;       // offset: 76, size 4
+};
+
 struct Scene
 {
-    const Bvh&                     bvh;
-    std::span<const Positions>     positions;
-    std::span<const Normals>       normals;
-    std::span<const TexCoords>     texCoords;
-    std::span<const std::uint32_t> textureIndices;
-    std::span<const Texture>       baseColorTextures;
+    const Bvh&                         bvh;
+    std::span<const PositionAttribute> positionAttributes;
+    std::span<const VertexAttributes>  vertexAttributes;
+    std::span<const Texture>           baseColorTextures;
 };
 
 struct RendererDescriptor
@@ -72,10 +100,8 @@ struct Renderer
     GpuBuffer          renderParamsBuffer;
     WGPUBindGroup      renderParamsBindGroup;
     GpuBuffer          bvhNodeBuffer;
-    GpuBuffer          triangleBuffer;
-    GpuBuffer          normalsBuffer;
-    GpuBuffer          texCoordsBuffer;
-    GpuBuffer          textureDescriptorIndicesBuffer;
+    GpuBuffer          positionAttributesBuffer;
+    GpuBuffer          vertexAttributesBuffer;
     GpuBuffer          textureDescriptorBuffer;
     GpuBuffer          textureBuffer;
     WGPUBindGroup      sceneBindGroup;
@@ -127,7 +153,7 @@ struct Renderer
                 .maxDynamicStorageBuffersPerPipelineLayout = 0,
                 .maxSampledTexturesPerShaderStage = 0,
                 .maxSamplersPerShaderStage = 0,
-                .maxStorageBuffersPerShaderStage = 7,
+                .maxStorageBuffersPerShaderStage = 5,
                 .maxStorageTexturesPerShaderStage = 0,
                 .maxUniformBuffersPerShaderStage = 1,
                 .maxUniformBufferBindingSize = 80,
