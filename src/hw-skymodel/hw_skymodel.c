@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <stddef.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 static const float PI = (float)M_PI;
@@ -20,17 +21,17 @@ static float quintic_9(const float* const data, const float t)
     const float t4 = t2 * t2;
     const float t5 = t4 * t;
 
-    const float inv_t = 1.0 - t;
+    const float inv_t = 1.0f - t;
     const float inv_t2 = inv_t * inv_t;
     const float inv_t3 = inv_t2 * inv_t;
     const float inv_t4 = inv_t2 * inv_t2;
     const float inv_t5 = inv_t4 * inv_t;
 
     const float m0 = data[0] * inv_t5;
-    const float m1 = data[9] * 5.0 * inv_t4 * t;
-    const float m2 = data[2 * 9] * 10.0 * inv_t3 * t2;
-    const float m3 = data[3 * 9] * 10.0 * inv_t2 * t3;
-    const float m4 = data[4 * 9] * 5.0 * inv_t * t4;
+    const float m1 = data[9] * 5.0f * inv_t4 * t;
+    const float m2 = data[2 * 9] * 10.0f * inv_t3 * t2;
+    const float m3 = data[3 * 9] * 10.0f * inv_t2 * t3;
+    const float m4 = data[4 * 9] * 5.0f * inv_t * t4;
     const float m5 = data[5 * 9] * t5;
 
     return m0 + m1 + m2 + m3 + m4 + m5;
@@ -43,17 +44,17 @@ static float quintic_1(const float* const data, const float t)
     const float t4 = t2 * t2;
     const float t5 = t4 * t;
 
-    const float inv_t = 1.0 - t;
+    const float inv_t = 1.0f - t;
     const float inv_t2 = inv_t * inv_t;
     const float inv_t3 = inv_t2 * inv_t;
     const float inv_t4 = inv_t2 * inv_t2;
     const float inv_t5 = inv_t4 * inv_t;
 
     const float m0 = data[0] * inv_t5;
-    const float m1 = data[1] * 5.0 * inv_t4 * t;
-    const float m2 = data[2 * 1] * 10.0 * inv_t3 * t2;
-    const float m3 = data[3 * 1] * 10.0 * inv_t2 * t3;
-    const float m4 = data[4 * 1] * 5.0 * inv_t * t4;
+    const float m1 = data[1] * 5.0f * inv_t4 * t;
+    const float m2 = data[2 * 1] * 10.0f * inv_t3 * t2;
+    const float m3 = data[3 * 1] * 10.0f * inv_t2 * t3;
+    const float m4 = data[4 * 1] * 5.0f * inv_t * t4;
     const float m5 = data[5 * 1] * t5;
 
     return m0 + m1 + m2 + m3 + m4 + m5;
@@ -77,9 +78,9 @@ static void initParams(
     const float* const p2 = data + (9 * 6 * 10 + 9 * 6 * turbidityMin);
     const float* const p3 = data + (9 * 6 * 10 + 9 * 6 * turbidityMax);
 
-    const float s0 = (1.0 - albedo) * (1.0 - turbidityRem);
-    const float s1 = (1.0 - albedo) * turbidityRem;
-    const float s2 = albedo * (1.0 - turbidityRem);
+    const float s0 = (1.0f - albedo) * (1.0f - turbidityRem);
+    const float s1 = (1.0f - albedo) * turbidityRem;
+    const float s2 = albedo * (1.0f - turbidityRem);
     const float s3 = albedo * turbidityRem;
 
     for (size_t i = 0; i < 9; ++i)
@@ -110,9 +111,9 @@ static void initRadiances(
     const float* const p2 = data + (6 * 10 + 6 * turbidity_min);
     const float* const p3 = data + (6 * 10 + 6 * turbidity_max);
 
-    const float s0 = (1.0 - albedo) * (1.0 - turbidity_rem);
-    const float s1 = (1.0 - albedo) * turbidity_rem;
-    const float s2 = albedo * (1.0 - turbidity_rem);
+    const float s0 = (1.0f - albedo) * (1.0f - turbidity_rem);
+    const float s1 = (1.0f - albedo) * turbidity_rem;
+    const float s2 = albedo * (1.0f - turbidity_rem);
     const float s3 = albedo * turbidity_rem;
 
     *outRadiance = 0.0f;
@@ -148,7 +149,7 @@ SkyStateResult skyStateNew(const SkyParams* const skyParams, SkyState* const sky
 
     // Init state.
 
-    const float t = powf((elevation / (0.5 * PI)), (1.0f / 3.0f));
+    const float t = powf((elevation / (0.5f * PI)), (1.0f / 3.0f));
 
     initParams(skyState->params + 0, paramsR, turbidity, albedo[0], t);
     initParams(skyState->params + 9, paramsG, turbidity, albedo[1], t);
@@ -185,11 +186,11 @@ float skyStateRadiance(
 
     const float expM = expf(p4 * gamma);
     const float rayM = cosGamma2;
-    const float mieMLhs = 1.0 + cosGamma2;
-    const float mieMRhs = powf(1.0 + p8 * p8 - 2.0 * p8 * cosGamma, 1.5f);
+    const float mieMLhs = 1.0f + cosGamma2;
+    const float mieMRhs = powf(1.0f + p8 * p8 - 2.0f * p8 * cosGamma, 1.5f);
     const float mieM = mieMLhs / mieMRhs;
     const float zenith = sqrtf(cos_theta);
-    const float radiance_lhs = 1.0 + p0 * expf(p1 / (cos_theta + 0.01));
+    const float radiance_lhs = 1.0f + p0 * expf(p1 / (cos_theta + 0.01f));
     const float radiance_rhs = p2 + p3 * expM + p5 * rayM + p6 * mieM + p7 * zenith;
     const float radiance_dist = radiance_lhs * radiance_rhs;
 
