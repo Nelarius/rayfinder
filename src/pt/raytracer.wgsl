@@ -186,8 +186,7 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
             ray = Ray(p, scatter.wi);
             throughput *= scatter.throughput;
         } else {
-            // TODO: I don't think this needs to be normalized
-            let v = normalize(ray.direction);
+            let v = ray.direction;
             let s = skyState.sunDirection;
 
             let theta = acos(v.y);
@@ -210,7 +209,7 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
 
 fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
     let origin = camera.origin;
-    let direction = camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin;
+    let direction = normalize(camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin);
 
     return Ray(origin, direction);
 }
