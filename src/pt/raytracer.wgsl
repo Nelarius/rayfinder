@@ -81,8 +81,6 @@ const FRAC_PI_2 = 1.5707964f;
 const T_MIN = 0.001f;
 const T_MAX = 10000f;
 
-const UNIFORM_HEMISPHERE_MULTIPLIER = 2f * PI;
-
 const CHANNEL_R = 0u;
 const CHANNEL_G = 1u;
 const CHANNEL_B = 2u;
