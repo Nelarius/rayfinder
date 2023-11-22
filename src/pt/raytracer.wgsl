@@ -81,7 +81,6 @@ const FRAC_PI_2 = 1.5707964f;
 const T_MIN = 0.001f;
 const T_MAX = 10000f;
 
-const NUM_BOUNCES = 4u;
 const UNIFORM_HEMISPHERE_MULTIPLIER = 2f * PI;
 
 const CHANNEL_R = 0u;
@@ -175,10 +174,11 @@ struct Scatter {
 
 fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var ray = primaryRay;
-
     var color = vec3(0f);
     var throughput = vec3(1f);
-    for (var bounces = 0u; bounces < NUM_BOUNCES; bounces += 1u) {
+
+    let numBounces = renderParams.samplingState.numBounces;
+    for (var bounces = 0u; bounces < numBounces; bounces += 1u) {
         var intersection: Intersection;
         if rayIntersectBvh(ray, T_MAX, &intersection) {
             let p = intersection.p;
