@@ -1,9 +1,7 @@
 #pragma once
 
-#include "geometry.hpp"
 #include "texture.hpp"
-
-#include <glm/glm.hpp>
+#include "triangle_attributes.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -12,27 +10,6 @@
 
 namespace nlrs
 {
-struct Positions
-{
-    glm::vec3 v0;
-    glm::vec3 v1;
-    glm::vec3 v2;
-};
-
-struct Normals
-{
-    glm::vec3 n0;
-    glm::vec3 n1;
-    glm::vec3 n2;
-};
-
-struct TexCoords
-{
-    glm::vec2 uv0;
-    glm::vec2 uv1;
-    glm::vec2 uv2;
-};
-
 class GltfModel
 {
 public:

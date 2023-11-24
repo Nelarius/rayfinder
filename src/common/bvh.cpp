@@ -57,9 +57,7 @@ void initInteriorNode(
 void buildLeafNode(
     BvhNode&                            node,
     const Aabb&                         nodeAabb,
-    const std::span<const Triangle>     triangles,
     const std::span<const BvhPrimitive> bvhPrimitives,
-    std::span<Triangle>                 orderedTriangles,
     std::span<std::size_t>              triangleIndices,
     const std::size_t                   orderedTrianglesOffset)
 {
@@ -69,7 +67,6 @@ void buildLeafNode(
     {
         const std::size_t newIdx = trianglesOffset + spanIdx;
         const std::size_t sourceIdx = bvhPrimitives[spanIdx].triangleIdx;
-        orderedTriangles[newIdx] = triangles[sourceIdx];
         triangleIndices[sourceIdx] = newIdx;
     }
     assert(trianglesOffset < std::numeric_limits<std::uint32_t>::max());
@@ -82,14 +79,13 @@ void buildLeafNode(
 }
 
 std::size_t buildRecursive(
-    const std::span<const Triangle> triangles,
-    std::span<BvhPrimitive>         bvhPrimitives,
-    std::vector<BvhNode>&           bvhNodes,
-    std::span<Triangle>             orderedTriangles,
-    std::span<std::size_t>          triangleIndices,
-    const std::size_t               orderedTrianglesOffset)
+    const std::span<const Positions> triangles,
+    std::span<BvhPrimitive>          bvhPrimitives,
+    std::vector<BvhNode>&            bvhNodes,
+    std::span<std::size_t>           triangleIndices,
+    const std::size_t                orderedTrianglesOffset)
 {
-    assert(triangles.size() == orderedTriangles.size());
+    assert(triangles.size() == triangleIndices.size());
     assert(bvhPrimitives.size() >= 1);
 
     // Insert new node in memory. Even though we don't reference it yet, recursive function calls
@@ -118,9 +114,7 @@ std::size_t buildRecursive(
         buildLeafNode(
             bvhNodes[currentNodeIdx],
             nodeAabb,
-            triangles,
             bvhPrimitives,
-            orderedTriangles,
             triangleIndices,
             orderedTrianglesOffset);
         return currentNodeIdx;
@@ -231,9 +225,7 @@ std::size_t buildRecursive(
                 buildLeafNode(
                     bvhNodes[currentNodeIdx],
                     nodeAabb,
-                    triangles,
                     bvhPrimitives,
-                    orderedTriangles,
                     triangleIndices,
                     orderedTrianglesOffset);
                 return currentNodeIdx;
@@ -247,14 +239,12 @@ std::size_t buildRecursive(
         triangles,
         bvhPrimitives.subspan(0, splitIdx),
         bvhNodes,
-        orderedTriangles,
         triangleIndices,
         orderedTrianglesOffset);
     const std::size_t secondChildOffset = buildRecursive(
         triangles,
         bvhPrimitives.subspan(splitIdx),
         bvhNodes,
-        orderedTriangles,
         triangleIndices,
         orderedTrianglesOffset + splitIdx);
 
@@ -270,7 +260,7 @@ std::size_t buildRecursive(
 }
 } // namespace
 
-Bvh buildBvh(std::span<const Triangle> triangles)
+Bvh buildBvh(std::span<const Positions> triangles)
 {
     assert(!triangles.empty());
 
@@ -279,8 +269,8 @@ Bvh buildBvh(std::span<const Triangle> triangles)
     bvhPrimitives.reserve(triangles.size());
     for (std::size_t idx = 0; idx < numTriangles; ++idx)
     {
-        const Triangle& tri = reinterpret_cast<const Triangle&>(triangles[idx]);
-        const Aabb      triAabb = aabb(tri);
+        const Positions& tri = triangles[idx];
+        const Aabb       triAabb = aabb(tri);
         bvhPrimitives.push_back(BvhPrimitive{
             .aabb = triAabb,
             .centroid = centroid(triAabb),
@@ -288,16 +278,14 @@ Bvh buildBvh(std::span<const Triangle> triangles)
         });
     }
 
-    std::vector<Triangle>    orderedTriangles(numTriangles);
     std::vector<std::size_t> triangleIndices(numTriangles);
     std::vector<BvhNode>     bvhNodes;
     bvhNodes.reserve(2 << 19);
 
-    buildRecursive(triangles, bvhPrimitives, bvhNodes, orderedTriangles, triangleIndices, 0);
+    buildRecursive(triangles, bvhPrimitives, bvhNodes, triangleIndices, 0);
 
     return Bvh{
         .nodes = std::move(bvhNodes),
-        .triangles = std::move(orderedTriangles),
         .triangleIndices = std::move(triangleIndices),
     };
 }

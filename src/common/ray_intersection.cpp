@@ -1,6 +1,8 @@
+#include "aabb.hpp"
 #include "bvh.hpp"
-#include "geometry.hpp"
+#include "ray.hpp"
 #include "ray_intersection.hpp"
+#include "triangle_attributes.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -9,10 +11,10 @@
 namespace nlrs
 {
 bool rayIntersectTriangle(
-    const Ray&      ray,
-    const Triangle& tri,
-    const float     rayTMax,
-    Intersection&   intersect)
+    const Ray&       ray,
+    const Positions& tri,
+    const float      rayTMax,
+    Intersection&    intersect)
 {
     constexpr float EPSILON = 0.00001f;
 
@@ -107,11 +109,12 @@ bool rayIntersectAabb(const RayAabbIntersector& intersector, const Aabb& aabb, c
 }
 
 bool rayIntersectBvh(
-    const Ray&    ray,
-    const Bvh&    bvh,
-    float         rayTMax,
-    Intersection& intersect,
-    BvhStats*     stats)
+    const Ray&                       ray,
+    const std::span<const BvhNode>   bvhNodes,
+    const std::span<const Positions> triangles,
+    float                            rayTMax,
+    Intersection&                    intersect,
+    BvhStats*                        stats)
 {
     const RayAabbIntersector intersector(ray);
 
@@ -126,7 +129,7 @@ bool rayIntersectBvh(
     while (true)
     {
         ++nodesVisited;
-        const BvhNode& node = bvh.nodes[currentNodeIdx];
+        const BvhNode& node = bvhNodes[currentNodeIdx];
 
         // Check ray against BVH node
         if (rayIntersectAabb(intersector, node.aabb, rayTMax))
@@ -136,7 +139,7 @@ bool rayIntersectBvh(
                 // Check for intersection with primitives in BVH node
                 for (std::size_t idx = 0; idx < node.triangleCount; ++idx)
                 {
-                    const Triangle& triangle = bvh.triangles[node.trianglesOffset + idx];
+                    const Positions& triangle = triangles[node.trianglesOffset + idx];
                     if (rayIntersectTriangle(ray, triangle, rayTMax, intersect))
                     {
                         rayTMax = intersect.t;

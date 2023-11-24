@@ -1,7 +1,7 @@
+#include <common/aabb.hpp>
 #include <common/bvh.hpp>
 #include <common/camera.hpp>
 #include <common/extent.hpp>
-#include <common/geometry.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/units/angle.hpp>
@@ -24,22 +24,9 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    static_assert(
-        sizeof(Positions) == sizeof(Triangle), "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v0) == offsetof(Triangle, v0),
-        "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v1) == offsetof(Triangle, v1),
-        "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v2) == offsetof(Triangle, v2),
-        "Positions and Triangle must have the same layout");
-
-    const nlrs::GltfModel           model(argv[1]);
-    const std::span<const Triangle> triangles = std::span<const Triangle>(
-        reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
-    const nlrs::Bvh bvh = nlrs::buildBvh(triangles);
+    const nlrs::GltfModel model(argv[1]);
+    const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
+    const auto            triangles = reorderAttributes(model.positions(), bvh.triangleIndices);
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];
@@ -78,7 +65,7 @@ int main(int argc, char** argv)
 
             Intersection intersect;
             BvhStats     bvhStats;
-            rayIntersectBvh(ray, bvh, FLT_MAX, intersect, &bvhStats);
+            rayIntersectBvh(ray, bvh.nodes, triangles, FLT_MAX, intersect, &bvhStats);
 
             const float x = 0.01f * static_cast<float>(bvhStats.nodesVisited);
             const auto  p = static_cast<std::uint8_t>(std::min(x, 1.0f) * 255.0f);

@@ -1,4 +1,5 @@
-#include <common/geometry.hpp>
+#include <common/aabb.hpp>
+#include <common/ray.hpp>
 #include <common/ray_intersection.hpp>
 
 #include <catch2/catch_test_macros.hpp>

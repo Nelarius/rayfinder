@@ -5,8 +5,8 @@
 #include "window.hpp"
 
 #include <common/bvh.hpp>
-#include <common/geometry.hpp>
 #include <common/gltf_model.hpp>
+#include <common/triangle_attributes.hpp>
 
 #include <cassert>
 #include <chrono>
@@ -56,40 +56,24 @@ int main(int argc, char** argv)
             };
 
             const nlrs::GltfModel model(argv[1]);
+            const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
 
-            static_assert(
-                sizeof(nlrs::Positions) == sizeof(nlrs::Triangle),
-                "Positions and Triangle must have the same layout");
-            static_assert(
-                offsetof(nlrs::Positions, v0) == offsetof(nlrs::Triangle, v0),
-                "Positions and Triangle must have the same layout");
-            static_assert(
-                offsetof(nlrs::Positions, v1) == offsetof(nlrs::Triangle, v1),
-                "Positions and Triangle must have the same layout");
-            static_assert(
-                offsetof(nlrs::Positions, v2) == offsetof(nlrs::Triangle, v2),
-                "Positions and Triangle must have the same layout");
-
-            const auto triangles = std::span<const nlrs::Triangle>(
-                reinterpret_cast<const nlrs::Triangle*>(model.positions().data()),
-                model.positions().size());
-            const nlrs::Bvh bvh = nlrs::buildBvh(triangles);
-
+            const auto positions = nlrs::reorderAttributes(model.positions(), bvh.triangleIndices);
             const auto normals = nlrs::reorderAttributes(model.normals(), bvh.triangleIndices);
             const auto texCoords = nlrs::reorderAttributes(model.texCoords(), bvh.triangleIndices);
             const auto textureIndices =
                 nlrs::reorderAttributes(model.baseColorTextureIndices(), bvh.triangleIndices);
 
-            assert(bvh.triangles.size() == normals.size());
-            assert(normals.size() == texCoords.size());
-            assert(normals.size() == textureIndices.size());
+            assert(positions.size() == normals.size());
+            assert(positions.size() == texCoords.size());
+            assert(positions.size() == textureIndices.size());
             std::vector<nlrs::PositionAttribute> positionAttributes;
             std::vector<nlrs::VertexAttributes>  vertexAttributes;
-            positionAttributes.reserve(bvh.triangles.size());
-            vertexAttributes.reserve(bvh.triangles.size());
+            positionAttributes.reserve(positions.size());
+            vertexAttributes.reserve(positions.size());
             for (std::size_t i = 0; i < normals.size(); ++i)
             {
-                const auto& ps = bvh.triangles[i];
+                const auto& ps = positions[i];
                 const auto& ns = normals[i];
                 const auto& uvs = texCoords[i];
                 const auto  textureIdx = textureIndices[i];

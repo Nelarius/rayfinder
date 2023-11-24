@@ -1,7 +1,10 @@
+#include <common/aabb.hpp>
 #include <common/bvh.hpp>
 #include <common/camera.hpp>
 #include <common/gltf_model.hpp>
+#include <common/ray.hpp>
 #include <common/ray_intersection.hpp>
+#include <common/triangle_attributes.hpp>
 #include <common/units/angle.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -10,13 +13,13 @@
 using namespace nlrs;
 
 bool bruteForceRayIntersectModel(
-    const Ray&                      ray,
-    const std::span<const Triangle> triangles,
-    float                           rayTMax,
-    Intersection&                   intersect)
+    const Ray&                       ray,
+    const std::span<const Positions> triangles,
+    float                            rayTMax,
+    Intersection&                    intersect)
 {
     bool didIntersect = false;
-    for (const Triangle& tri : triangles)
+    for (const Positions& tri : triangles)
     {
         if (rayIntersectTriangle(ray, tri, rayTMax, intersect))
         {
@@ -29,33 +32,18 @@ bool bruteForceRayIntersectModel(
 
 TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 {
-    static_assert(
-        sizeof(Positions) == sizeof(Triangle), "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v0) == offsetof(Triangle, v0),
-        "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v1) == offsetof(Triangle, v1),
-        "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v2) == offsetof(Triangle, v2),
-        "Positions and Triangle must have the same layout");
-
     GltfModel model("Duck.glb");
     REQUIRE_FALSE(model.positions().empty());
 
-    const Bvh bvh = [&model]() -> Bvh {
-        const std::span<const Triangle> triangles = std::span<const Triangle>(
-            reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
-        return buildBvh(triangles);
-    }();
+    const Bvh  bvh = buildBvh(model.positions());
+    const auto triangles = nlrs::reorderAttributes(model.positions(), bvh.triangleIndices);
     REQUIRE_FALSE(bvh.nodes.empty());
-    REQUIRE_FALSE(bvh.triangles.empty());
+    REQUIRE_FALSE(bvh.triangleIndices.empty());
 
-    const Camera camera = [&bvh]() -> Camera {
-        const Aabb modelAabb = [&bvh]() -> Aabb {
+    const Camera camera = [&triangles]() -> Camera {
+        const Aabb modelAabb = [&triangles]() -> Aabb {
             Aabb aabb;
-            for (const Triangle& tri : bvh.triangles)
+            for (const Positions& tri : triangles)
             {
                 aabb = merge(aabb, tri.v0);
                 aabb = merge(aabb, tri.v1);
@@ -96,9 +84,10 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 
             Intersection bruteForceIntersection;
             const bool   didIntersect =
-                bruteForceRayIntersectModel(ray, bvh.triangles, rayTMax, bruteForceIntersection);
+                bruteForceRayIntersectModel(ray, triangles, rayTMax, bruteForceIntersection);
             Intersection bvhIntersection;
-            const bool   bvhDidIntersect = rayIntersectBvh(ray, bvh, rayTMax, bvhIntersection);
+            const bool   bvhDidIntersect =
+                rayIntersectBvh(ray, bvh.nodes, triangles, rayTMax, bvhIntersection);
 
             REQUIRE(bvhDidIntersect == didIntersect);
 
