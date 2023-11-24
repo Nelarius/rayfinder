@@ -109,11 +109,12 @@ bool rayIntersectAabb(const RayAabbIntersector& intersector, const Aabb& aabb, c
 }
 
 bool rayIntersectBvh(
-    const Ray&    ray,
-    const Bvh&    bvh,
-    float         rayTMax,
-    Intersection& intersect,
-    BvhStats*     stats)
+    const Ray&                       ray,
+    const std::span<const BvhNode>   bvhNodes,
+    const std::span<const Positions> triangles,
+    float                            rayTMax,
+    Intersection&                    intersect,
+    BvhStats*                        stats)
 {
     const RayAabbIntersector intersector(ray);
 
@@ -128,7 +129,7 @@ bool rayIntersectBvh(
     while (true)
     {
         ++nodesVisited;
-        const BvhNode& node = bvh.nodes[currentNodeIdx];
+        const BvhNode& node = bvhNodes[currentNodeIdx];
 
         // Check ray against BVH node
         if (rayIntersectAabb(intersector, node.aabb, rayTMax))
@@ -138,7 +139,7 @@ bool rayIntersectBvh(
                 // Check for intersection with primitives in BVH node
                 for (std::size_t idx = 0; idx < node.triangleCount; ++idx)
                 {
-                    const Positions& triangle = bvh.triangles[node.trianglesOffset + idx];
+                    const Positions& triangle = triangles[node.trianglesOffset + idx];
                     if (rayIntersectTriangle(ray, triangle, rayTMax, intersect))
                     {
                         rayTMax = intersect.t;

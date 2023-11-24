@@ -58,21 +58,22 @@ int main(int argc, char** argv)
             const nlrs::GltfModel model(argv[1]);
             const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
 
+            const auto positions = nlrs::reorderAttributes(model.positions(), bvh.triangleIndices);
             const auto normals = nlrs::reorderAttributes(model.normals(), bvh.triangleIndices);
             const auto texCoords = nlrs::reorderAttributes(model.texCoords(), bvh.triangleIndices);
             const auto textureIndices =
                 nlrs::reorderAttributes(model.baseColorTextureIndices(), bvh.triangleIndices);
 
-            assert(bvh.triangles.size() == normals.size());
-            assert(normals.size() == texCoords.size());
-            assert(normals.size() == textureIndices.size());
+            assert(positions.size() == normals.size());
+            assert(positions.size() == texCoords.size());
+            assert(positions.size() == textureIndices.size());
             std::vector<nlrs::PositionAttribute> positionAttributes;
             std::vector<nlrs::VertexAttributes>  vertexAttributes;
-            positionAttributes.reserve(bvh.triangles.size());
-            vertexAttributes.reserve(bvh.triangles.size());
+            positionAttributes.reserve(positions.size());
+            vertexAttributes.reserve(positions.size());
             for (std::size_t i = 0; i < normals.size(); ++i)
             {
-                const auto& ps = bvh.triangles[i];
+                const auto& ps = positions[i];
                 const auto& ns = normals[i];
                 const auto& uvs = texCoords[i];
                 const auto  textureIdx = textureIndices[i];

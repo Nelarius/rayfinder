@@ -1,11 +1,14 @@
 #pragma once
 
+#include "bvh.hpp"
+
 #include <glm/glm.hpp>
+
+#include <span>
 
 namespace nlrs
 {
 struct Aabb;
-struct Bvh;
 struct Ray;
 struct Positions;
 
@@ -38,9 +41,10 @@ struct BvhStats
 };
 
 bool rayIntersectBvh(
-    const Ray&    ray,
-    const Bvh&    bvh,
-    float         rayTMax,
-    Intersection& intersect,
-    BvhStats*     stats = nullptr);
+    const Ray&                 ray,
+    std::span<const BvhNode>   bvhNodes,
+    std::span<const Positions> triangles,
+    float                      rayTMax,
+    Intersection&              intersect,
+    BvhStats*                  stats = nullptr);
 } // namespace nlrs

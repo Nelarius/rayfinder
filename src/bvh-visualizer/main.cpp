@@ -26,6 +26,7 @@ int main(int argc, char** argv)
 
     const nlrs::GltfModel model(argv[1]);
     const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
+    const auto            triangles = reorderAttributes(model.positions(), bvh.triangleIndices);
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];
@@ -64,7 +65,7 @@ int main(int argc, char** argv)
 
             Intersection intersect;
             BvhStats     bvhStats;
-            rayIntersectBvh(ray, bvh, FLT_MAX, intersect, &bvhStats);
+            rayIntersectBvh(ray, bvh.nodes, triangles, FLT_MAX, intersect, &bvhStats);
 
             const float x = 0.01f * static_cast<float>(bvhStats.nodesVisited);
             const auto  p = static_cast<std::uint8_t>(std::min(x, 1.0f) * 255.0f);

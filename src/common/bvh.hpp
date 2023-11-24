@@ -24,11 +24,10 @@ struct BvhNode
 struct Bvh
 {
     std::vector<BvhNode> nodes;
-    // TODO: are these even needed?
-    std::vector<Positions> triangles;
-    // The positions are sorted so that leaf nodes point to contiguous ranges of triangle
-    // attributes. `triangleIndices` contains the new index of the position. It can be used to
-    // reorder the remaining triangle attributes to match the order of the positions.
+    // The BVH leaf nodes point to contiguous ranges of triangle attributes. `triangleIndices`
+    // contains the new index of the triangle attributes, given the original locations of the
+    // triangle attributes in `buildBvh`. It can be used to reorder the triangle attributes using
+    // `reorderAttributes`.
     std::vector<std::size_t> triangleIndices;
 };
 

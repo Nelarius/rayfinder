@@ -35,14 +35,15 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
     GltfModel model("Duck.glb");
     REQUIRE_FALSE(model.positions().empty());
 
-    const Bvh bvh = buildBvh(model.positions());
+    const Bvh  bvh = buildBvh(model.positions());
+    const auto triangles = nlrs::reorderAttributes(model.positions(), bvh.triangleIndices);
     REQUIRE_FALSE(bvh.nodes.empty());
-    REQUIRE_FALSE(bvh.triangles.empty());
+    REQUIRE_FALSE(bvh.triangleIndices.empty());
 
-    const Camera camera = [&bvh]() -> Camera {
-        const Aabb modelAabb = [&bvh]() -> Aabb {
+    const Camera camera = [&triangles]() -> Camera {
+        const Aabb modelAabb = [&triangles]() -> Aabb {
             Aabb aabb;
-            for (const Positions& tri : bvh.triangles)
+            for (const Positions& tri : triangles)
             {
                 aabb = merge(aabb, tri.v0);
                 aabb = merge(aabb, tri.v1);
@@ -83,9 +84,10 @@ TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 
             Intersection bruteForceIntersection;
             const bool   didIntersect =
-                bruteForceRayIntersectModel(ray, bvh.triangles, rayTMax, bruteForceIntersection);
+                bruteForceRayIntersectModel(ray, triangles, rayTMax, bruteForceIntersection);
             Intersection bvhIntersection;
-            const bool   bvhDidIntersect = rayIntersectBvh(ray, bvh, rayTMax, bvhIntersection);
+            const bool   bvhDidIntersect =
+                rayIntersectBvh(ray, bvh.nodes, triangles, rayTMax, bvhIntersection);
 
             REQUIRE(bvhDidIntersect == didIntersect);
 
