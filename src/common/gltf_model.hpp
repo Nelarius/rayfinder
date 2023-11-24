@@ -1,6 +1,5 @@
 #pragma once
 
-#include "geometry.hpp"
 #include "texture.hpp"
 #include "triangle_attributes.hpp"
 

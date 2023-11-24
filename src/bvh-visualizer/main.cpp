@@ -1,7 +1,7 @@
+#include <common/aabb.hpp>
 #include <common/bvh.hpp>
 #include <common/camera.hpp>
 #include <common/extent.hpp>
-#include <common/geometry.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/units/angle.hpp>

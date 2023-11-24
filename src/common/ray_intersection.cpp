@@ -1,5 +1,6 @@
+#include "aabb.hpp"
 #include "bvh.hpp"
-#include "geometry.hpp"
+#include "ray.hpp"
 #include "ray_intersection.hpp"
 #include "triangle_attributes.hpp"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "geometry.hpp"
+#include "ray.hpp"
 #include "units/angle.hpp"
 
 #include <glm/glm.hpp>

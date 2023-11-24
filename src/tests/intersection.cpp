@@ -1,5 +1,5 @@
 #include <common/bvh.hpp>
-#include <common/geometry.hpp>
+#include <common/ray.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/triangle_attributes.hpp>
 

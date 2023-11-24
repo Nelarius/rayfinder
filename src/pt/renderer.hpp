@@ -5,7 +5,6 @@
 #include <common/bvh.hpp>
 #include <common/camera.hpp>
 #include <common/extent.hpp>
-#include <common/geometry.hpp>
 #include <common/texture.hpp>
 #include <webgpu/webgpu.h>
 

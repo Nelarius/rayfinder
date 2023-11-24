@@ -1,6 +1,6 @@
 #pragma once
 
-#include "geometry.hpp"
+#include "aabb.hpp"
 #include "triangle_attributes.hpp"
 
 #include <concepts>

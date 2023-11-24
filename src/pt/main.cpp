@@ -5,8 +5,8 @@
 #include "window.hpp"
 
 #include <common/bvh.hpp>
-#include <common/geometry.hpp>
 #include <common/gltf_model.hpp>
+#include <common/triangle_attributes.hpp>
 
 #include <cassert>
 #include <chrono>

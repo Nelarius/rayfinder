@@ -27,12 +27,6 @@ struct Aabb
     }
 };
 
-struct Ray
-{
-    glm::vec3 origin;
-    glm::vec3 direction;
-};
-
 inline glm::vec3 centroid(const Aabb& aabb) { return 0.5f * (aabb.min + aabb.max); }
 
 inline glm::vec3 diagonal(const Aabb& aabb) { return aabb.max - aabb.min; }
