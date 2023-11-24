@@ -56,24 +56,7 @@ int main(int argc, char** argv)
             };
 
             const nlrs::GltfModel model(argv[1]);
-
-            static_assert(
-                sizeof(nlrs::Positions) == sizeof(nlrs::Triangle),
-                "Positions and Triangle must have the same layout");
-            static_assert(
-                offsetof(nlrs::Positions, v0) == offsetof(nlrs::Triangle, v0),
-                "Positions and Triangle must have the same layout");
-            static_assert(
-                offsetof(nlrs::Positions, v1) == offsetof(nlrs::Triangle, v1),
-                "Positions and Triangle must have the same layout");
-            static_assert(
-                offsetof(nlrs::Positions, v2) == offsetof(nlrs::Triangle, v2),
-                "Positions and Triangle must have the same layout");
-
-            const auto triangles = std::span<const nlrs::Triangle>(
-                reinterpret_cast<const nlrs::Triangle*>(model.positions().data()),
-                model.positions().size());
-            const nlrs::Bvh bvh = nlrs::buildBvh(triangles);
+            const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
 
             const auto normals = nlrs::reorderAttributes(model.normals(), bvh.triangleIndices);
             const auto texCoords = nlrs::reorderAttributes(model.texCoords(), bvh.triangleIndices);

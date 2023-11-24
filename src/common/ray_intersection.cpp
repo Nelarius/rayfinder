@@ -1,6 +1,7 @@
 #include "bvh.hpp"
 #include "geometry.hpp"
 #include "ray_intersection.hpp"
+#include "triangle_attributes.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -9,10 +10,10 @@
 namespace nlrs
 {
 bool rayIntersectTriangle(
-    const Ray&      ray,
-    const Triangle& tri,
-    const float     rayTMax,
-    Intersection&   intersect)
+    const Ray&       ray,
+    const Positions& tri,
+    const float      rayTMax,
+    Intersection&    intersect)
 {
     constexpr float EPSILON = 0.00001f;
 
@@ -136,7 +137,7 @@ bool rayIntersectBvh(
                 // Check for intersection with primitives in BVH node
                 for (std::size_t idx = 0; idx < node.triangleCount; ++idx)
                 {
-                    const Triangle& triangle = bvh.triangles[node.trianglesOffset + idx];
+                    const Positions& triangle = bvh.triangles[node.trianglesOffset + idx];
                     if (rayIntersectTriangle(ray, triangle, rayTMax, intersect))
                     {
                         rayTMax = intersect.t;

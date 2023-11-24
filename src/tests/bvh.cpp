@@ -2,6 +2,7 @@
 #include <common/camera.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
+#include <common/triangle_attributes.hpp>
 #include <common/units/angle.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -10,13 +11,13 @@
 using namespace nlrs;
 
 bool bruteForceRayIntersectModel(
-    const Ray&                      ray,
-    const std::span<const Triangle> triangles,
-    float                           rayTMax,
-    Intersection&                   intersect)
+    const Ray&                       ray,
+    const std::span<const Positions> triangles,
+    float                            rayTMax,
+    Intersection&                    intersect)
 {
     bool didIntersect = false;
-    for (const Triangle& tri : triangles)
+    for (const Positions& tri : triangles)
     {
         if (rayIntersectTriangle(ray, tri, rayTMax, intersect))
         {
@@ -29,33 +30,17 @@ bool bruteForceRayIntersectModel(
 
 TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 {
-    static_assert(
-        sizeof(Positions) == sizeof(Triangle), "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v0) == offsetof(Triangle, v0),
-        "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v1) == offsetof(Triangle, v1),
-        "Positions and Triangle must have the same layout");
-    static_assert(
-        offsetof(Positions, v2) == offsetof(Triangle, v2),
-        "Positions and Triangle must have the same layout");
-
     GltfModel model("Duck.glb");
     REQUIRE_FALSE(model.positions().empty());
 
-    const Bvh bvh = [&model]() -> Bvh {
-        const std::span<const Triangle> triangles = std::span<const Triangle>(
-            reinterpret_cast<const Triangle*>(model.positions().data()), model.positions().size());
-        return buildBvh(triangles);
-    }();
+    const Bvh bvh = buildBvh(model.positions());
     REQUIRE_FALSE(bvh.nodes.empty());
     REQUIRE_FALSE(bvh.triangles.empty());
 
     const Camera camera = [&bvh]() -> Camera {
         const Aabb modelAabb = [&bvh]() -> Aabb {
             Aabb aabb;
-            for (const Triangle& tri : bvh.triangles)
+            for (const Positions& tri : bvh.triangles)
             {
                 aabb = merge(aabb, tri.v0);
                 aabb = merge(aabb, tri.v1);

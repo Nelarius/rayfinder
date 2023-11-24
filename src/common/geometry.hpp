@@ -1,5 +1,7 @@
 #pragma once
 
+#include "triangle_attributes.hpp"
+
 #include <glm/glm.hpp>
 
 #include <cstddef>
@@ -23,13 +25,6 @@ struct Aabb
           pad1(0.0f)
     {
     }
-};
-
-struct Triangle
-{
-    glm::vec3 v0;
-    glm::vec3 v1;
-    glm::vec3 v2;
 };
 
 struct Ray
@@ -75,12 +70,7 @@ inline float surfaceArea(const Aabb& aabb)
     return 2.0f * (d.x * d.y + d.x * d.z + d.y * d.z);
 }
 
-inline float surfaceArea(const Triangle& t)
-{
-    return 0.5f * glm::length(glm::cross(t.v1 - t.v0, t.v2 - t.v0));
-}
-
-inline Aabb aabb(const Triangle& triangle)
+inline Aabb aabb(const Positions& triangle)
 {
     return Aabb(
         glm::min(glm::min(triangle.v0, triangle.v1), triangle.v2),

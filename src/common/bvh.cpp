@@ -57,9 +57,9 @@ void initInteriorNode(
 void buildLeafNode(
     BvhNode&                            node,
     const Aabb&                         nodeAabb,
-    const std::span<const Triangle>     triangles,
+    const std::span<const Positions>    triangles,
     const std::span<const BvhPrimitive> bvhPrimitives,
-    std::span<Triangle>                 orderedTriangles,
+    std::span<Positions>                orderedTriangles,
     std::span<std::size_t>              triangleIndices,
     const std::size_t                   orderedTrianglesOffset)
 {
@@ -82,12 +82,12 @@ void buildLeafNode(
 }
 
 std::size_t buildRecursive(
-    const std::span<const Triangle> triangles,
-    std::span<BvhPrimitive>         bvhPrimitives,
-    std::vector<BvhNode>&           bvhNodes,
-    std::span<Triangle>             orderedTriangles,
-    std::span<std::size_t>          triangleIndices,
-    const std::size_t               orderedTrianglesOffset)
+    const std::span<const Positions> triangles,
+    std::span<BvhPrimitive>          bvhPrimitives,
+    std::vector<BvhNode>&            bvhNodes,
+    std::span<Positions>             orderedTriangles,
+    std::span<std::size_t>           triangleIndices,
+    const std::size_t                orderedTrianglesOffset)
 {
     assert(triangles.size() == orderedTriangles.size());
     assert(bvhPrimitives.size() >= 1);
@@ -270,7 +270,7 @@ std::size_t buildRecursive(
 }
 } // namespace
 
-Bvh buildBvh(std::span<const Triangle> triangles)
+Bvh buildBvh(std::span<const Positions> triangles)
 {
     assert(!triangles.empty());
 
@@ -279,8 +279,8 @@ Bvh buildBvh(std::span<const Triangle> triangles)
     bvhPrimitives.reserve(triangles.size());
     for (std::size_t idx = 0; idx < numTriangles; ++idx)
     {
-        const Triangle& tri = reinterpret_cast<const Triangle&>(triangles[idx]);
-        const Aabb      triAabb = aabb(tri);
+        const Positions& tri = triangles[idx];
+        const Aabb       triAabb = aabb(tri);
         bvhPrimitives.push_back(BvhPrimitive{
             .aabb = triAabb,
             .centroid = centroid(triAabb),
@@ -288,7 +288,7 @@ Bvh buildBvh(std::span<const Triangle> triangles)
         });
     }
 
-    std::vector<Triangle>    orderedTriangles(numTriangles);
+    std::vector<Positions>   orderedTriangles(numTriangles);
     std::vector<std::size_t> triangleIndices(numTriangles);
     std::vector<BvhNode>     bvhNodes;
     bvhNodes.reserve(2 << 19);

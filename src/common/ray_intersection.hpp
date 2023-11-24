@@ -7,7 +7,7 @@ namespace nlrs
 struct Aabb;
 struct Bvh;
 struct Ray;
-struct Triangle;
+struct Positions;
 
 struct Intersection
 {
@@ -15,7 +15,11 @@ struct Intersection
     float     t;
 };
 
-bool rayIntersectTriangle(const Ray& ray, const Triangle& tri, float tMax, Intersection& intersect);
+bool rayIntersectTriangle(
+    const Ray&       ray,
+    const Positions& tri,
+    float            tMax,
+    Intersection&    intersect);
 
 struct RayAabbIntersector
 {
