@@ -474,14 +474,15 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
 
 @must_use
 fn rngNextInCosineWeightedHemisphere(state: ptr<function, u32>) -> vec3f {
-    let r1 = rngNextFloat(state);
-    let r2 = rngNextFloat(state);
-    let sqrtR2 = sqrt(r2);
+    let u1 = rngNextFloat(state);
+    let u2 = rngNextFloat(state);
 
-    let z = sqrt(1f - r2);
-    let phi = 2f * PI * r1;
-    let x = cos(phi) * sqrtR2;
-    let y = sin(phi) * sqrtR2;
+    let phi = 2f * PI * u2;
+    let sinTheta = sqrt(1f - u1);
+
+    let x = cos(phi) * sinTheta;
+    let y = sin(phi) * sinTheta;
+    let z = sqrt(u1);
 
     return vec3(x, y, z);
 }
