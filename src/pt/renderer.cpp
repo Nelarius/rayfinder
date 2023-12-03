@@ -140,7 +140,6 @@ struct RenderParamsLayout
     FrameDataLayout     frameData;
     CameraLayout        camera;
     SamplingStateLayout samplingState;
-    SkyStateLayout      skyState;
 
     RenderParamsLayout(
         const Extent2u&         dimensions,
@@ -149,8 +148,7 @@ struct RenderParamsLayout
         const std::uint32_t     accumulatedSampleCount)
         : frameData(dimensions, frameCount),
           camera(renderParams.camera),
-          samplingState(renderParams.samplingParams, accumulatedSampleCount),
-          skyState(renderParams.sky)
+          samplingState(renderParams.samplingParams, accumulatedSampleCount)
     {
     }
 };
