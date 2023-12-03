@@ -252,6 +252,8 @@ Renderer::Renderer(
       currentPostProcessingParams(),
       frameCount(0),
       accumulatedSampleCount(0),
+      drawDurationsNs(),
+      renderPassDurationsNs(),
       timestampBufferMapContext{&timestampBuffer, &drawDurationsNs, &renderPassDurationsNs}
 {
     {
