@@ -25,7 +25,8 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 
 // render params bind group
 @group(1) @binding(0) var<uniform> renderParams: RenderParams;
-@group(1) @binding(1) var<storage, read_write> skyState: SkyState;
+@group(1) @binding(1) var<uniform> postProcessingParams: PostProcessingParams;
+@group(1) @binding(2) var<storage, read_write> skyState: SkyState;
 
 // scene bind group
 // TODO: these are `read` only buffers. How can I create a buffer layout type which allows this?
@@ -67,7 +68,12 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     }
 
     let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
-    let rgb = expose(estimator, 0.17f);
+
+    let stops = f32(postProcessingParams.stops);
+    let exposure = 1f / pow(2f, stops);
+
+    let tonemapFn = postProcessingParams.tonemapFn;
+    let rgb = expose(tonemapFn, exposure * estimator);
 
     return vec4f(rgb, 1f);
 }
@@ -108,6 +114,11 @@ struct SamplingState {
     numSamplesPerPixel: u32,
     numBounces: u32,
     accumulatedSampleCount: u32,
+}
+
+struct PostProcessingParams {
+    stops: u32,
+    tonemapFn: u32,
 }
 
 struct SkyState {
@@ -243,8 +254,26 @@ fn radiance(theta: f32, gamma: f32, channel: u32) -> f32 {
 }
 
 @must_use
-fn expose(v: vec3f, exposure: f32) -> vec3f {
-    return vec3(2.0f) / (vec3(1.0f) + exp(-exposure * v)) - vec3(1.0f);
+fn expose(tonemapFn: u32, x: vec3f) -> vec3f {
+    switch tonemapFn {
+        case 1u: {
+            return acesFilmic(x);
+        }
+
+        default: {
+            return x;
+        }
+    }
+}
+
+@must_use
+fn acesFilmic(x: vec3f) -> vec3f {
+    let a = 2.51f;
+    let b = 0.03f;
+    let c = 2.43f;
+    let d = 0.59f;
+    let e = 0.14f;
+    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 
 fn evalImplicitLambertian(hit: Intersection, rngState: ptr<function, u32>) -> Scatter {

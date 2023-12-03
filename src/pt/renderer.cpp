@@ -201,6 +201,11 @@ Renderer::Renderer(
           "render params buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(RenderParamsLayout)),
+      postProcessingParamsBuffer(
+          gpuContext.device,
+          "post processing params buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+          sizeof(PostProcessingParameters)),
       skyStateBuffer(
           gpuContext.device,
           "sky state buffer",
@@ -244,6 +249,7 @@ Renderer::Renderer(
           sizeof(TimestampsLayout)),
       renderPipeline(nullptr),
       currentRenderParams(rendererDesc.renderParams),
+      currentPostProcessingParams(),
       frameCount(0),
       accumulatedSampleCount(0),
       timestampBufferMapContext{&timestampBuffer, &drawDurationsNs, &renderPassDurationsNs}
@@ -452,9 +458,10 @@ Renderer::Renderer(
 
         // renderParams group layout
 
-        const std::array<WGPUBindGroupLayoutEntry, 2> renderParamsBindGroupLayoutEntries{
+        const std::array<WGPUBindGroupLayoutEntry, 3> renderParamsBindGroupLayoutEntries{
             renderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            skyStateBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            postProcessingParamsBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            skyStateBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
         };
 
         const WGPUBindGroupLayoutDescriptor renderParamsBindGroupLayoutDesc{
@@ -534,9 +541,10 @@ Renderer::Renderer(
 
         // renderParams bind group
 
-        const std::array<WGPUBindGroupEntry, 2> renderParamsBindGroupEntries{
+        const std::array<WGPUBindGroupEntry, 3> renderParamsBindGroupEntries{
             renderParamsBuffer.bindGroupEntry(0),
-            skyStateBuffer.bindGroupEntry(1),
+            postProcessingParamsBuffer.bindGroupEntry(1),
+            skyStateBuffer.bindGroupEntry(2),
         };
 
         const WGPUBindGroupDescriptor renderParamsBindGroupDesc{
@@ -662,6 +670,11 @@ void Renderer::setRenderParameters(const RenderParameters& renderParams)
     }
 }
 
+void Renderer::setPostProcessingParameters(const PostProcessingParameters& postProcessingParameters)
+{
+    currentPostProcessingParams = postProcessingParameters;
+}
+
 void Renderer::render(const GpuContext& gpuContext, Gui& gui)
 {
     const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(gpuContext.swapChain);
@@ -687,6 +700,12 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
             sizeof(RenderParamsLayout));
         accumulatedSampleCount = std::min(
             accumulatedSampleCount + 1, currentRenderParams.samplingParams.numSamplesPerPixel);
+        wgpuQueueWriteBuffer(
+            gpuContext.queue,
+            postProcessingParamsBuffer.handle(),
+            0,
+            &currentPostProcessingParams,
+            sizeof(PostProcessingParameters));
         const SkyStateLayout skyStateLayout{currentRenderParams.sky};
         wgpuQueueWriteBuffer(
             gpuContext.queue, skyStateBuffer.handle(), 0, &skyStateLayout, sizeof(SkyStateLayout));

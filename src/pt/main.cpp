@@ -101,15 +101,22 @@ int main(int argc, char** argv)
         }();
 
         {
-            nlrs::Extent2i       curFramebufferSize = window.resolution();
-            float                vfovDegrees = 70.0f;
-            int                  numSamplesPerPixel = 128;
-            int                  numBounces = 4;
+            nlrs::Extent2i curFramebufferSize = window.resolution();
+            // camera
+            float vfovDegrees = 70.0f;
+            // sampling
+            int numSamplesPerPixel = 128;
+            int numBounces = 4;
+            // sky
             float                sunZenithDegrees = 30.0f;
             float                sunAzimuthDegrees = 0.0f;
             float                skyTurbidity = 1.0f;
             std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
-            auto                 lastTime = std::chrono::steady_clock::now();
+            // tonemapping
+            int exposureStops = 4;
+            int tonemapFn = 1;
+            // timestep
+            auto lastTime = std::chrono::steady_clock::now();
             while (!glfwWindowShouldClose(window.ptr()))
             {
                 const auto  currentTime = std::chrono::steady_clock::now();
@@ -194,6 +201,16 @@ int main(int argc, char** argv)
                     cameraController.vfov() = nlrs::Angle::degrees(vfovDegrees);
 
                     ImGui::Separator();
+                    ImGui::Text("Post processing");
+
+                    ImGui::SliderInt("exposure stops", &exposureStops, 0, 10);
+                    ImGui::Text("tonemap fn");
+                    ImGui::SameLine();
+                    ImGui::RadioButton("linear", &tonemapFn, 0);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("filmic", &tonemapFn, 1);
+
+                    ImGui::Separator();
                     ImGui::Text("Camera");
                     {
                         const glm::vec3 camPos = cameraController.position();
@@ -240,6 +257,13 @@ int main(int argc, char** argv)
                         },
                     };
                     renderer.setRenderParameters(renderParams);
+
+                    const nlrs::PostProcessingParameters postProcessingParams{
+                        static_cast<std::uint32_t>(exposureStops),
+                        static_cast<nlrs::Tonemapping>(tonemapFn),
+                    };
+                    renderer.setPostProcessingParameters(postProcessingParams);
+
                     renderer.render(gpuContext, gui);
                 }
 

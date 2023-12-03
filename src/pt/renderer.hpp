@@ -47,6 +47,20 @@ struct RenderParameters
     bool operator==(const RenderParameters&) const noexcept = default;
 };
 
+enum class Tonemapping : std::uint32_t
+{
+    Linear = 0,
+    Filmic,
+};
+
+struct PostProcessingParameters
+{
+    // Exposure is calculated as 1 / (2 ^ stops), stops >= 0. Increasing a stop by one halves the
+    // exposure.
+    std::uint32_t stops = 0;
+    Tonemapping   tonemapping = Tonemapping::Filmic;
+};
+
 struct PositionAttribute
 {
     glm::vec3 p0;   // offset: 0, size: 12
@@ -97,6 +111,7 @@ struct Renderer
     GpuBuffer          uniformsBuffer;
     WGPUBindGroup      uniformsBindGroup;
     GpuBuffer          renderParamsBuffer;
+    GpuBuffer          postProcessingParamsBuffer;
     GpuBuffer          skyStateBuffer;
     WGPUBindGroup      renderParamsBindGroup;
     GpuBuffer          bvhNodeBuffer;
@@ -112,9 +127,10 @@ struct Renderer
     GpuBuffer          timestampBuffer;
     WGPURenderPipeline renderPipeline;
 
-    RenderParameters currentRenderParams;
-    std::uint32_t    frameCount;
-    std::uint32_t    accumulatedSampleCount;
+    RenderParameters         currentRenderParams;
+    PostProcessingParameters currentPostProcessingParams;
+    std::uint32_t            frameCount;
+    std::uint32_t            accumulatedSampleCount;
 
     std::deque<std::uint64_t> drawDurationsNs;
     std::deque<std::uint64_t> renderPassDurationsNs;
@@ -132,6 +148,7 @@ struct Renderer
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);
+    void setPostProcessingParameters(const PostProcessingParameters&);
     void render(const GpuContext&, Gui&);
 
     float averageDrawDurationMs() const;
