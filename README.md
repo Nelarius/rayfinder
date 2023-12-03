@@ -19,6 +19,8 @@ An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn
   - Lambertian BRDF, `sampleLambertian`, `evalLambertian` 
 - [Building an Orthonormal Basis, Revisited](https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf)
   - Robust orthonormal axis, implemented in the `pixarOnb` function
+- [ACES Filmic Tone Mapping Curve](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
+  - filmic tonemapping function
 
 ## Build
 
