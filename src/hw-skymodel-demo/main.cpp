@@ -46,8 +46,6 @@ int main()
     {
         for (int j = 0; j < width; ++j)
         {
-            // Example Rust code
-
             // coordinates in [0, 1]
             const float u = static_cast<float>(j) / static_cast<float>(width);
             const float v = static_cast<float>(i) / static_cast<float>(height);
