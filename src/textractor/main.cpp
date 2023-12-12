@@ -1,9 +1,11 @@
 #include <common/gltf_model.hpp>
 #include <common/texture.hpp>
 
+#include <stb_image_write.h>
+
 #include <cassert>
 #include <cstdio>
-#include <fstream>
+#include <format>
 
 void printHelp() { std::printf("Usage: textractor <input_gltf_file>\n"); }
 
@@ -24,26 +26,18 @@ int main(int argc, char** argv)
         const auto  dimensions = texture.dimensions();
         const auto  pixels = texture.pixels();
 
-        const std::string filename = "base_color_texture_" + std::to_string(textureIdx) + ".ppm";
-        std::ofstream     file(filename, std::ios::out | std::ios::binary);
-        assert(file.is_open());
-        // Outputs binary PPM image format, https://netpbm.sourceforge.net/doc/ppm.html
-        file << "P6\n";
-        file << dimensions.width << ' ' << dimensions.height << '\n';
-        file << "255\n";
-        for (std::uint32_t i = 0; i < dimensions.height; ++i)
-        {
-            for (std::uint32_t j = 0; j < dimensions.width; ++j)
-            {
-                const std::size_t idx = i * dimensions.width + j;
-                const auto        rgba = pixels[idx];
-                const auto        r = static_cast<std::uint8_t>(rgba & 0xFFU);
-                const auto        g = static_cast<std::uint8_t>((rgba >> 8) & 0xFFU);
-                const auto        b = static_cast<std::uint8_t>((rgba >> 16) & 0xFFU);
+        const std::string filename = std::format("base_color_texture_{}.png", textureIdx);
+        const int         numChannels = 4;
+        const int         strideBytes = dimensions.width * numChannels;
 
-                file << r << g << b;
-            }
-        }
+        [[maybe_unused]] const int result = stbi_write_png(
+            filename.c_str(),
+            dimensions.width,
+            dimensions.height,
+            numChannels,
+            pixels.data(),
+            strideBytes);
+        assert(result != 0);
     }
 
     return 0;

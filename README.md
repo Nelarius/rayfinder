@@ -58,7 +58,7 @@ $ (cd build-debug && ./tests)
 
 ### `textractor`
 
-For validating that textures are loaded correctly. Loads the specified glTF model and its base color textures, and dumps the textures into `.ppm` files.
+For validating that textures are loaded correctly. Loads the specified glTF model and its base color textures, and dumps the textures into `.png` files.
 
 ```sh
 $ ./build-release/textractor assets/Sponza.ppm
