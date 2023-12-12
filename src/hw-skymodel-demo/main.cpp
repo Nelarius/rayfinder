@@ -94,7 +94,7 @@ int main()
     const int numChannels = 4;
     const int strideBytes = WIDTH * numChannels;
 
-    const int result = stbi_write_png(
+    [[maybe_unused]] const int result = stbi_write_png(
         "hw-skymodel-demo.png", WIDTH, HEIGHT, numChannels, pixelData.data(), strideBytes);
     assert(result != 0);
 
