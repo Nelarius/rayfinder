@@ -38,7 +38,7 @@ target_include_directories(hw-skymodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 # hw-skymodel-demo
 add_executable(hw-skymodel-demo src/hw-skymodel-demo/main.cpp)
-target_link_libraries(hw-skymodel-demo PRIVATE hw-skymodel glm::glm)
+target_link_libraries(hw-skymodel-demo PRIVATE common hw-skymodel glm::glm)
 
 # pt
 set(PT_SOURCE_FILES

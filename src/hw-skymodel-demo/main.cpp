@@ -1,18 +1,19 @@
 #include <hw-skymodel/hw_skymodel.h>
 
 #include <glm/glm.hpp>
+#include <stb_image_write.h>
 
 #include <cassert>
 #include <cmath>
 #include <cstddef>
-#include <iostream>
 #include <numbers>
+#include <vector>
 
 inline constexpr float PI = std::numbers::pi_v<float>;
 
 inline constexpr float DEGREES_TO_RADIANS = PI / 180.0f;
-inline constexpr int   width = 720;
-inline constexpr int   height = 720;
+inline constexpr int   WIDTH = 720;
+inline constexpr int   HEIGHT = 720;
 
 static glm::vec3 expose(const glm::vec3& x, const float exposure)
 {
@@ -39,24 +40,25 @@ int main()
     [[maybe_unused]] const auto r = skyStateNew(&skyParams, &skyState);
     assert(r == SkyStateResult_Success);
 
-    std::cout << "P6\n";
-    std::cout << width << ' ' << height << '\n';
-    std::cout << "255\n";
-    for (int i = 0; i < height; ++i)
+    const std::size_t         numBytes = static_cast<std::size_t>(WIDTH * HEIGHT * 3);
+    std::vector<std::uint8_t> pixelData;
+    pixelData.reserve(numBytes);
+
+    for (int i = 0; i < HEIGHT; ++i)
     {
-        for (int j = 0; j < width; ++j)
+        for (int j = 0; j < WIDTH; ++j)
         {
             // coordinates in [0, 1]
-            const float u = static_cast<float>(j) / static_cast<float>(width);
-            const float v = static_cast<float>(i) / static_cast<float>(height);
+            const float u = static_cast<float>(j) / static_cast<float>(WIDTH);
+            const float v = static_cast<float>(i) / static_cast<float>(HEIGHT);
 
             // coordinates in [-1, 1]
             const float x = 2.0f * u - 1.0f;
-            const float y = 2.0f * v - 1.0f;
+            const float y = 1.0f - 2.0f * v; // flip y so that (left, top) is written first
 
             const float radiusSqr = x * x + y * y;
 
-            glm::vec3 color = glm::vec3(0.0f);
+            glm::vec4 rgba = glm::vec4(0.0f);
 
             if (radiusSqr < 1.0f)
             {
@@ -72,13 +74,29 @@ int main()
                     skyStateRadiance(&skyState, theta, gamma, Channel_R),
                     skyStateRadiance(&skyState, theta, gamma, Channel_G),
                     skyStateRadiance(&skyState, theta, gamma, Channel_B));
-                color = expose(radiance, 0.1f);
+
+                const glm::vec3 color = expose(radiance, 0.1f);
+                rgba = glm::vec4(color, 1.0f);
             }
 
-            const auto r = static_cast<std::uint8_t>(std::min(color.r, 1.0f) * 255.0f);
-            const auto g = static_cast<std::uint8_t>(std::min(color.g, 1.0f) * 255.0f);
-            const auto b = static_cast<std::uint8_t>(std::min(color.b, 1.0f) * 255.0f);
-            std::cout << r << g << b;
+            const auto r = static_cast<std::uint8_t>(std::min(rgba.r, 1.0f) * 255.0f);
+            const auto g = static_cast<std::uint8_t>(std::min(rgba.g, 1.0f) * 255.0f);
+            const auto b = static_cast<std::uint8_t>(std::min(rgba.b, 1.0f) * 255.0f);
+            const auto a = static_cast<std::uint8_t>(std::min(rgba.a, 1.0f) * 255.0f);
+
+            pixelData.push_back(r);
+            pixelData.push_back(g);
+            pixelData.push_back(b);
+            pixelData.push_back(a);
         }
     }
+
+    const int numChannels = 4;
+    const int strideBytes = WIDTH * numChannels;
+
+    const int result = stbi_write_png(
+        "hw-skymodel-demo.png", WIDTH, HEIGHT, numChannels, pixelData.data(), strideBytes);
+    assert(result != 0);
+
+    return 0;
 }

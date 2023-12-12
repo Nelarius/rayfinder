@@ -44,6 +44,10 @@ For validating that the bounding volume hierarchy (BVH) and it's intersection te
 $ ./build-release/bvh-visualizer assets/Duck.glb > duck.ppm
 ```
 
+### `hw-skymodel-demo`
+
+Running the `hw-skymodel-demo` target generates a test image `hw-skymodel-demo.png`.
+
 ### `tests`
 
 To run the tests, the working directory has to be in the build folder. The tests depend on assets which are copied to the build folder.
