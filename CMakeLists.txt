@@ -24,6 +24,7 @@ set(COMMON_SOURCE_FILES
     gltf_model.cpp
     ray_intersection.cpp
     stb_image.c
+    stb_image_write.c
     texture.cpp)
 list(TRANSFORM COMMON_SOURCE_FILES PREPEND src/common/)
 
