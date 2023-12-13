@@ -38,7 +38,7 @@ $ cmake --build build-debug --target pt -- -j 32
 
 ### `bvh-visualizer`
 
-For validating that the bounding volume hierarchy (BVH) and it's intersection tests are computed correctly. This executable loads the specified glTF file, builds a BVH, and produces an image where each pixel is colored by the number of nodes visited for the pixel's primary ray. Running the executable products the test image `bvh-visualizer.png`.
+For validating that the bounding volume hierarchy (BVH) and it's intersection tests are computed correctly. This executable loads the specified glTF file, builds a BVH, and produces an image where each pixel is colored by the number of nodes visited for the pixel's primary ray. Running the executable produces the test image `bvh-visualizer.png`.
 
 ```sh
 $ ./build-release/bvh-visualizer assets/Duck.glb
