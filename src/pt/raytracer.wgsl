@@ -183,7 +183,7 @@ struct Scatter {
 
 fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var ray = primaryRay;
-    var color = vec3(0f);
+    var radiance = vec3(0f);
     var throughput = vec3(1f);
 
     let numBounces = renderParams.samplingState.numBounces;
@@ -202,18 +202,18 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
             let gamma = acos(clamp(dot(v, s), -1f, 1f));
 
             let skyRadiance = vec3f(
-                radiance(theta, gamma, CHANNEL_R),
-                radiance(theta, gamma, CHANNEL_G),
-                radiance(theta, gamma, CHANNEL_B)
+                skyRadiance(theta, gamma, CHANNEL_R),
+                skyRadiance(theta, gamma, CHANNEL_G),
+                skyRadiance(theta, gamma, CHANNEL_B)
             );
 
-            color += throughput * skyRadiance;
+            radiance += throughput * skyRadiance;
 
             break;
         }
     }
 
-    return color;
+    return radiance;
 }
 
 fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
@@ -224,7 +224,7 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
 }
 
 @must_use
-fn radiance(theta: f32, gamma: f32, channel: u32) -> f32 {
+fn skyRadiance(theta: f32, gamma: f32, channel: u32) -> f32 {
     let r = skyState.radiances[channel];
     let idx = 9u * channel;
     let p0 = skyState.params[idx + 0u];
