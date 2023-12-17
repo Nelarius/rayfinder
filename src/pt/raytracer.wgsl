@@ -52,28 +52,9 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let i = u32(v * f32(dimensions.y));
     let idx = i * dimensions.x + j;
 
-    var accumulatedSampleCount = renderParams.samplingState.accumulatedSampleCount;
-
-    if accumulatedSampleCount == 0u {
-        imageBuffer[idx] = vec3(0f);
-    }
-
-    if accumulatedSampleCount < renderParams.samplingState.numSamplesPerPixel {
-        var rngState = initRng(vec2(j, i), dimensions, frameCount);
-        let uoffset = rngNextFloat(&rngState) / f32(dimensions.x);
-        let voffset = rngNextFloat(&rngState) / f32(dimensions.y);
-        let primaryRay = generateCameraRay(renderParams.camera, &rngState, u + uoffset, v + voffset);
-        imageBuffer[idx] += rayColor(primaryRay, &rngState);
-        accumulatedSampleCount += 1u;
-    }
-
-    let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
-
-    let stops = f32(postProcessingParams.stops);
-    let exposure = 1f / pow(2f, stops);
-
-    let tonemapFn = postProcessingParams.tonemapFn;
-    let rgb = expose(tonemapFn, exposure * estimator);
+    var rngState = initRng(vec2(j, i), dimensions, frameCount);
+    let primaryRay = generateCameraRay(renderParams.camera, &rngState, u, v);
+    let rgb = rayColor(primaryRay, &rngState);
 
     return vec4f(rgb, 1f);
 }
@@ -183,37 +164,21 @@ struct Scatter {
 
 fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var ray = primaryRay;
-    var radiance = vec3(0f);
-    var throughput = vec3(1f);
 
-    let numBounces = renderParams.samplingState.numBounces;
-    for (var bounces = 0u; bounces < numBounces; bounces += 1u) {
-        var intersection: Intersection;
-        if rayIntersectBvh(ray, T_MAX, &intersection) {
-            let p = intersection.p;
-            let scatter = evalImplicitLambertian(intersection, rngState);
-            ray = Ray(p, scatter.wi);
-            throughput *= scatter.throughput;
-        } else {
-            let v = ray.direction;
-            let s = skyState.sunDirection;
+    let unitDirection = normalize(ray.direction);
+    let t = 0.5f * (unitDirection.y + 1f);
+    let skyColor = (1f - t) * vec3(1f, 1f, 1f) + t * vec3(0.5f, 0.7f, 1f);
 
-            let theta = acos(v.y);
-            let gamma = acos(clamp(dot(v, s), -1f, 1f));
+    var color = skyColor;
 
-            let skyRadiance = vec3f(
-                skyRadiance(theta, gamma, CHANNEL_R),
-                skyRadiance(theta, gamma, CHANNEL_G),
-                skyRadiance(theta, gamma, CHANNEL_B)
-            );
-
-            radiance += throughput * skyRadiance;
-
-            break;
-        }
+    var intersection: Intersection;
+    if rayIntersectBvh(ray, T_MAX, &intersection) {
+        let uv = intersection.uv;
+        // color = vec3(uv, 0f);
+        color = textureLookup(textureDescriptors[intersection.textureDescriptorIdx], uv);
     }
 
-    return radiance;
+    return color;
 }
 
 fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
