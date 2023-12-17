@@ -317,22 +317,18 @@ fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> 
                     var trihit: TriangleHit;
                     if rayIntersectTriangle(ray, triangle, tmax, &trihit) {
                         tmax = trihit.t;
+                        didIntersect = true;
 
                         let b = trihit.b;
-
-                        let p = trihit.p;
-
                         let triangleIdx = node.trianglesOffset + idx;
                         let vert = vertexAttributes[triangleIdx];
 
+                        let p = trihit.p;
                         let n = b[0] * vert.n0 + b[1] * vert.n1 + b[2] * vert.n2;
-
                         let uv = b[0] * vert.uv0 + b[1] * vert.uv1 + b[2] * vert.uv2;
-
                         let textureDescriptorIdx = vertexAttributes[triangleIdx].textureDescriptorIdx;
 
                         *hit = Intersection(p, n, uv, textureDescriptorIdx);
-                        didIntersect = true;
                     }
                 }
                 if toVisitOffset == 0u {
@@ -445,12 +441,33 @@ fn rayIntersectTriangle(ray: Ray, tri: Positions, tmax: f32, hit: ptr<function, 
         // e2 = v2 - v0
         // -> p = v0 + u * e1 + v * e2
         let p = tri.p0 + u * e1 + v * e2;
+        let n = normalize(cross(e1, e2));
         let b = vec3f(1f - u - v, u, v);
-        *hit = TriangleHit(p, b, t);
+        *hit = TriangleHit(offsetRay(p, n), b, t);
         return true;
     } else {
         return false;
     }
+}
+
+const ORIGIN = 1f / 32f;
+const FLOAT_SCALE = 1f / 65536f;
+const INT_SCALE = 256f;
+
+fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
+    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
+    let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
+    // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
+    // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
+    let po = vec3f(
+        bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
+        bitcast<f32>(bitcast<i32>(p.y) + select(offset.y, -offset.y, (p.y < 0))),
+        bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
+    );
+
+    return vec3f(select(po.x, p.x + FLOAT_SCALE * n.x, (abs(p.x) < ORIGIN)),
+        select(po.y, p.y + FLOAT_SCALE * n.y, (abs(p.y) < ORIGIN)),
+        select(po.z, p.z + FLOAT_SCALE * n.z, (abs(p.z) < ORIGIN)));
 }
 
 struct TextureDescriptor {

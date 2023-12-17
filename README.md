@@ -12,13 +12,15 @@ An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn
 - [Ray Tracing: The Rest of Your Life](https://raytracing.github.io/books/RayTracingTheRestOfYourLife.html)
   - Cosine-weighted hemisphere sampling method
 - [scratchapixel/moller-trumbore-ray-triangle-intersection](https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection.html)
-- _The Reference Path Tracer, Ray Tracing Gems II_ and associated code sample [boksajak/referencePT](https://github.com/boksajak/referencePT/)
+- _The Reference Path Tracer_, _Ray Tracing Gems II_ and associated code sample [boksajak/referencePT](https://github.com/boksajak/referencePT/)
   - Rng initialization
 - [Crash Course in BRDF implementation](https://boksajak.github.io/files/CrashCourseBRDF.pdf)
   - BRDF interface
   - Lambertian BRDF, `sampleLambertian`, `evalLambertian` 
 - [Building an Orthonormal Basis, Revisited](https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf)
   - Robust orthonormal axis, implemented in the `pixarOnb` function
+- _A Fast and Robust Method for Avoiding Self-Intersection_, _Ray Tracing Gems_
+  - Method for the `offsetRay` function, for preventing ray self-intersections.
 - [ACES Filmic Tone Mapping Curve](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
   - filmic tonemapping function
 
