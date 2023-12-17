@@ -40,9 +40,8 @@ int main()
     [[maybe_unused]] const auto r = skyStateNew(&skyParams, &skyState);
     assert(r == SkyStateResult_Success);
 
-    const std::size_t         numBytes = static_cast<std::size_t>(WIDTH * HEIGHT * 3);
-    std::vector<std::uint8_t> pixelData;
-    pixelData.reserve(numBytes);
+    std::vector<std::uint32_t> pixelData;
+    pixelData.reserve(WIDTH * HEIGHT);
 
     for (int i = 0; i < HEIGHT; ++i)
     {
@@ -79,15 +78,13 @@ int main()
                 rgba = glm::vec4(color, 1.0f);
             }
 
-            const auto r = static_cast<std::uint8_t>(std::min(rgba.r, 1.0f) * 255.0f);
-            const auto g = static_cast<std::uint8_t>(std::min(rgba.g, 1.0f) * 255.0f);
-            const auto b = static_cast<std::uint8_t>(std::min(rgba.b, 1.0f) * 255.0f);
-            const auto a = static_cast<std::uint8_t>(std::min(rgba.a, 1.0f) * 255.0f);
+            const auto r = static_cast<std::uint32_t>(std::min(rgba.r, 1.0f) * 255.0f);
+            const auto g = static_cast<std::uint32_t>(std::min(rgba.g, 1.0f) * 255.0f);
+            const auto b = static_cast<std::uint32_t>(std::min(rgba.b, 1.0f) * 255.0f);
+            const auto a = static_cast<std::uint32_t>(std::min(rgba.a, 1.0f) * 255.0f);
 
-            pixelData.push_back(r);
-            pixelData.push_back(g);
-            pixelData.push_back(b);
-            pixelData.push_back(a);
+            const std::uint32_t pixel = (a << 24) | (b << 16) | (g << 8) | r;
+            pixelData.push_back(pixel);
         }
     }
 
