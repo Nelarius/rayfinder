@@ -47,4 +47,16 @@ bool rayIntersectBvh(
     float                      rayTMax,
     Intersection&              intersect,
     BvhStats*                  stats = nullptr);
+
+struct DebugBvhIntersection
+{
+    std::size_t triangleIdx;
+};
+
+bool debugRayIntersectBvh(
+    const Ray&                 ray,
+    std::span<const BvhNode>   bvhNodes,
+    std::span<const Positions> triangles,
+    float                      rayTMax,
+    DebugBvhIntersection&      intersect);
 } // namespace nlrs

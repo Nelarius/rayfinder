@@ -93,7 +93,7 @@ struct VertexAttributes
 
 struct Scene
 {
-    const Bvh&                         bvh;
+    std::span<const BvhNode>           bvhNodes;
     std::span<const PositionAttribute> positionAttributes;
     std::span<const VertexAttributes>  vertexAttributes;
     std::span<const Texture>           baseColorTextures;

@@ -211,4 +211,73 @@ bool rayIntersectBvh(
 
     return didIntersect;
 }
+
+bool debugRayIntersectBvh(
+    const Ray&                       ray,
+    const std::span<const BvhNode>   bvhNodes,
+    const std::span<const Positions> triangles,
+    float                            rayTMax,
+    DebugBvhIntersection&            intersect)
+{
+    const RayAabbIntersector intersector(ray);
+
+    constexpr std::size_t STACK_SIZE = 32;
+
+    std::size_t toVisitOffset = 0;
+    std::size_t currentNodeIdx = 0;
+    std::size_t nodesToVisit[STACK_SIZE];
+    bool        didIntersect = false;
+
+    while (true)
+    {
+        const BvhNode& node = bvhNodes[currentNodeIdx];
+        if (rayIntersectAabb(intersector, node.aabb, rayTMax))
+        {
+            if (node.triangleCount > 0)
+            {
+                for (std::size_t idx = 0; idx < node.triangleCount; ++idx)
+                {
+                    const std::size_t triangleIdx = node.trianglesOffset + idx;
+                    const Positions&  triangle = triangles[triangleIdx];
+                    Intersection      triangleIntersect;
+                    if (rayIntersectTriangle(ray, triangle, rayTMax, triangleIntersect))
+                    {
+                        intersect.triangleIdx = triangleIdx;
+                        rayTMax = triangleIntersect.t;
+                        didIntersect = true;
+                    }
+                }
+                if (toVisitOffset == 0)
+                {
+                    break;
+                }
+                currentNodeIdx = nodesToVisit[--toVisitOffset];
+            }
+            else
+            {
+                if (intersector.dirNeg[node.splitAxis])
+                {
+                    nodesToVisit[toVisitOffset++] = currentNodeIdx + 1;
+                    currentNodeIdx = node.secondChildOffset;
+                }
+                else
+                {
+                    nodesToVisit[toVisitOffset++] = node.secondChildOffset;
+                    currentNodeIdx = currentNodeIdx + 1;
+                }
+                assert(toVisitOffset < STACK_SIZE);
+            }
+        }
+        else
+        {
+            if (toVisitOffset == 0)
+            {
+                break;
+            }
+            currentNodeIdx = nodesToVisit[--toVisitOffset];
+        }
+    }
+
+    return didIntersect;
+}
 } // namespace nlrs
