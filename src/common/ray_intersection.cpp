@@ -5,11 +5,36 @@
 #include "triangle_attributes.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 
 namespace nlrs
 {
+namespace
+{
+glm::vec3 offsetRay(const glm::vec3& p, const glm::vec3& n)
+{
+    constexpr float ORIGIN = 1.0f / 32.0f;
+    constexpr float FLOAT_SCALE = 1.0f / 65536.0f;
+    constexpr float INT_SCALE = 256.0f;
+
+    const glm::ivec3 offset =
+        glm::ivec3(int(INT_SCALE * n.x), int(INT_SCALE * n.y), int(INT_SCALE * n.z));
+
+    const glm::vec3 po = glm::vec3(
+        std::bit_cast<float>(std::bit_cast<int>(p.x) + (p.x < 0 ? -offset.x : offset.x)),
+        std::bit_cast<float>(std::bit_cast<int>(p.y) + (p.y < 0 ? -offset.y : offset.y)),
+        std::bit_cast<float>(std::bit_cast<int>(p.z) + (p.z < 0 ? -offset.z : offset.z)));
+
+    return glm::vec3(
+        std::abs(p.x) < ORIGIN ? p.x + FLOAT_SCALE * n.x : po.x,
+        std::abs(p.y) < ORIGIN ? p.y + FLOAT_SCALE * n.y : po.y,
+        std::abs(p.z) < ORIGIN ? p.z + FLOAT_SCALE * n.z : po.z);
+}
+} // namespace
+
 bool rayIntersectTriangle(
     const Ray&       ray,
     const Positions& tri,
@@ -52,7 +77,9 @@ bool rayIntersectTriangle(
 
     if (t > EPSILON && t < rayTMax)
     {
-        intersect.p = ray.origin + ray.direction * t;
+        const glm::vec3 p = tri.v0 + u * e1 + v * e2;
+        const glm::vec3 n = glm::normalize(glm::cross(e1, e2));
+        intersect.p = offsetRay(p, n);
         intersect.t = t;
         return true;
     }

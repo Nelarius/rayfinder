@@ -4,7 +4,7 @@
 #include <common/triangle_attributes.hpp>
 
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_approx.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 TEST_CASE("Ray intersects triangle", "[intersection]")
 {
@@ -22,7 +22,7 @@ TEST_CASE("Ray intersects triangle", "[intersection]")
     const bool         intersects = rayIntersectTriangle(ray, triangle, 1000.0f, isect);
 
     REQUIRE(intersects);
-    REQUIRE(isect.p.x == Catch::Approx(0.0f));
-    REQUIRE(isect.p.y == Catch::Approx(0.0f));
-    REQUIRE(isect.p.z == Catch::Approx(1.0f));
+    REQUIRE_THAT(isect.p.x, Catch::Matchers::WithinRel(0.0f, 0.001f));
+    REQUIRE_THAT(isect.p.y, Catch::Matchers::WithinRel(0.0f, 0.001f));
+    REQUIRE_THAT(isect.p.z, Catch::Matchers::WithinRel(1.0f, 0.001f));
 }
