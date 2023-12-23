@@ -12,6 +12,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <utility>
 
 #include <GLFW/glfw3.h>
 #include <glfw3webgpu.h>
