@@ -173,6 +173,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 for (std::size_t i = 0; i < attributeCount; ++i)
                 {
                     const cgltf_attribute& attribute = primitive.attributes[i];
+                    assert(attribute.index == 0);
                     if (attribute.type == cgltf_attribute_type_position)
                     {
                         positionAccessor = attribute.data;
@@ -208,21 +209,31 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 texCoords.resize(vertexOffset + vertexCount);
                 for (std::size_t idx = 0; idx < vertexCount; ++idx)
                 {
-                    glm::vec3  position;
-                    glm::vec3& normal = normals[vertexOffset + idx];
-                    glm::vec2& texCoord = texCoords[vertexOffset + idx];
+                    const std::size_t subIdx = vertexOffset + idx;
+                    glm::vec3         position;
+                    glm::vec3&        normal = normals[subIdx];
+                    // glm::vec2&        texCoord = texCoords[subIdx];
 
                     [[maybe_unused]] bool readSuccess =
                         cgltf_accessor_read_float(positionAccessor, idx, &position.x, 3);
                     assert(readSuccess);
                     readSuccess = cgltf_accessor_read_float(normalAccessor, idx, &normal.x, 3);
                     assert(readSuccess);
-                    readSuccess = cgltf_accessor_read_float(texCoordAccessor, idx, &texCoord.x, 2);
-                    assert(readSuccess);
+                    // readSuccess = cgltf_accessor_read_float(texCoordAccessor, idx, &texCoord.x,
+                    // 2); assert(readSuccess);
 
-                    positions[vertexOffset + idx] =
-                        meshTransforms[meshIdx] * glm::vec4(position, 1.0f);
+                    // assert that textCoord values are in [0, 1]
+                    // assert(texCoord.x >= 0.0f && texCoord.x <= 1.0f);
+                    // assert(texCoord.y >= 0.0f && texCoord.y <= 1.0f);
+
+                    // assert(glm::length(normal) <= 1.0f);
+
+                    positions[subIdx] = meshTransforms[meshIdx] * glm::vec4(position, 1.0f);
                 }
+
+                [[maybe_unused]] const std::size_t numFloats = cgltf_accessor_unpack_floats(
+                    texCoordAccessor, &texCoords[vertexOffset].x, 2 * vertexCount);
+                assert(numFloats == 2 * vertexCount);
             }
         }
 

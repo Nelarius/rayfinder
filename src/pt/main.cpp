@@ -44,69 +44,74 @@ int main(int argc, char** argv)
         nlrs::GpuContext          gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);
         nlrs::Gui                 gui(window.ptr(), gpuContext);
 
-        auto [renderer, bvhNodes, triangles] = [&cameraController, &gpuContext, &window, argv]()
-            -> std::
-                tuple<nlrs::Renderer, std::vector<nlrs::BvhNode>, std::vector<nlrs::Positions>> {
-                    const nlrs::RendererDescriptor rendererDesc{
-                        [&window, &cameraController]() -> nlrs::RenderParameters {
-                            const nlrs::Extent2i framebufferSize = window.resolution();
-                            return nlrs::RenderParameters{
-                                nlrs::Extent2u(framebufferSize),
-                                cameraController.getCamera(),
-                                nlrs::SamplingParams(),
-                                nlrs::Sky()};
-                        }(),
-                        window.largestMonitorResolution(),
-                    };
+        auto [renderer, bvhNodes, triangleIndices, triangles] =
+            [&cameraController, &gpuContext, &window, argv]() -> std::tuple<
+                                                                  nlrs::Renderer,
+                                                                  std::vector<nlrs::BvhNode>,
+                                                                  std::vector<std::size_t>,
+                                                                  std::vector<nlrs::Positions>> {
+            const nlrs::RendererDescriptor rendererDesc{
+                [&window, &cameraController]() -> nlrs::RenderParameters {
+                    const nlrs::Extent2i framebufferSize = window.resolution();
+                    return nlrs::RenderParameters{
+                        nlrs::Extent2u(framebufferSize),
+                        cameraController.getCamera(),
+                        nlrs::SamplingParams(),
+                        nlrs::Sky()};
+                }(),
+                window.largestMonitorResolution(),
+            };
 
-                    const nlrs::GltfModel model(argv[1]);
-                    const auto [bvhNodes, triangleIndices] = nlrs::buildBvh(model.positions());
+            const nlrs::GltfModel model(argv[1]);
+            const auto [bvhNodes, triangleIndices] = nlrs::buildBvh(model.positions());
 
-                    auto positions = nlrs::reorderAttributes(model.positions(), triangleIndices);
-                    const auto normals = nlrs::reorderAttributes(model.normals(), triangleIndices);
-                    const auto texCoords =
-                        nlrs::reorderAttributes(model.texCoords(), triangleIndices);
-                    const auto textureIndices =
-                        nlrs::reorderAttributes(model.baseColorTextureIndices(), triangleIndices);
+            auto       positions = nlrs::reorderAttributes(model.positions(), triangleIndices);
+            const auto normals = nlrs::reorderAttributes(model.normals(), triangleIndices);
+            const auto texCoords = nlrs::reorderAttributes(model.texCoords(), triangleIndices);
+            const auto textureIndices =
+                nlrs::reorderAttributes(model.baseColorTextureIndices(), triangleIndices);
 
-                    assert(positions.size() == normals.size());
-                    assert(positions.size() == texCoords.size());
-                    assert(positions.size() == textureIndices.size());
-                    std::vector<nlrs::PositionAttribute> positionAttributes;
-                    std::vector<nlrs::VertexAttributes>  vertexAttributes;
-                    positionAttributes.reserve(positions.size());
-                    vertexAttributes.reserve(positions.size());
-                    for (std::size_t i = 0; i < normals.size(); ++i)
-                    {
-                        const auto& ps = positions[i];
-                        const auto& ns = normals[i];
-                        const auto& uvs = texCoords[i];
-                        const auto  textureIdx = textureIndices[i];
+            assert(positions.size() == normals.size());
+            assert(positions.size() == texCoords.size());
+            assert(positions.size() == textureIndices.size());
+            std::vector<nlrs::PositionAttribute> positionAttributes;
+            std::vector<nlrs::VertexAttributes>  vertexAttributes;
+            positionAttributes.reserve(positions.size());
+            vertexAttributes.reserve(positions.size());
+            for (std::size_t i = 0; i < normals.size(); ++i)
+            {
+                const auto& ps = positions[i];
+                const auto& ns = normals[i];
+                const auto& uvs = texCoords[i];
+                const auto  textureIdx = textureIndices[i];
 
-                        positionAttributes.push_back(
-                            nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
-                        vertexAttributes.push_back(nlrs::VertexAttributes{
-                            .n0 = ns.n0,
-                            .n1 = ns.n1,
-                            .n2 = ns.n2,
-                            .uv0 = uvs.uv0,
-                            .uv1 = uvs.uv1,
-                            .uv2 = uvs.uv2,
-                            .textureIdx = textureIdx});
-                    }
+                positionAttributes.push_back(
+                    nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
+                vertexAttributes.push_back(nlrs::VertexAttributes{
+                    .n0 = ns.n0,
+                    .n1 = ns.n1,
+                    .n2 = ns.n2,
+                    .uv0 = uvs.uv0,
+                    .uv1 = uvs.uv1,
+                    .uv2 = uvs.uv2,
+                    .textureIdx = textureIdx});
+            }
 
-                    nlrs::Scene scene{
-                        .bvhNodes = std::span(bvhNodes),
-                        .positionAttributes = positionAttributes,
-                        .vertexAttributes = vertexAttributes,
-                        .baseColorTextures = model.baseColorTextures(),
-                    };
+            nlrs::Scene scene{
+                .bvhNodes = std::span(bvhNodes),
+                .positionAttributes = positionAttributes,
+                .vertexAttributes = vertexAttributes,
+                .baseColorTextures = model.baseColorTextures(),
+            };
 
-                    nlrs::Renderer renderer(rendererDesc, gpuContext, std::move(scene));
+            nlrs::Renderer renderer(rendererDesc, gpuContext, std::move(scene));
 
-                    return std::make_tuple(
-                        std::move(renderer), std::move(bvhNodes), std::move(positions));
-                }();
+            return std::make_tuple(
+                std::move(renderer),
+                std::move(bvhNodes),
+                std::move(triangleIndices),
+                std::move(positions));
+        }();
 
         {
             nlrs::Extent2i curFramebufferSize = window.resolution();
@@ -260,7 +265,9 @@ int main(int argc, char** argv)
 
                             nlrs::DebugBvhIntersection intersect;
                             debugRayIntersectBvh(ray, bvhNodes, triangles, FLT_MAX, intersect);
-                            std::printf("intersected triangle %zu\n", intersect.triangleIdx);
+                            std::printf(
+                                "intersected triangle %zu\n",
+                                triangleIndices[intersect.triangleIdx]);
                         }
                     }
                 }

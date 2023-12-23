@@ -41,7 +41,8 @@ std::vector<T> reorderAttributes(
     std::vector<T> reorderedAttributes(attributes.size());
     for (std::size_t i = 0; i < attributes.size(); ++i)
     {
-        reorderedAttributes[triangleIndices[i]] = attributes[i];
+        const std::size_t destIdx = triangleIndices[i];
+        reorderedAttributes[destIdx] = attributes[i];
     }
     return reorderedAttributes;
 }

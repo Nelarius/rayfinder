@@ -174,8 +174,8 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var intersection: Intersection;
     if rayIntersectBvh(ray, T_MAX, &intersection) {
         let uv = intersection.uv;
-        // color = vec3(uv, 0f);
-        color = textureLookup(textureDescriptors[intersection.textureDescriptorIdx], uv);
+        color = vec3(uv, 0f);
+        // color = textureLookup(textureDescriptors[intersection.textureDescriptorIdx], uv);
     }
 
     return color;
