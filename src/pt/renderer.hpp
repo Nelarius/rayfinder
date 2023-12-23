@@ -135,15 +135,6 @@ struct Renderer
     std::deque<std::uint64_t> drawDurationsNs;
     std::deque<std::uint64_t> renderPassDurationsNs;
 
-    struct TimestampBufferMapContext
-    {
-        GpuBuffer*                 timestampBuffer = nullptr;
-        std::deque<std::uint64_t>* drawDurationsNs = nullptr;
-        std::deque<std::uint64_t>* renderPassDurationsNs = nullptr;
-    };
-
-    TimestampBufferMapContext timestampBufferMapContext;
-
     Renderer(const RendererDescriptor&, const GpuContext&, Scene);
     ~Renderer();
 

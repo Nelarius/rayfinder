@@ -253,8 +253,7 @@ Renderer::Renderer(
       frameCount(0),
       accumulatedSampleCount(0),
       drawDurationsNs(),
-      renderPassDurationsNs(),
-      timestampBufferMapContext{&timestampBuffer, &drawDurationsNs, &renderPassDurationsNs}
+      renderPassDurationsNs()
 {
     {
         const std::array<Vertex, 6> vertexData{
@@ -798,10 +797,9 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
         [](const WGPUBufferMapAsyncStatus status, void* const userdata) -> void {
             if (status == WGPUBufferMapAsyncStatus_Success)
             {
-                TimestampBufferMapContext& timestampBufferMapContext =
-                    *reinterpret_cast<TimestampBufferMapContext*>(userdata);
-                assert(timestampBufferMapContext.timestampBuffer);
-                GpuBuffer&  timestampBuffer = *timestampBufferMapContext.timestampBuffer;
+                assert(userdata);
+                Renderer&   renderer = *static_cast<Renderer*>(userdata);
+                GpuBuffer&  timestampBuffer = renderer.timestampBuffer;
                 const void* bufferData = wgpuBufferGetConstMappedRange(
                     timestampBuffer.handle(), 0, sizeof(TimestampsLayout));
                 assert(bufferData);
@@ -809,10 +807,8 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
                 const TimestampsLayout* const timestamps =
                     reinterpret_cast<const TimestampsLayout*>(bufferData);
 
-                assert(timestampBufferMapContext.renderPassDurationsNs);
-                std::deque<std::uint64_t>& renderPassDurations =
-                    *timestampBufferMapContext.renderPassDurationsNs;
-                const std::uint64_t renderPassDelta =
+                std::deque<std::uint64_t>& renderPassDurations = renderer.renderPassDurationsNs;
+                const std::uint64_t        renderPassDelta =
                     timestamps->renderPassEnd - timestamps->renderPassBegin;
 
                 renderPassDurations.push_back(renderPassDelta);
@@ -822,10 +818,8 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
                 }
 
 #ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
-                assert(timestampBufferMapContext.drawDurationsNs);
-                std::deque<std::uint64_t>& drawDurations =
-                    *timestampBufferMapContext.drawDurationsNs;
-                const std::uint64_t drawDelta = timestamps->drawEnd - timestamps->drawBegin;
+                std::deque<std::uint64_t>& drawDurations = renderer.drawDurationsNs;
+                const std::uint64_t        drawDelta = timestamps->drawEnd - timestamps->drawBegin;
                 drawDurations.push_back(drawDelta);
                 if (drawDurations.size() > 30)
                 {
@@ -840,7 +834,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
                 std::fprintf(stderr, "Failed to map query buffer\n");
             }
         },
-        &timestampBufferMapContext);
+        this);
 }
 
 float Renderer::averageDrawDurationMs() const
