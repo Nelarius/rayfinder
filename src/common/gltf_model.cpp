@@ -129,6 +129,9 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 assert(pbrMetallicRoughness.base_color_texture.texcoord == 0);
                 assert(pbrMetallicRoughness.base_color_texture.scale == 1.f);
                 assert(pbrMetallicRoughness.base_color_texture.texture);
+                const cgltf_texture& baseColorTexture =
+                    *pbrMetallicRoughness.base_color_texture.texture;
+
                 // Look up OpenGL texture wrap modes:
                 // https://registry.khronos.org/OpenGL/api/GL/glcorearb.h
                 // GL_REPEAT: 10497
@@ -137,9 +140,6 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 // GL_CLAMP_TO_BORDER: 33069
                 assert(baseColorTexture.sampler->wrap_s == 10497);
                 assert(baseColorTexture.sampler->wrap_t == 10497);
-                const cgltf_texture& baseColorTexture =
-                    *pbrMetallicRoughness.base_color_texture.texture;
-
                 assert(baseColorTexture.image);
                 const cgltf_image* const baseColorImage = baseColorTexture.image;
                 uniqueBaseColorImages.insert(baseColorImage);
