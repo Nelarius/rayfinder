@@ -173,11 +173,9 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
 
     var intersection: Intersection;
     if rayIntersectBvh(ray, T_MAX, &intersection) {
-        let uv = intersection.uv;
-        let u = modf(uv.x).fract;
-        let v = modf(uv.y).fract;
-        color = vec3(u, v, 0f);
-        // color = textureLookup(textureDescriptors[intersection.textureDescriptorIdx], uv);
+        let uv = fract(intersection.uv);
+        // color = vec3(u, v, 0f);
+        color = textureLookup(textureDescriptors[intersection.textureDescriptorIdx], uv);
     }
 
     return color;
@@ -445,8 +443,8 @@ struct TextureDescriptor {
 
 @must_use
 fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
-    let u = modf(uv.x).fract;
-    let v = modf(uv.y).fract;
+    let u = uv.x;
+    let v = uv.y;
 
     let j = u32(u * f32(desc.width));
     let i = u32(v * f32(desc.height));
