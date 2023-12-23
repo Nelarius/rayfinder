@@ -136,6 +136,13 @@ struct Renderer
     std::deque<std::uint64_t> renderPassDurationsNs;
 
     Renderer(const RendererDescriptor&, const GpuContext&, Scene);
+
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
+
+    Renderer(Renderer&&);
+    Renderer& operator=(Renderer&&);
+
     ~Renderer();
 
     void setRenderParameters(const RenderParameters&);

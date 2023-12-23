@@ -27,6 +27,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <utility>
 
 namespace nlrs
 {
@@ -644,6 +645,87 @@ Renderer::Renderer(
             .pipelineStatisticsCount = 0u};
         querySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
     }
+}
+
+Renderer::Renderer(Renderer&& other)
+{
+    if (this != &other)
+    {
+        vertexBuffer = std::move(other.vertexBuffer);
+        uniformsBuffer = std::move(other.uniformsBuffer);
+        uniformsBindGroup = other.uniformsBindGroup;
+        other.uniformsBindGroup = nullptr;
+        renderParamsBuffer = std::move(other.renderParamsBuffer);
+        postProcessingParamsBuffer = std::move(other.postProcessingParamsBuffer);
+        skyStateBuffer = std::move(other.skyStateBuffer);
+        renderParamsBindGroup = other.renderParamsBindGroup;
+        other.renderParamsBindGroup = nullptr;
+        bvhNodeBuffer = std::move(other.bvhNodeBuffer);
+        positionAttributesBuffer = std::move(other.positionAttributesBuffer);
+        vertexAttributesBuffer = std::move(other.vertexAttributesBuffer);
+        textureDescriptorBuffer = std::move(other.textureDescriptorBuffer);
+        textureBuffer = std::move(other.textureBuffer);
+        sceneBindGroup = other.sceneBindGroup;
+        other.sceneBindGroup = nullptr;
+        imageBuffer = std::move(other.imageBuffer);
+        imageBindGroup = other.imageBindGroup;
+        other.imageBindGroup = nullptr;
+        querySet = other.querySet;
+        other.querySet = nullptr;
+        queryBuffer = std::move(other.queryBuffer);
+        timestampBuffer = std::move(other.timestampBuffer);
+        renderPipeline = other.renderPipeline;
+        other.renderPipeline = nullptr;
+
+        currentRenderParams = other.currentRenderParams;
+        currentPostProcessingParams = other.currentPostProcessingParams;
+        frameCount = other.frameCount;
+        accumulatedSampleCount = other.accumulatedSampleCount;
+
+        drawDurationsNs = std::move(other.drawDurationsNs);
+        renderPassDurationsNs = std::move(other.renderPassDurationsNs);
+    }
+}
+
+Renderer& Renderer::operator=(Renderer&& other)
+{
+    if (this != &other)
+    {
+        vertexBuffer = std::move(other.vertexBuffer);
+        uniformsBuffer = std::move(other.uniformsBuffer);
+        uniformsBindGroup = other.uniformsBindGroup;
+        other.uniformsBindGroup = nullptr;
+        renderParamsBuffer = std::move(other.renderParamsBuffer);
+        postProcessingParamsBuffer = std::move(other.postProcessingParamsBuffer);
+        skyStateBuffer = std::move(other.skyStateBuffer);
+        renderParamsBindGroup = other.renderParamsBindGroup;
+        other.renderParamsBindGroup = nullptr;
+        bvhNodeBuffer = std::move(other.bvhNodeBuffer);
+        positionAttributesBuffer = std::move(other.positionAttributesBuffer);
+        vertexAttributesBuffer = std::move(other.vertexAttributesBuffer);
+        textureDescriptorBuffer = std::move(other.textureDescriptorBuffer);
+        textureBuffer = std::move(other.textureBuffer);
+        sceneBindGroup = other.sceneBindGroup;
+        other.sceneBindGroup = nullptr;
+        imageBuffer = std::move(other.imageBuffer);
+        imageBindGroup = other.imageBindGroup;
+        other.imageBindGroup = nullptr;
+        querySet = other.querySet;
+        other.querySet = nullptr;
+        queryBuffer = std::move(other.queryBuffer);
+        timestampBuffer = std::move(other.timestampBuffer);
+        renderPipeline = other.renderPipeline;
+        other.renderPipeline = nullptr;
+
+        currentRenderParams = other.currentRenderParams;
+        currentPostProcessingParams = other.currentPostProcessingParams;
+        frameCount = other.frameCount;
+        accumulatedSampleCount = other.accumulatedSampleCount;
+
+        drawDurationsNs = std::move(other.drawDurationsNs);
+        renderPassDurationsNs = std::move(other.renderPassDurationsNs);
+    }
+    return *this;
 }
 
 Renderer::~Renderer()
