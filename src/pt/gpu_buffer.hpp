@@ -41,8 +41,16 @@ public:
 
     // Raw access
 
-    inline WGPUBuffer  handle() const { return mBuffer; }
-    inline std::size_t byteSize() const { return mByteSize; }
+    inline WGPUBuffer handle() const
+    {
+        assert(mBuffer != nullptr);
+        return mBuffer;
+    }
+    inline std::size_t byteSize() const
+    {
+        assert(mByteSize > 0);
+        return mByteSize;
+    }
 
     // Bind group and layout
 
