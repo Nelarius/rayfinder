@@ -478,8 +478,8 @@ struct TextureDescriptor {
 
 @must_use
 fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
-    let u = clamp(uv.x, 0f, 1f);
-    let v = clamp(uv.y, 0f, 1f);
+    let u = fract(uv.x);
+    let v = fract(uv.y);
 
     let j = u32(u * f32(desc.width));
     let i = u32(v * f32(desc.height));
