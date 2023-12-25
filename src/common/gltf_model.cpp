@@ -15,7 +15,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <iterator> // std::distance
+#include <iterator>
 #include <stdexcept>
 
 namespace fs = std::filesystem;
@@ -211,26 +211,29 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 assert(positionAccessor->count == normalAccessor->count);
                 assert(positionAccessor->count == texCoordAccessor->count);
                 const std::size_t vertexCount = positionAccessor->count;
-                positions.resize(vertexOffset + vertexCount);
                 normals.resize(vertexOffset + vertexCount);
                 texCoords.resize(vertexOffset + vertexCount);
-                for (std::size_t idx = 0; idx < vertexCount; ++idx)
-                {
-                    glm::vec3  position;
-                    glm::vec3& normal = normals[vertexOffset + idx];
-                    glm::vec2& texCoord = texCoords[vertexOffset + idx];
+                std::vector<glm::vec3> localPositions(vertexCount, glm::vec3(0.f));
+                auto primitiveNormals = std::span(normals).subspan(vertexOffset, vertexCount);
+                auto primitiveTexCoords = std::span(texCoords).subspan(vertexOffset, vertexCount);
 
-                    [[maybe_unused]] bool readSuccess =
-                        cgltf_accessor_read_float(positionAccessor, idx, &position.x, 3);
-                    assert(readSuccess);
-                    readSuccess = cgltf_accessor_read_float(normalAccessor, idx, &normal.x, 3);
-                    assert(readSuccess);
-                    readSuccess = cgltf_accessor_read_float(texCoordAccessor, idx, &texCoord.x, 2);
-                    assert(readSuccess);
+                [[maybe_unused]] std::size_t numFloats = cgltf_accessor_unpack_floats(
+                    positionAccessor, &localPositions[0].x, 3 * vertexCount);
+                assert(numFloats == 3 * vertexCount);
+                numFloats = cgltf_accessor_unpack_floats(
+                    normalAccessor, &primitiveNormals[0].x, 3 * vertexCount);
+                assert(numFloats == 3 * vertexCount);
+                numFloats = cgltf_accessor_unpack_floats(
+                    texCoordAccessor, &primitiveTexCoords[0].x, 2 * vertexCount);
+                assert(numFloats == 2 * vertexCount);
 
-                    positions[vertexOffset + idx] =
-                        meshTransforms[meshIdx] * glm::vec4(position, 1.0f);
-                }
+                std::transform(
+                    localPositions.begin(),
+                    localPositions.end(),
+                    std::back_inserter(positions),
+                    [&transform = meshTransforms[meshIdx]](const glm::vec3& p) -> glm::vec3 {
+                        return transform * glm::vec4(p, 1.0f);
+                    });
             }
         }
 
