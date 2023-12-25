@@ -1,3 +1,4 @@
+#include "assert.hpp"
 #include "gltf_model.hpp"
 #include "texture.hpp"
 #include "vector_set.hpp"
@@ -9,7 +10,6 @@
 #include <stb_image.h>
 
 #include <algorithm>
-#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
@@ -53,8 +53,8 @@ void traverseNodeHierarchy(
     if (node->mesh != nullptr)
     {
         const auto distance = std::distance(meshBegin, const_cast<const cgltf_mesh*>(node->mesh));
-        assert(distance >= 0);
-        assert(static_cast<std::size_t>(distance) < transforms.size());
+        NLRS_ASSERT(distance >= 0);
+        NLRS_ASSERT(static_cast<std::size_t>(distance) < transforms.size());
         const std::size_t meshIdx = static_cast<std::size_t>(distance);
         transforms[meshIdx] = transform;
     }
@@ -86,14 +86,14 @@ GltfModel::GltfModel(const fs::path gltfPath)
     cgltf_data*                   data = nullptr;
     [[maybe_unused]] cgltf_result result =
         cgltf_parse_file(&options, gltfPath.string().c_str(), &data);
-    assert(result == cgltf_result_success);
+    NLRS_ASSERT(result == cgltf_result_success);
 
     result = cgltf_load_buffers(&options, data, gltfPath.string().c_str());
-    assert(result == cgltf_result_success);
+    NLRS_ASSERT(result == cgltf_result_success);
 
     std::vector<glm::mat4> meshTransforms(data->meshes_count, glm::mat4(1.0));
     {
-        assert(data->scenes_count == 1);
+        NLRS_ASSERT(data->scenes_count == 1);
         const size_t count = data->scene->nodes_count;
         for (std::size_t nodeIdx = 0; nodeIdx < count; ++nodeIdx)
         {
@@ -102,7 +102,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
         }
     }
 
-    assert(data->scenes_count == 1);
+    NLRS_ASSERT(data->scenes_count == 1);
 
     {
         std::vector<glm::vec3>          positions;
@@ -119,16 +119,16 @@ GltfModel::GltfModel(const fs::path gltfPath)
             for (std::size_t primitiveIdx = 0; primitiveIdx < mesh.primitives_count; ++primitiveIdx)
             {
                 const cgltf_primitive& primitive = mesh.primitives[primitiveIdx];
-                assert(primitive.type == cgltf_primitive_type_triangles);
+                NLRS_ASSERT(primitive.type == cgltf_primitive_type_triangles);
 
-                assert(primitive.material);
-                assert(primitive.material->has_pbr_metallic_roughness);
+                NLRS_ASSERT(primitive.material);
+                NLRS_ASSERT(primitive.material->has_pbr_metallic_roughness);
                 const cgltf_pbr_metallic_roughness& pbrMetallicRoughness =
                     primitive.material->pbr_metallic_roughness;
 
-                assert(pbrMetallicRoughness.base_color_texture.texcoord == 0);
-                assert(pbrMetallicRoughness.base_color_texture.scale == 1.f);
-                assert(pbrMetallicRoughness.base_color_texture.texture);
+                NLRS_ASSERT(pbrMetallicRoughness.base_color_texture.texcoord == 0);
+                NLRS_ASSERT(pbrMetallicRoughness.base_color_texture.scale == 1.f);
+                NLRS_ASSERT(pbrMetallicRoughness.base_color_texture.texture);
 
                 const cgltf_texture& baseColorTexture =
                     *pbrMetallicRoughness.base_color_texture.texture;
@@ -138,22 +138,22 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 // GL_MIRRORED_REPEAT: 33648
                 // GL_CLAMP_TO_EDGE: 33071
                 // GL_CLAMP_TO_BORDER: 33069
-                assert(baseColorTexture.sampler->wrap_s == 10497);
-                assert(baseColorTexture.sampler->wrap_t == 10497);
-                assert(baseColorTexture.image);
+                NLRS_ASSERT(baseColorTexture.sampler->wrap_s == 10497);
+                NLRS_ASSERT(baseColorTexture.sampler->wrap_t == 10497);
+                NLRS_ASSERT(baseColorTexture.image);
                 const cgltf_image* const baseColorImage = baseColorTexture.image;
                 uniqueBaseColorImages.insert(baseColorImage);
 
                 const cgltf_accessor* const indexAccessor = primitive.indices;
-                assert(indexAccessor != nullptr);
-                assert(indexAccessor->type == cgltf_type_scalar);
+                NLRS_ASSERT(indexAccessor != nullptr);
+                NLRS_ASSERT(indexAccessor->type == cgltf_type_scalar);
 
                 const std::size_t vertexOffset = positions.size();
                 const std::size_t indexOffset = indices.size();
                 const std::size_t indexCount = indexAccessor->count;
                 indices.resize(indexOffset + indexCount);
-                assert(indices.size() % 3 == 0);
-                assert((indexCount % 3) == 0);
+                NLRS_ASSERT(indices.size() % 3 == 0);
+                NLRS_ASSERT((indexCount % 3) == 0);
                 auto subindices = std::span(indices).subspan(indexOffset, indexCount);
                 for (std::size_t i = 0; i < indexCount; i += 3)
                 {
@@ -162,11 +162,11 @@ GltfModel::GltfModel(const fs::path gltfPath)
                     std::uint32_t&        idx3 = subindices[i + 2];
                     [[maybe_unused]] bool readSuccess =
                         cgltf_accessor_read_uint(indexAccessor, i + 0, &idx1, 1);
-                    assert(readSuccess);
+                    NLRS_ASSERT(readSuccess);
                     readSuccess = cgltf_accessor_read_uint(indexAccessor, i + 1, &idx2, 1);
-                    assert(readSuccess);
+                    NLRS_ASSERT(readSuccess);
                     readSuccess = cgltf_accessor_read_uint(indexAccessor, i + 2, &idx3, 1);
-                    assert(readSuccess);
+                    NLRS_ASSERT(readSuccess);
                     idx1 += static_cast<std::uint32_t>(vertexOffset);
                     idx2 += static_cast<std::uint32_t>(vertexOffset);
                     idx3 += static_cast<std::uint32_t>(vertexOffset);
@@ -196,20 +196,20 @@ GltfModel::GltfModel(const fs::path gltfPath)
                     }
                 }
 
-                assert(positionAccessor != nullptr);
-                assert(positionAccessor->type == cgltf_type_vec3);
-                assert(positionAccessor->component_type == cgltf_component_type_r_32f);
+                NLRS_ASSERT(positionAccessor != nullptr);
+                NLRS_ASSERT(positionAccessor->type == cgltf_type_vec3);
+                NLRS_ASSERT(positionAccessor->component_type == cgltf_component_type_r_32f);
 
-                assert(normalAccessor != nullptr);
-                assert(normalAccessor->type == cgltf_type_vec3);
-                assert(normalAccessor->component_type == cgltf_component_type_r_32f);
+                NLRS_ASSERT(normalAccessor != nullptr);
+                NLRS_ASSERT(normalAccessor->type == cgltf_type_vec3);
+                NLRS_ASSERT(normalAccessor->component_type == cgltf_component_type_r_32f);
 
-                assert(texCoordAccessor != nullptr);
-                assert(texCoordAccessor->type == cgltf_type_vec2);
-                assert(texCoordAccessor->component_type == cgltf_component_type_r_32f);
+                NLRS_ASSERT(texCoordAccessor != nullptr);
+                NLRS_ASSERT(texCoordAccessor->type == cgltf_type_vec2);
+                NLRS_ASSERT(texCoordAccessor->component_type == cgltf_component_type_r_32f);
 
-                assert(positionAccessor->count == normalAccessor->count);
-                assert(positionAccessor->count == texCoordAccessor->count);
+                NLRS_ASSERT(positionAccessor->count == normalAccessor->count);
+                NLRS_ASSERT(positionAccessor->count == texCoordAccessor->count);
                 const std::size_t vertexCount = positionAccessor->count;
                 normals.resize(vertexOffset + vertexCount);
                 texCoords.resize(vertexOffset + vertexCount);
@@ -217,15 +217,18 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 auto primitiveNormals = std::span(normals).subspan(vertexOffset, vertexCount);
                 auto primitiveTexCoords = std::span(texCoords).subspan(vertexOffset, vertexCount);
 
-                [[maybe_unused]] std::size_t numFloats = cgltf_accessor_unpack_floats(
-                    positionAccessor, &localPositions[0].x, 3 * vertexCount);
-                assert(numFloats == 3 * vertexCount);
-                numFloats = cgltf_accessor_unpack_floats(
-                    normalAccessor, &primitiveNormals[0].x, 3 * vertexCount);
-                assert(numFloats == 3 * vertexCount);
-                numFloats = cgltf_accessor_unpack_floats(
-                    texCoordAccessor, &primitiveTexCoords[0].x, 2 * vertexCount);
-                assert(numFloats == 2 * vertexCount);
+                NLRS_ASSERT(
+                    cgltf_accessor_unpack_floats(
+                        positionAccessor, &localPositions[0].x, 3 * vertexCount) ==
+                    3 * vertexCount);
+                NLRS_ASSERT(
+                    cgltf_accessor_unpack_floats(
+                        normalAccessor, &primitiveNormals[0].x, 3 * vertexCount) ==
+                    3 * vertexCount);
+                NLRS_ASSERT(
+                    cgltf_accessor_unpack_floats(
+                        texCoordAccessor, &primitiveTexCoords[0].x, 2 * vertexCount) ==
+                    2 * vertexCount);
 
                 std::transform(
                     localPositions.begin(),
@@ -266,7 +269,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
         auto bufferViewData =
             [](const cgltf_buffer_view* const bufferView) -> std::span<const std::uint8_t> {
             // NOTE: cgltf_buffer_view_data used as a reference for this function
-            assert(bufferView != nullptr);
+            NLRS_ASSERT(bufferView != nullptr);
             const std::size_t byteLength = bufferView->size;
 
             // See cgltf_buffer_view::data comment, overrides buffer->data if present
@@ -277,7 +280,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 return std::span(bufferPtr, byteLength);
             }
 
-            assert(bufferView->buffer != nullptr);
+            NLRS_ASSERT(bufferView->buffer != nullptr);
             const std::size_t         bufferOffset = bufferView->offset;
             const std::uint8_t* const bufferPtr =
                 static_cast<const std::uint8_t*>(bufferView->buffer->data);
@@ -294,7 +297,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
             }
             else
             {
-                assert(image->uri);
+                NLRS_ASSERT(image->uri);
                 const fs::path imagePath = gltfPath.parent_path() / image->uri;
                 if (!fs::exists(imagePath))
                 {
@@ -303,9 +306,9 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 }
 
                 const std::size_t fileSize = static_cast<std::size_t>(fs::file_size(imagePath));
-                assert(fileSize > 0);
+                NLRS_ASSERT(fileSize > 0);
                 std::ifstream file(imagePath, std::ios::binary);
-                assert(file.is_open());
+                NLRS_ASSERT(file.is_open());
 
                 std::vector<std::uint8_t> fileData(fileSize, 0);
                 file.read(reinterpret_cast<char*>(fileData.data()), fileSize);
@@ -315,15 +318,15 @@ GltfModel::GltfModel(const fs::path gltfPath)
 
         // Replace each triangle's base color image attribute pointer with an index into a unique
         // array of images.
-        assert(baseColorImageAttributes.size() == mPositions.size());
+        NLRS_ASSERT(baseColorImageAttributes.size() == mPositions.size());
         for (const cgltf_image* image : baseColorImageAttributes)
         {
             const auto imageIter = uniqueBaseColorImages.find(image);
-            assert(imageIter != uniqueBaseColorImages.end());
+            NLRS_ASSERT(imageIter != uniqueBaseColorImages.end());
             const auto distance = std::distance(uniqueBaseColorImages.begin(), imageIter);
-            assert(distance >= 0);
+            NLRS_ASSERT(distance >= 0);
             const auto textureIdx = static_cast<std::uint32_t>(distance);
-            assert(textureIdx < mBaseColorTextures.size());
+            NLRS_ASSERT(textureIdx < mBaseColorTextures.size());
             mBaseColorTextureIndices.push_back(textureIdx);
         }
     }
