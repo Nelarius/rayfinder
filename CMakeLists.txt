@@ -33,7 +33,7 @@ target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE
 target_link_libraries(common PRIVATE glm::glm)
 
 # hw-skymodel
-add_library(hw-skymodel src/hw-skymodel/hw_skymodel.c)
+add_library(hw-skymodel src/hw-skymodel/ArHosekSkyModel.c)
 target_include_directories(hw-skymodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
 
 # hw-skymodel-demo
