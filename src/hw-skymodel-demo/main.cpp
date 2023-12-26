@@ -113,7 +113,7 @@ int main()
                 for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
                 {
                     radiances[idx] =
-                        arhosekskymodel_radiance(skyState, theta, gamma, wavelengths[idx]);
+                        arhosekskymodel_solar_radiance(skyState, theta, gamma, wavelengths[idx]);
                 }
 
                 constexpr std::size_t backIdx = wavelengths.size() - 1;
@@ -146,7 +146,7 @@ int main()
                 zradiance *= deltaWl;
 
                 const glm::dvec3 radiance = xyzToSrgb * glm::dvec3(xradiance, yradiance, zradiance);
-                const glm::dvec3 color = expose(radiance, 0.1);
+                const glm::dvec3 color = expose(radiance, 0.000005);
                 rgba = glm::dvec4(color, 1.0);
             }
 
