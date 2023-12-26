@@ -319,7 +319,7 @@ ArHosekSkyModelState* arhosekskymodelstate_alloc_init(
 {
     ArHosekSkyModelState* state = ALLOC(ArHosekSkyModelState);
 
-    state->solar_radius = (0.51 DEGREES) / 2.0;
+    state->solar_radius = TERRESTRIAL_SOLAR_RADIUS;
     state->turbidity = atmospheric_turbidity;
     state->albedo = ground_albedo;
     state->elevation = solar_elevation;
@@ -436,9 +436,9 @@ double arhosek_tristim_skymodel_radiance(
 const int pieces = 45;
 const int order = 4;
 
-double arhosekskymodel_sr_internal(int turbidity, int wl, double elevation)
+double arhosekskymodel_sr_internal(int turbidity, int wl, double view_elevation)
 {
-    int pos = (int)(pow(2.0 * elevation / MATH_PI, 1.0 / 3.0) * pieces); // floor
+    int pos = (int)(pow(2.0 * view_elevation / MATH_PI, 1.0 / 3.0) * pieces); // floor
 
     if (pos > 44)
         pos = 44;
@@ -448,12 +448,12 @@ double arhosekskymodel_sr_internal(int turbidity, int wl, double elevation)
     const double* coefs = solarDatasets[wl] + (order * pieces * turbidity + order * (pos + 1) - 1);
 
     double       res = 0.0;
-    const double x = elevation - break_x;
+    const double x = view_elevation - break_x;
     double       x_exp = 1.0;
 
     for (int i = 0; i < order; ++i)
     {
-        res += x_exp * *coefs--;
+        res += x_exp * (*(coefs--));
         x_exp *= x;
     }
 
@@ -463,8 +463,7 @@ double arhosekskymodel_sr_internal(int turbidity, int wl, double elevation)
 double arhosekskymodel_solar_radiance_internal2(
     ArHosekSkyModelState* state,
     double                wavelength,
-    double                elevation,
-    double                gamma)
+    double                view_elevation)
 {
     assert(
         wavelength >= 320.0 && wavelength <= 720.0 && state->turbidity >= 1.0 &&
@@ -490,12 +489,13 @@ double arhosekskymodel_solar_radiance_internal2(
 
     double direct_radiance =
         (1.0 - turb_frac) *
-            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(state, turb_low, wl_low, elevation) +
-             wl_frac * arhosekskymodel_sr_internal(state, turb_low, wl_low + 1, elevation)) +
+            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(turb_low, wl_low, view_elevation) +
+             wl_frac * arhosekskymodel_sr_internal(turb_low, wl_low + 1, view_elevation)) +
         turb_frac *
-            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(state, turb_low + 1, wl_low, elevation) +
-             wl_frac * arhosekskymodel_sr_internal(state, turb_low + 1, wl_low + 1, elevation));
+            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(turb_low + 1, wl_low, view_elevation) +
+             wl_frac * arhosekskymodel_sr_internal(turb_low + 1, wl_low + 1, view_elevation));
 
+#ifdef LIMB_DARKENING
     double ldCoefficient[6];
 
     for (int i = 0; i < 6; i++)
@@ -507,10 +507,8 @@ double arhosekskymodel_solar_radiance_internal2(
     const double sol_rad_sin = sin(state->solar_radius);
     const double ar2 = 1 / (sol_rad_sin * sol_rad_sin);
     const double singamma = sin(gamma);
-    double       sc2 = 1.0 - ar2 * singamma * singamma;
-    if (sc2 < 0.0)
-        sc2 = 0.0;
-    double sampleCosine = sqrt(sc2);
+    const double sc2 = fmax(0.0, 1.0 - ar2 * singamma * singamma);
+    const double sampleCosine = sqrt(sc2);
 
     //   The following will be improved in future versions of the model:
     //   here, we directly use fitted 5th order polynomials provided by the
@@ -520,12 +518,13 @@ double arhosekskymodel_solar_radiance_internal2(
     //   dataset based on quadratic polynomials will be provided in a future
     //   release.
 
-    double darkeningFactor =
+    const double darkeningFactor =
         ldCoefficient[0] + ldCoefficient[1] * sampleCosine +
         ldCoefficient[2] * pow(sampleCosine, 2.0) + ldCoefficient[3] * pow(sampleCosine, 3.0) +
         ldCoefficient[4] * pow(sampleCosine, 4.0) + ldCoefficient[5] * pow(sampleCosine, 5.0);
 
     direct_radiance *= darkeningFactor;
+#endif
 
     return direct_radiance;
 }
@@ -536,10 +535,19 @@ double arhosekskymodel_solar_radiance(
     double                gamma,
     double                wavelength)
 {
-    double direct_radiance = arhosekskymodel_solar_radiance_internal2(
-        state, wavelength, ((MATH_PI / 2.0) - theta), gamma);
+    double direct_radiance =
+        arhosekskymodel_solar_radiance_internal2(state, wavelength, ((MATH_PI / 2.0) - theta));
 
     double inscattered_radiance = arhosekskymodel_radiance(state, theta, gamma, wavelength);
 
     return direct_radiance + inscattered_radiance;
+}
+
+double arhosekskymodel_direct_solar_radiance(
+    ArHosekSkyModelState* state,
+    double                theta,
+    double                wavelength)
+{
+    const double view_elevation = (MATH_PI / 2.0) - theta;
+    return arhosekskymodel_solar_radiance_internal2(state, wavelength, view_elevation);
 }

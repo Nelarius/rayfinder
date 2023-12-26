@@ -414,4 +414,9 @@ double arhosekskymodel_solar_radiance(
     double                gamma,
     double                wavelength);
 
+double arhosekskymodel_direct_solar_radiance(
+    ArHosekSkyModelState* state,
+    double                theta,
+    double                wavelength);
+
 #endif // _ARHOSEK_SKYMODEL_H_
