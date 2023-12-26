@@ -335,157 +335,6 @@ ArHosekSkyModelState* arhosekskymodelstate_alloc_init(
 
         state->radiances[wl] = ArHosekSkyModel_CookRadianceConfiguration(
             datasetsRad[wl], atmospheric_turbidity, ground_albedo, solar_elevation);
-
-        state->emission_correction_factor_sun[wl] = 1.0;
-        state->emission_correction_factor_sky[wl] = 1.0;
-    }
-
-    return state;
-}
-
-//   'blackbody_scaling_factor'
-//
-//   Fudge factor, computed in Mathematica, to scale the results of the
-//   following function to match the solar radiance spectrum used in the
-//   original simulation. The scaling is done so their integrals over the
-//   range from 380.0 to 720.0 nanometers match for a blackbody temperature
-//   of 5800 K.
-//   Which leaves the original spectrum being less bright overall than the 5.8k
-//   blackbody radiation curve if the ultra-violet part of the spectrum is
-//   also considered. But the visible brightness should be very similar.
-
-const double blackbody_scaling_factor = 3.19992 * 10E-11;
-
-//   'art_blackbody_dd_value()' function
-//
-//   Blackbody radiance, Planck's formula
-
-double art_blackbody_dd_value(const double temperature, const double lambda)
-{
-    double c1 = 3.74177 * 10E-17;
-    double c2 = 0.0143878;
-    double value;
-
-    value = (c1 / (pow(lambda, 5.0))) * (1.0 / (exp(c2 / (lambda * temperature)) - 1.0));
-
-    return value;
-}
-
-//   'originalSolarRadianceTable[]'
-//
-//   The solar spectrum incident at the top of the atmosphere, as it was used
-//   in the brute force path tracer that generated the reference results the
-//   model was fitted to. We need this as the yardstick to compare any altered
-//   Blackbody emission spectra for alien world stars to.
-
-//   This is just the data from the Preetham paper, extended into the UV range.
-
-const double originalSolarRadianceTable[] = {
-    7500.0,
-    12500.0,
-    21127.5,
-    26760.5,
-    30663.7,
-    27825.0,
-    25503.8,
-    25134.2,
-    23212.1,
-    21526.7,
-    19870.8};
-
-ArHosekSkyModelState* arhosekskymodelstate_alienworld_alloc_init(
-    const double solar_elevation,
-    const double solar_intensity,
-    const double solar_surface_temperature_kelvin,
-    const double atmospheric_turbidity,
-    const double ground_albedo)
-{
-    ArHosekSkyModelState* state = ALLOC(ArHosekSkyModelState);
-
-    state->turbidity = atmospheric_turbidity;
-    state->albedo = ground_albedo;
-    state->elevation = solar_elevation;
-
-    for (unsigned int wl = 0; wl < 11; ++wl)
-    {
-        //   Basic init as for the normal scenario
-
-        ArHosekSkyModel_CookConfiguration(
-            datasets[wl],
-            state->configs[wl],
-            atmospheric_turbidity,
-            ground_albedo,
-            solar_elevation);
-
-        state->radiances[wl] = ArHosekSkyModel_CookRadianceConfiguration(
-            datasetsRad[wl], atmospheric_turbidity, ground_albedo, solar_elevation);
-
-        //   The wavelength of this band in nanometers
-
-        double owl = (320.0 + 40.0 * wl) * 10E-10;
-
-        //   The original intensity we just computed
-
-        double osr = originalSolarRadianceTable[wl];
-
-        //   The intensity of a blackbody with the desired temperature
-        //   The fudge factor described above is used to make sure the BB
-        //   function matches the used radiance data reasonably well
-        //   in magnitude.
-
-        double nsr = art_blackbody_dd_value(solar_surface_temperature_kelvin, owl) *
-                     blackbody_scaling_factor;
-
-        //   Correction factor for this waveband is simply the ratio of
-        //   the two.
-
-        state->emission_correction_factor_sun[wl] = nsr / osr;
-    }
-
-    //   We then compute the average correction factor of all wavebands.
-
-    //   Theoretically, some weighting to favour wavelengths human vision is
-    //   more sensitive to could be introduced here - think V(lambda). But
-    //   given that the whole effort is not *that* accurate to begin with (we
-    //   are talking about the appearance of alien worlds, after all), simple
-    //   averaging over the visible wavelenghts (! - this is why we start at
-    //   WL #2, and only use 2-11) seems like a sane first approximation.
-
-    double correctionFactor = 0.0;
-
-    for (unsigned int i = 2; i < 11; i++)
-    {
-        correctionFactor += state->emission_correction_factor_sun[i];
-    }
-
-    //   This is the average ratio in emitted energy between our sun, and an
-    //   equally large sun with the blackbody spectrum we requested.
-
-    //   Division by 9 because we only used 9 of the 11 wavelengths for this
-    //   (see above).
-
-    double ratio = correctionFactor / 9.0;
-
-    //   This ratio is then used to determine the radius of the alien sun
-    //   on the sky dome. The additional factor 'solar_intensity' can be used
-    //   to make the alien sun brighter or dimmer compared to our sun.
-
-    state->solar_radius = (sqrt(solar_intensity) * TERRESTRIAL_SOLAR_RADIUS) / sqrt(ratio);
-
-    //   Finally, we have to reduce the scaling factor of the sky by the
-    //   ratio used to scale the solar disc size. The rationale behind this is
-    //   that the scaling factors apply to the new blackbody spectrum, which
-    //   can be more or less bright than the one our sun emits. However, we
-    //   just scaled the size of the alien solar disc so it is roughly as
-    //   bright (in terms of energy emitted) as the terrestrial sun. So the sky
-    //   dome has to be reduced in brightness appropriately - but not in an
-    //   uniform fashion across wavebands. If we did that, the sky colour would
-    //   be wrong.
-
-    for (unsigned int i = 0; i < 11; i++)
-    {
-        state->emission_correction_factor_sky[i] =
-            solar_intensity * state->emission_correction_factor_sun[i] / ratio;
     }
 
     return state;
@@ -507,7 +356,7 @@ double arhosekskymodel_radiance(
     double interp = fmod((wavelength - 320.0) / 40.0, 1.0);
 
     double val_low = ArHosekSkyModel_GetRadianceInternal(state->configs[low_wl], theta, gamma) *
-                     state->radiances[low_wl] * state->emission_correction_factor_sky[low_wl];
+                     state->radiances[low_wl];
 
     if (interp < 1e-6)
         return val_low;
@@ -518,7 +367,7 @@ double arhosekskymodel_radiance(
     {
         result += interp *
                   ArHosekSkyModel_GetRadianceInternal(state->configs[low_wl + 1], theta, gamma) *
-                  state->radiances[low_wl + 1] * state->emission_correction_factor_sky[low_wl + 1];
+                  state->radiances[low_wl + 1];
     }
 
     return result;
@@ -587,11 +436,7 @@ double arhosek_tristim_skymodel_radiance(
 const int pieces = 45;
 const int order = 4;
 
-double arhosekskymodel_sr_internal(
-    ArHosekSkyModelState* state,
-    int                   turbidity,
-    int                   wl,
-    double                elevation)
+double arhosekskymodel_sr_internal(int turbidity, int wl, double elevation)
 {
     int pos = (int)(pow(2.0 * elevation / MATH_PI, 1.0 / 3.0) * pieces); // floor
 
@@ -612,7 +457,7 @@ double arhosekskymodel_sr_internal(
         x_exp *= x;
     }
 
-    return res * state->emission_correction_factor_sun[wl];
+    return res;
 }
 
 double arhosekskymodel_solar_radiance_internal2(

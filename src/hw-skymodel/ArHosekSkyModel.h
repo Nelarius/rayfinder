@@ -316,19 +316,6 @@ typedef double ArHosekSkyModelConfiguration[9];
     structs is via the functions 'arhosekskymodelstate_alloc_init' and
     'arhosekskymodelstate_free'.
 
-    'emission_correction_factor_sky'
-    'emission_correction_factor_sun'
-
-        The original model coefficients were fitted against the emission of
-        our local sun. If a different solar emission is desired (i.e. if the
-        model is being used to predict skydome appearance for an earth-like
-        planet that orbits a different star), these correction factors, which
-        are determined during the alloc_init step, are applied to each waveband
-        separately (they default to 1.0 in normal usage). This is the simplest
-        way to retrofit this sort of capability to the existing model. The
-        different factors for sky and sun are needed since the solar disc may
-        be of a different size compared to the terrestrial sun.
-
 ---------------------------------------------------------------------------- */
 
 typedef struct ArHosekSkyModelState
@@ -337,8 +324,6 @@ typedef struct ArHosekSkyModelState
     double                       radiances[11];
     double                       turbidity;
     double                       solar_radius;
-    double                       emission_correction_factor_sky[11];
-    double                       emission_correction_factor_sun[11];
     double                       albedo;
     double                       elevation;
 } ArHosekSkyModelState;
