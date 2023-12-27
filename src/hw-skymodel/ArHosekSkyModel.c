@@ -342,7 +342,74 @@ ArHosekSkyModelState* arhosekskymodelstate_alloc_init(
 
 void arhosekskymodelstate_free(ArHosekSkyModelState* state) { free(state); }
 
-double arhosekskymodel_radiance(
+const int pieces = 45;
+const int order = 4;
+
+double arhosekskymodel_sr_internal(int turbidity, int wl, double solar_disk_radius)
+{
+    int pos = (int)(pow((1.0 - solar_disk_radius), 1.0 / 3.0) * pieces); // floor
+
+    if (pos > 44)
+        pos = 44;
+
+    const double break_x = pow(((double)pos / (double)pieces), 3.0) * (MATH_PI * 0.5);
+
+    const double* coefs = solarDatasets[wl] + (order * pieces * turbidity + order * (pos + 1) - 1);
+
+    double       res = 0.0;
+    const double elevation = 0.5 * MATH_PI * (1.0 - solar_disk_radius);
+    const double x = elevation - break_x;
+    double       x_exp = 1.0;
+
+    for (int i = 0; i < order; ++i)
+    {
+        res += x_exp * (*(coefs--));
+        x_exp *= x;
+    }
+
+    return res;
+}
+
+double arhosekskymodel_solar_disk_radiance(
+    ArHosekSkyModelState* state,
+    double                solar_disk_radius,
+    double                wavelength)
+{
+    assert(
+        wavelength >= 320.0 && wavelength <= 720.0 && state->turbidity >= 1.0 &&
+        state->turbidity <= 10.0);
+
+    int    turb_low = (int)state->turbidity - 1;
+    double turb_frac = state->turbidity - (double)(turb_low + 1);
+
+    if (turb_low == 9)
+    {
+        turb_low = 8;
+        turb_frac = 1.0;
+    }
+
+    int    wl_low = (int)((wavelength - 320.0) / 40.0);
+    double wl_frac = fmod(wavelength, 40.0) / 40.0;
+
+    if (wl_low == 10)
+    {
+        wl_low = 9;
+        wl_frac = 1.0;
+    }
+
+    double direct_radiance =
+        (1.0 - turb_frac) *
+            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(turb_low, wl_low, solar_disk_radius) +
+             wl_frac * arhosekskymodel_sr_internal(turb_low, wl_low + 1, solar_disk_radius)) +
+        turb_frac *
+            ((1.0 - wl_frac) *
+                 arhosekskymodel_sr_internal(turb_low + 1, wl_low, solar_disk_radius) +
+             wl_frac * arhosekskymodel_sr_internal(turb_low + 1, wl_low + 1, solar_disk_radius));
+
+    return direct_radiance;
+}
+
+double arhosekskymodel_skydome_radiance(
     ArHosekSkyModelState* state,
     double                theta,
     double                gamma,
@@ -371,6 +438,24 @@ double arhosekskymodel_radiance(
     }
 
     return result;
+}
+
+double arhosekskymodel_radiance(
+    ArHosekSkyModelState* state,
+    double                theta,
+    double                gamma,
+    double                wavelength)
+{
+    const double solar_disk_radius = gamma / TERRESTRIAL_SOLAR_RADIUS;
+    const double solar_radiance =
+        gamma < TERRESTRIAL_SOLAR_RADIUS
+            ? arhosekskymodel_solar_disk_radiance(state, solar_disk_radius, wavelength)
+            : 0.0;
+
+    const double inscattered_radiance =
+        arhosekskymodel_skydome_radiance(state, theta, gamma, wavelength);
+
+    return solar_radiance + inscattered_radiance;
 }
 
 // xyz and rgb versions
@@ -431,97 +516,4 @@ double arhosek_tristim_skymodel_radiance(
 {
     return ArHosekSkyModel_GetRadianceInternal(state->configs[channel], theta, gamma) *
            state->radiances[channel];
-}
-
-const int pieces = 45;
-const int order = 4;
-
-double arhosekskymodel_sr_internal(int turbidity, int wl, double solar_disk_radius)
-{
-    int pos = (int)(pow((1.0 - solar_disk_radius), 1.0 / 3.0) * pieces); // floor
-
-    if (pos > 44)
-        pos = 44;
-
-    const double break_x = pow(((double)pos / (double)pieces), 3.0) * (MATH_PI * 0.5);
-
-    const double* coefs = solarDatasets[wl] + (order * pieces * turbidity + order * (pos + 1) - 1);
-
-    double       res = 0.0;
-    const double elevation = 0.5 * MATH_PI * (1.0 - solar_disk_radius);
-    const double x = elevation - break_x;
-    double       x_exp = 1.0;
-
-    for (int i = 0; i < order; ++i)
-    {
-        res += x_exp * (*(coefs--));
-        x_exp *= x;
-    }
-
-    return res;
-}
-
-double arhosekskymodel_solar_radiance_internal2(
-    ArHosekSkyModelState* state,
-    double                wavelength,
-    double                solar_disk_radius)
-{
-    assert(
-        wavelength >= 320.0 && wavelength <= 720.0 && state->turbidity >= 1.0 &&
-        state->turbidity <= 10.0);
-
-    int    turb_low = (int)state->turbidity - 1;
-    double turb_frac = state->turbidity - (double)(turb_low + 1);
-
-    if (turb_low == 9)
-    {
-        turb_low = 8;
-        turb_frac = 1.0;
-    }
-
-    int    wl_low = (int)((wavelength - 320.0) / 40.0);
-    double wl_frac = fmod(wavelength, 40.0) / 40.0;
-
-    if (wl_low == 10)
-    {
-        wl_low = 9;
-        wl_frac = 1.0;
-    }
-
-    double direct_radiance =
-        (1.0 - turb_frac) *
-            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(turb_low, wl_low, solar_disk_radius) +
-             wl_frac * arhosekskymodel_sr_internal(turb_low, wl_low + 1, solar_disk_radius)) +
-        turb_frac *
-            ((1.0 - wl_frac) *
-                 arhosekskymodel_sr_internal(turb_low + 1, wl_low, solar_disk_radius) +
-             wl_frac * arhosekskymodel_sr_internal(turb_low + 1, wl_low + 1, solar_disk_radius));
-
-    return direct_radiance;
-}
-
-double arhosekskymodel_solar_radiance(
-    ArHosekSkyModelState* state,
-    double                theta,
-    double                gamma,
-    double                wavelength)
-{
-    const double solar_disk_radius = gamma / TERRESTRIAL_SOLAR_RADIUS;
-    const double solar_radiance =
-        gamma < TERRESTRIAL_SOLAR_RADIUS
-            ? arhosekskymodel_solar_radiance_internal2(state, wavelength, solar_disk_radius)
-            : 0.0;
-
-    const double inscattered_radiance = arhosekskymodel_radiance(state, theta, gamma, wavelength);
-
-    return solar_radiance + inscattered_radiance;
-}
-
-double arhosekskymodel_direct_solar_radiance(
-    ArHosekSkyModelState* state,
-    double                solar_disk_radius,
-    double                wavelength)
-{
-    // TODO: pass through function
-    return arhosekskymodel_solar_radiance_internal2(state, wavelength, solar_disk_radius);
 }

@@ -112,18 +112,20 @@ int main()
                 // rule: https://en.wikipedia.org/wiki/Trapezoidal_rule#Uniform_grid
 
 #if 1
+                const double           exposure = 0.1;
                 std::array<double, 11> radiances = {};
                 for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
                 {
                     radiances[idx] =
-                        arhosekskymodel_solar_radiance(skyState, theta, gamma, wavelengths[idx]);
+                        arhosekskymodel_radiance(skyState, theta, gamma, wavelengths[idx]);
                 }
 #else
+                const double           exposure = 0.000001;
                 std::array<double, 11> radiances = {};
                 const double           solarDiskRadius = theta / PI_2;
                 for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
                 {
-                    radiances[idx] = arhosekskymodel_direct_solar_radiance(
+                    radiances[idx] = arhosekskymodel_solar_disk_radiance(
                         skyState, solarDiskRadius, wavelengths[idx]);
                 }
 #endif
@@ -158,7 +160,7 @@ int main()
                 zradiance *= deltaWl;
 
                 const glm::dvec3 radiance = xyzToSrgb * glm::dvec3(xradiance, yradiance, zradiance);
-                const glm::dvec3 color = expose(radiance, 0.1);
+                const glm::dvec3 color = expose(radiance, exposure);
                 rgba = glm::dvec4(color, 1.0);
             }
 

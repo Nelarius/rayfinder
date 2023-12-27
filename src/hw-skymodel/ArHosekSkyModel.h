@@ -380,7 +380,22 @@ ArHosekSkyModelState* arhosekskymodelstate_alienworld_alloc_init(
 
 void arhosekskymodelstate_free(ArHosekSkyModelState* state);
 
+// The complete model: sky dome + solar disk radiance.
 double arhosekskymodel_radiance(
+    ArHosekSkyModelState* state,
+    double                theta,
+    double                gamma,
+    double                wavelength);
+
+// The solar disk model.
+// solar_disk_radiance is in  [0, 1]. 0 is the center of the disk, and 1 is the edge.
+double arhosekskymodel_solar_disk_radiance(
+    ArHosekSkyModelState* state,
+    double                solar_disk_radius,
+    double                wavelength);
+
+// The sky dome model.
+double arhosekskymodel_skydome_radiance(
     ArHosekSkyModelState* state,
     double                theta,
     double                gamma,
@@ -403,20 +418,5 @@ double arhosek_tristim_skymodel_radiance(
     double                theta,
     double                gamma,
     int                   channel);
-
-//   Delivers the complete function: sky + sun, including limb darkening.
-//   Please read the above description before using this - there are several
-//   caveats!
-
-double arhosekskymodel_solar_radiance(
-    ArHosekSkyModelState* state,
-    double                theta,
-    double                gamma,
-    double                wavelength);
-
-double arhosekskymodel_direct_solar_radiance(
-    ArHosekSkyModelState* state,
-    double                theta,
-    double                wavelength);
 
 #endif // _ARHOSEK_SKYMODEL_H_
