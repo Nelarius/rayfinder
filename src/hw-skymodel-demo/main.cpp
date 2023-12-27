@@ -22,6 +22,44 @@ static glm::dvec3 expose(const glm::dvec3& x, const double exposure)
     return glm::dvec3(2.0) / (glm::dvec3(1.0) + glm::exp(-exposure * x)) - glm::dvec3(1.0);
 }
 
+// Source: https://jcgt.org/published/0002/02/01/
+// Simple Analytic Approximations to the CIE XYZ Color Matching Functions
+// Multi-lobe gaussian fit to the CIE 1931 color matching functions.
+static double cie_1931_x(const double wave)
+{
+    const double t1 = (wave - 442.0) * ((wave < 442.0) ? 0.0624 : 0.0374);
+    const double t2 = (wave - 599.8) * ((wave < 599.8) ? 0.0264 : 0.0323);
+    const double t3 = (wave - 501.1) * ((wave < 501.1) ? 0.0490 : 0.0382);
+    return 0.362 * std::exp(-0.5 * t1 * t1) + 1.056 * std::exp(-0.5 * t2 * t2) -
+           0.065 * expf(-0.5 * t3 * t3);
+}
+
+static double cie_1931_y(const double wave)
+{
+    const double t1 = (wave - 568.8) * ((wave < 568.8) ? 0.0213 : 0.0247);
+    const double t2 = (wave - 530.9) * ((wave < 530.9) ? 0.0613 : 0.0322);
+    return 0.821 * std::exp(-0.5 * t1 * t1) + 0.286 * std::exp(-0.5 * t2 * t2);
+}
+
+static double cie_1931_z(const double wave)
+{
+    const double t1 = (wave - 437.0) * ((wave < 437.0) ? 0.0845 : 0.0278);
+    const double t2 = (wave - 459.0) * ((wave < 459.0) ? 0.0385 : 0.0725);
+    return 1.217 * std::exp(-0.5 * t1 * t1) + 0.681 * std::exp(-0.5 * t2 * t2);
+}
+
+constexpr std::array<double, 11> wavelengths =
+    {320.0, 360.0, 400.0, 440.0, 480.0, 520.0, 560.0, 600.0, 640.0, 680.0, 720.0};
+
+// Source: http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html
+constexpr glm::dmat3x3 xyzToSrgb(
+    // clang-format off
+        3.2404542, -0.9692660, 0.0556434,
+        -1.5371385, 1.8760108, -0.2040259,
+        -0.4985314, 0.0415560, 1.0572252
+    // clang-format on
+);
+
 int main()
 {
     const double     sunZenith = 30.0 * DEGREES_TO_RADIANS;
@@ -33,13 +71,9 @@ int main()
 
     const double solarElevation = 0.5 * PI - sunZenith;
     const double turbidity = 1.0;
-    const double albedoR = 1.0;
-    const double albedoG = 1.0;
-    const double albedoB = 1.0;
+    const double albedo = 1.0;
 
-    auto* skyStateR = arhosek_rgb_skymodelstate_alloc_init(solarElevation, turbidity, albedoR);
-    auto* skyStateG = arhosek_rgb_skymodelstate_alloc_init(solarElevation, turbidity, albedoG);
-    auto* skyStateB = arhosek_rgb_skymodelstate_alloc_init(solarElevation, turbidity, albedoB);
+    auto* skyState = arhosekskymodelstate_alloc_init(solarElevation, turbidity, albedo);
 
     std::vector<std::uint32_t> pixelData;
     pixelData.reserve(static_cast<std::size_t>(WIDTH * HEIGHT));
@@ -68,15 +102,52 @@ int main()
                 const glm::dvec3 s = sunDirection;
 
                 // Compute the sky radiance.
-                const double     theta = std::acos(v.y);
-                const double     gamma = std::acos(std::clamp(glm::dot(v, s), -1.0, 1.0));
-                const glm::dvec3 radiance = glm::dvec3(
-                    arhosek_tristim_skymodel_radiance(skyStateR, theta, gamma, 0),
-                    arhosek_tristim_skymodel_radiance(skyStateG, theta, gamma, 1),
-                    arhosek_tristim_skymodel_radiance(skyStateB, theta, gamma, 2));
 
+                const double theta = std::acos(v.y);
+                const double gamma = std::acos(std::clamp(glm::dot(v, s), -1.0, 1.0));
+
+                // Integrate XYZ tristimulus values over the visible spectrum using the Trapezoidal
+                // rule: https://en.wikipedia.org/wiki/Trapezoidal_rule#Uniform_grid
+
+                std::array<double, 11> radiances = {};
+                for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
+                {
+                    radiances[idx] =
+                        arhosekskymodel_radiance(skyState, theta, gamma, wavelengths[idx]);
+                }
+
+                constexpr std::size_t backIdx = wavelengths.size() - 1;
+                constexpr double      deltaWl = (wavelengths[backIdx] - wavelengths[0]) /
+                                           static_cast<double>(wavelengths.size());
+
+                assert(wavelengths.size() == radiances.size());
+                double xradiance = 0.5 * (cie_1931_x(wavelengths[0]) * radiances[0] +
+                                          cie_1931_x(wavelengths[backIdx]) * radiances[backIdx]);
+                for (std::size_t idx = 1; idx < backIdx; ++idx)
+                {
+                    xradiance += cie_1931_x(wavelengths[idx]) * radiances[idx];
+                }
+                xradiance *= deltaWl;
+
+                double yradiance = 0.5 * (cie_1931_y(wavelengths[0]) * radiances[0] +
+                                          cie_1931_y(wavelengths[backIdx]) * radiances[backIdx]);
+                for (std::size_t idx = 1; idx < backIdx; ++idx)
+                {
+                    yradiance += cie_1931_y(wavelengths[idx]) * radiances[idx];
+                }
+                yradiance *= deltaWl;
+
+                double zradiance = 0.5 * (cie_1931_z(wavelengths[0]) * radiances[0] +
+                                          cie_1931_z(wavelengths[backIdx]) * radiances[backIdx]);
+                for (std::size_t idx = 1; idx < backIdx; ++idx)
+                {
+                    zradiance += cie_1931_z(wavelengths[idx]) * radiances[idx];
+                }
+                zradiance *= deltaWl;
+
+                const glm::dvec3 radiance = xyzToSrgb * glm::dvec3(xradiance, yradiance, zradiance);
                 const glm::dvec3 color = expose(radiance, 0.1);
-                rgba = glm::dvec4(color, 1.0f);
+                rgba = glm::dvec4(color, 1.0);
             }
 
             const auto r = static_cast<std::uint32_t>(std::min(rgba.r, 1.0) * 255.0);
@@ -88,6 +159,8 @@ int main()
             pixelData.push_back(pixel);
         }
     }
+
+    arhosekskymodelstate_free(skyState);
 
     const int numChannels = 4;
     const int strideBytes = WIDTH * numChannels;
