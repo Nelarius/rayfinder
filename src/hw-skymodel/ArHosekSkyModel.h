@@ -342,42 +342,6 @@ ArHosekSkyModelState* arhosekskymodelstate_alloc_init(
     const double atmospheric_turbidity,
     const double ground_albedo);
 
-/* ----------------------------------------------------------------------------
-
-    arhosekskymodelstate_alienworld_alloc_init() function
-    -----------------------------------------------------
-
-    Initialises an ArHosekSkyModelState struct for an "alien world" setting
-    with a sun of a surface temperature given in 'kelvin'. The parameter
-    'solar_intensity' controls the overall brightness of the sky, relative
-    to the solar irradiance on Earth. A value of 1.0 yields a sky dome that
-    is, on average over the wavelenghts covered in the model (!), as bright
-    as the terrestrial sky in radiometric terms.
-
-    Which means that the solar radius has to be adjusted, since the
-    emissivity of a solar surface with a given temperature is more or less
-    fixed. So hotter suns have to be smaller to be equally bright as the
-    terrestrial sun, while cooler suns have to be larger. Note that there are
-    limits to the validity of the luminance patterns of the underlying model:
-    see the discussion above for more on this. In particular, an alien sun with
-    a surface temperature of only 2000 Kelvin has to be very large if it is
-    to be as bright as the terrestrial sun - so large that the luminance
-    patterns are no longer a really good fit in that case.
-
-    If you need information about the solar radius that the model computes
-    for a given temperature (say, for light source sampling purposes), you
-    have to query the 'solar_radius' variable of the sky model state returned
-    *after* running this function.
-
----------------------------------------------------------------------------- */
-
-ArHosekSkyModelState* arhosekskymodelstate_alienworld_alloc_init(
-    const double solar_elevation,
-    const double solar_intensity,
-    const double solar_surface_temperature_kelvin,
-    const double atmospheric_turbidity,
-    const double ground_albedo);
-
 void arhosekskymodelstate_free(ArHosekSkyModelState* state);
 
 // The complete model: sky dome + solar disk radiance.
