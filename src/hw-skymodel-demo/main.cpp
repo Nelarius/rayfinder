@@ -12,6 +12,7 @@ extern "C" {
 #include <vector>
 
 inline constexpr double PI = std::numbers::pi_v<double>;
+inline constexpr double PI_2 = PI / 2.0;
 inline constexpr double DEGREES_TO_RADIANS = PI / 180.0;
 
 inline constexpr int WIDTH = 720;
@@ -102,7 +103,7 @@ int main()
                 const glm::dvec3 s = sunDirection;
 
                 // Compute the sky radiance.
-                
+
                 [[maybe_unused]] const double theta = std::acos(v.y);
                 [[maybe_unused]] const double gamma =
                     std::acos(std::clamp(glm::dot(v, s), -1.0, 1.0));
@@ -110,12 +111,22 @@ int main()
                 // Integrate XYZ tristimulus values over the visible spectrum using the Trapezoidal
                 // rule: https://en.wikipedia.org/wiki/Trapezoidal_rule#Uniform_grid
 
+#if 1
                 std::array<double, 11> radiances = {};
                 for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
                 {
                     radiances[idx] =
-                        arhosekskymodel_direct_solar_radiance(skyState, theta, wavelengths[idx]);
+                        arhosekskymodel_solar_radiance(skyState, theta, gamma, wavelengths[idx]);
                 }
+#else
+                std::array<double, 11> radiances = {};
+                const double           solarDiskRadius = theta / PI_2;
+                for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
+                {
+                    radiances[idx] = arhosekskymodel_direct_solar_radiance(
+                        skyState, solarDiskRadius, wavelengths[idx]);
+                }
+#endif
 
                 constexpr std::size_t backIdx = wavelengths.size() - 1;
                 constexpr double      deltaWl = (wavelengths[backIdx] - wavelengths[0]) /
@@ -147,7 +158,7 @@ int main()
                 zradiance *= deltaWl;
 
                 const glm::dvec3 radiance = xyzToSrgb * glm::dvec3(xradiance, yradiance, zradiance);
-                const glm::dvec3 color = expose(radiance, 0.000001);
+                const glm::dvec3 color = expose(radiance, 0.1);
                 rgba = glm::dvec4(color, 1.0);
             }
 

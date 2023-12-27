@@ -436,9 +436,9 @@ double arhosek_tristim_skymodel_radiance(
 const int pieces = 45;
 const int order = 4;
 
-double arhosekskymodel_sr_internal(int turbidity, int wl, double view_elevation)
+double arhosekskymodel_sr_internal(int turbidity, int wl, double solar_disk_radius)
 {
-    int pos = (int)(pow(2.0 * view_elevation / MATH_PI, 1.0 / 3.0) * pieces); // floor
+    int pos = (int)(pow((1.0 - solar_disk_radius), 1.0 / 3.0) * pieces); // floor
 
     if (pos > 44)
         pos = 44;
@@ -448,7 +448,8 @@ double arhosekskymodel_sr_internal(int turbidity, int wl, double view_elevation)
     const double* coefs = solarDatasets[wl] + (order * pieces * turbidity + order * (pos + 1) - 1);
 
     double       res = 0.0;
-    const double x = view_elevation - break_x;
+    const double elevation = 0.5 * MATH_PI * (1.0 - solar_disk_radius);
+    const double x = elevation - break_x;
     double       x_exp = 1.0;
 
     for (int i = 0; i < order; ++i)
@@ -463,7 +464,7 @@ double arhosekskymodel_sr_internal(int turbidity, int wl, double view_elevation)
 double arhosekskymodel_solar_radiance_internal2(
     ArHosekSkyModelState* state,
     double                wavelength,
-    double                view_elevation)
+    double                solar_disk_radius)
 {
     assert(
         wavelength >= 320.0 && wavelength <= 720.0 && state->turbidity >= 1.0 &&
@@ -489,11 +490,12 @@ double arhosekskymodel_solar_radiance_internal2(
 
     double direct_radiance =
         (1.0 - turb_frac) *
-            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(turb_low, wl_low, view_elevation) +
-             wl_frac * arhosekskymodel_sr_internal(turb_low, wl_low + 1, view_elevation)) +
+            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(turb_low, wl_low, solar_disk_radius) +
+             wl_frac * arhosekskymodel_sr_internal(turb_low, wl_low + 1, solar_disk_radius)) +
         turb_frac *
-            ((1.0 - wl_frac) * arhosekskymodel_sr_internal(turb_low + 1, wl_low, view_elevation) +
-             wl_frac * arhosekskymodel_sr_internal(turb_low + 1, wl_low + 1, view_elevation));
+            ((1.0 - wl_frac) *
+                 arhosekskymodel_sr_internal(turb_low + 1, wl_low, solar_disk_radius) +
+             wl_frac * arhosekskymodel_sr_internal(turb_low + 1, wl_low + 1, solar_disk_radius));
 
     return direct_radiance;
 }
@@ -504,19 +506,22 @@ double arhosekskymodel_solar_radiance(
     double                gamma,
     double                wavelength)
 {
-    double direct_radiance =
-        arhosekskymodel_solar_radiance_internal2(state, wavelength, ((MATH_PI / 2.0) - theta));
+    const double solar_disk_radius = gamma / TERRESTRIAL_SOLAR_RADIUS;
+    const double solar_radiance =
+        gamma < TERRESTRIAL_SOLAR_RADIUS
+            ? arhosekskymodel_solar_radiance_internal2(state, wavelength, solar_disk_radius)
+            : 0.0;
 
-    double inscattered_radiance = arhosekskymodel_radiance(state, theta, gamma, wavelength);
+    const double inscattered_radiance = arhosekskymodel_radiance(state, theta, gamma, wavelength);
 
-    return direct_radiance + inscattered_radiance;
+    return solar_radiance + inscattered_radiance;
 }
 
 double arhosekskymodel_direct_solar_radiance(
     ArHosekSkyModelState* state,
-    double                theta,
+    double                solar_disk_radius,
     double                wavelength)
 {
-    const double view_elevation = (MATH_PI / 2.0) - theta;
-    return arhosekskymodel_solar_radiance_internal2(state, wavelength, view_elevation);
+    // TODO: pass through function
+    return arhosekskymodel_solar_radiance_internal2(state, wavelength, solar_disk_radius);
 }
