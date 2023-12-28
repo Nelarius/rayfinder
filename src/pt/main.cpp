@@ -114,7 +114,7 @@ int main(int argc, char** argv)
             float                skyTurbidity = 1.0f;
             std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
             // tonemapping
-            int exposureStops = 4;
+            int exposureStops = 3;
             int tonemapFn = 1;
             // timestep
             auto lastTime = std::chrono::steady_clock::now();
@@ -182,11 +182,11 @@ int main(int argc, char** argv)
 
                     ImGui::Text("num bounces:");
                     ImGui::SameLine();
+                    ImGui::RadioButton("2", &numBounces, 2);
+                    ImGui::SameLine();
                     ImGui::RadioButton("4", &numBounces, 4);
                     ImGui::SameLine();
                     ImGui::RadioButton("8", &numBounces, 8);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("16", &numBounces, 16);
 
                     ImGui::SliderFloat("sun zenith", &sunZenithDegrees, 0.0f, 90.0f, "%.2f");
                     ImGui::SliderFloat("sun azimuth", &sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
