@@ -120,13 +120,13 @@ int main()
                         arhosekskymodel_radiance(skyState, theta, gamma, wavelengths[idx]);
                 }
 #else
-                const double           exposure = 0.000001;
+                const double           exposure = 0.000002;
                 std::array<double, 11> radiances = {};
                 const double           solarDiskRadius = theta / PI_2;
                 for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
                 {
                     radiances[idx] = arhosekskymodel_solar_disk_radiance(
-                        skyState, solarDiskRadius, wavelengths[idx]);
+                        skyState, gamma, solarDiskRadius, wavelengths[idx]);
                 }
 #endif
 

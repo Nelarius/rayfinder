@@ -372,6 +372,7 @@ double arhosekskymodel_sr_internal(int turbidity, int wl, double solar_disk_radi
 
 double arhosekskymodel_solar_disk_radiance(
     ArHosekSkyModelState* state,
+    double                gamma,
     double                solar_disk_radius,
     double                wavelength)
 {
@@ -405,6 +406,35 @@ double arhosekskymodel_solar_disk_radiance(
             ((1.0 - wl_frac) *
                  arhosekskymodel_sr_internal(turb_low + 1, wl_low, solar_disk_radius) +
              wl_frac * arhosekskymodel_sr_internal(turb_low + 1, wl_low + 1, solar_disk_radius));
+
+    double ldCoefficient[6];
+
+    for (int i = 0; i < 6; i++)
+        ldCoefficient[i] = (1.0 - wl_frac) * limbDarkeningDatasets[wl_low][i] +
+                           wl_frac * limbDarkeningDatasets[wl_low + 1][i];
+
+    // sun distance to diameter ratio, squared
+
+    const double sol_rad_sin = sin(state->solar_radius);
+    const double ar2 = 1 / (sol_rad_sin * sol_rad_sin);
+    const double singamma = sin(gamma);
+    const double sc2 = fmax(0.0, 1.0 - ar2 * singamma * singamma);
+    const double sampleCosine = sqrt(sc2);
+
+    //   The following will be improved in future versions of the model:
+    //   here, we directly use fitted 5th order polynomials provided by the
+    //   astronomical community for the limb darkening effect. Astronomers need
+    //   such accurate fittings for their predictions. However, this sort of
+    //   accuracy is not really needed for CG purposes, so an approximated
+    //   dataset based on quadratic polynomials will be provided in a future
+    //   release.
+
+    const double darkeningFactor =
+        ldCoefficient[0] + ldCoefficient[1] * sampleCosine +
+        ldCoefficient[2] * pow(sampleCosine, 2.0) + ldCoefficient[3] * pow(sampleCosine, 3.0) +
+        ldCoefficient[4] * pow(sampleCosine, 4.0) + ldCoefficient[5] * pow(sampleCosine, 5.0);
+
+    direct_radiance *= darkeningFactor;
 
     return direct_radiance;
 }
@@ -449,7 +479,7 @@ double arhosekskymodel_radiance(
     const double solar_disk_radius = gamma / TERRESTRIAL_SOLAR_RADIUS;
     const double solar_radiance =
         gamma < TERRESTRIAL_SOLAR_RADIUS
-            ? arhosekskymodel_solar_disk_radiance(state, solar_disk_radius, wavelength)
+            ? arhosekskymodel_solar_disk_radiance(state, gamma, solar_disk_radius, wavelength)
             : 0.0;
 
     const double inscattered_radiance =

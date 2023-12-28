@@ -101,8 +101,6 @@ This file contains the coefficient data for the spectral version of the model.
 
 // uses Apr 26 dataset
 
-// clang-format off
-
 double dataset320[] = 
 {
 	// albedo 0, turbidity 1
@@ -33721,4 +33719,52 @@ double* solarDatasets[] =
 	solarDataset720
 };
 
-// clang-format on
+double limbDarkeningDataset320[] =
+{ 0.087657, 0.767174, 0.658123, -1.02953, 0.703297, -0.186735 };
+
+double limbDarkeningDataset360[] =
+{ 0.122953, 1.01278, 0.238687, -1.12208, 1.17087, -0.424947 };
+
+double limbDarkeningDataset400[] =
+{ 0.123511, 1.08444, -0.405598, 0.370629, -0.240567, 0.0674778 };
+
+double limbDarkeningDataset440[] =
+{ 0.158489, 1.23346, -0.875754, 0.857812, -0.484919, 0.110895 };
+
+double limbDarkeningDataset480[] =
+{ 0.198587, 1.30507, -1.25998, 1.49727, -1.04047, 0.299516 };
+
+double limbDarkeningDataset520[] =
+{ 0.23695, 1.29927, -1.28034, 1.37760, -0.85054, 0.21706 };
+
+double limbDarkeningDataset560[] =
+{ 0.26892, 1.34319, -1.58427, 1.91271, -1.31350, 0.37295 };
+
+double limbDarkeningDataset600[] =
+{ 0.299804, 1.36718, -1.80884, 2.29294, -1.60595, 0.454874 };
+
+double limbDarkeningDataset640[] =
+{ 0.33551, 1.30791, -1.79382, 2.44646, -1.89082, 0.594769 };
+
+double limbDarkeningDataset680[] =
+{ 0.364007, 1.27316, -1.73824, 2.28535, -1.70203, 0.517758 };
+
+double limbDarkeningDataset720[] =
+{ 0.389704, 1.2448, -1.69708, 2.14061, -1.51803, 0.440004 };
+
+double * limbDarkeningDatasets[] =
+{
+	limbDarkeningDataset320,
+	limbDarkeningDataset360,
+	limbDarkeningDataset400,
+	limbDarkeningDataset440,
+	limbDarkeningDataset480,
+	limbDarkeningDataset520,
+	limbDarkeningDataset560,
+	limbDarkeningDataset600,
+	limbDarkeningDataset640,
+	limbDarkeningDataset680,
+	limbDarkeningDataset720
+};
+
+

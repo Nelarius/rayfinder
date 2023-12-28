@@ -355,6 +355,7 @@ double arhosekskymodel_radiance(
 // solar_disk_radiance is in  [0, 1]. 0 is the center of the disk, and 1 is the edge.
 double arhosekskymodel_solar_disk_radiance(
     ArHosekSkyModelState* state,
+    double                gamma,
     double                solar_disk_radius,
     double                wavelength);
 
