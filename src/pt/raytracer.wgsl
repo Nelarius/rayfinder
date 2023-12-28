@@ -91,6 +91,12 @@ const CHANNEL_R = 0u;
 const CHANNEL_G = 1u;
 const CHANNEL_B = 2u;
 
+const DEGREES_TO_RADIANS = PI / 180f;
+const TERRESTRIAL_SOLAR_RADIUS = 0.255f * DEGREES_TO_RADIANS;
+
+const SOLAR_COS_THETA_MAX = cos(TERRESTRIAL_SOLAR_RADIUS);
+const SOLAR_INV_PDF = 2f * PI * (1f - SOLAR_COS_THETA_MAX);
+
 struct RenderParams {
   frameData: FrameData,
   camera: Camera,
@@ -186,12 +192,26 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var radiance = vec3(0f);
     var throughput = vec3(1f);
 
+    var bounce = 1u;
     let numBounces = renderParams.samplingState.numBounces;
-    for (var bounces = 0u; bounces < numBounces; bounces += 1u) {
-        var intersection: Intersection;
-        if rayIntersectBvh(ray, T_MAX, &intersection) {
-            let p = intersection.p;
-            let scatter = evalImplicitLambertian(intersection, rngState);
+    loop {
+        var hit: Intersection;
+        if rayIntersectBvh(ray, T_MAX, &hit) {
+            let albedo = evalTexture(hit.textureDescriptorIdx, hit.uv);
+            let p = hit.p;
+
+            let lightDirection = sampleSolarDiskDirection(SOLAR_COS_THETA_MAX, skyState.sunDirection, rngState);
+            let lightIntensity = vec3f(1000000f, 1000000f, 1000000f);  // TODO: replace with more plausible solar intensity
+            let brdf = albedo * FRAC_1_PI;
+            let reflectance = brdf * dot(hit.n, lightDirection);
+            let lightVisibility = shadowRay(Ray(p, lightDirection), T_MAX);
+            radiance += throughput * lightIntensity * reflectance * lightVisibility * SOLAR_INV_PDF;
+
+            if bounce == numBounces {
+                break;
+            }
+
+            let scatter = evalImplicitLambertian(hit.n, albedo, rngState);
             ray = Ray(p, scatter.wi);
             throughput *= scatter.throughput;
         } else {
@@ -211,6 +231,8 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
 
             break;
         }
+
+        bounce += 1u;
     }
 
     return radiance;
@@ -276,16 +298,25 @@ fn acesFilmic(x: vec3f) -> vec3f {
     return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 
-fn evalImplicitLambertian(hit: Intersection, rngState: ptr<function, u32>) -> Scatter {
+@must_use
+fn sampleSolarDiskDirection(cosThetaMax: f32, direction: vec3f, state: ptr<function, u32>) -> vec3f {
+    let v = rngNextInCone(state, cosThetaMax);
+    let onb = pixarOnb(direction);
+    return onb * v;
+}
+
+@must_use
+fn evalImplicitLambertian(n: vec3f, albedo: vec3f, rngState: ptr<function, u32>) -> Scatter {
     let v = rngNextInCosineWeightedHemisphere(rngState);
-    let onb = pixarOnb(hit.n);
+    let onb = pixarOnb(n);
     let wi = onb * v;
 
-    let textureDesc = textureDescriptors[hit.textureDescriptorIdx];
-    let uv = hit.uv;
-    let albedo = textureLookup(textureDesc, uv);
-
     return Scatter(wi, albedo);
+}
+
+fn evalTexture(textureDescriptorIdx: u32, uv: vec2f) -> vec3f {
+    let textureDesc = textureDescriptors[textureDescriptorIdx];
+    return textureLookup(textureDesc, uv);
 }
 
 fn pixarOnb(n: vec3f) -> mat3x3f {
@@ -297,6 +328,55 @@ fn pixarOnb(n: vec3f) -> mat3x3f {
     let v = vec3(b, s + n.y * n.y * a, -n.y);
 
     return mat3x3(u, v, n);
+}
+
+// Returns 1.0 if no forward intersections, 0.0 otherwise.
+@must_use
+fn shadowRay(ray: Ray, rayTMax: f32) -> f32 {
+    let intersector = rayAabbIntersector(ray);
+    var toVisitOffset = 0u;
+    var currentNodeIdx = 0u;
+    var nodesToVisit: array<u32, 32u>;
+
+    loop {
+        let node: BvhNode = bvhNodes[currentNodeIdx];
+
+        if rayIntersectAabb(intersector, node.aabb, rayTMax) {
+            if node.triangleCount > 0u {
+                for (var idx = 0u; idx < node.triangleCount; idx = idx + 1u) {
+                    let triangle: Positions = positionAttributes[node.trianglesOffset + idx];
+                    // TODO: trihit not actually used. A different code path could be used?
+                    var trihit: TriangleHit;
+                    if rayIntersectTriangle(ray, triangle, rayTMax, &trihit) {
+                        return 0f;
+                    }
+                }
+                if toVisitOffset == 0u {
+                    break;
+                }
+                toVisitOffset -= 1u;
+                currentNodeIdx = nodesToVisit[toVisitOffset];
+            } else {
+                // Is intersector.invDir[node.splitAxis] < 0f? If so, visit second child first.
+                if intersector.dirNeg[node.splitAxis] == 1u {
+                    nodesToVisit[toVisitOffset] = currentNodeIdx + 1u;
+                    currentNodeIdx = node.secondChildOffset;
+                } else {
+                    nodesToVisit[toVisitOffset] = node.secondChildOffset;
+                    currentNodeIdx = currentNodeIdx + 1u;
+                }
+                toVisitOffset += 1u;
+            }
+        } else {
+            if toVisitOffset == 0u {
+                break;
+            }
+            toVisitOffset -= 1u;
+            currentNodeIdx = nodesToVisit[toVisitOffset];
+        }
+    }
+
+    return 1f;
 }
 
 fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
@@ -487,6 +567,22 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
 
     let rgba = textures[desc.offset + idx];
     return vec3f(f32(rgba & 0xffu), f32((rgba >> 8u) & 0xffu), f32((rgba >> 16u) & 0xffu)) / 255f;
+}
+
+@must_use
+fn rngNextInCone(state: ptr<function, u32>, cosThetaMax: f32) -> vec3f {
+    let u1 = rngNextFloat(state);
+    let u2 = rngNextFloat(state);
+
+    let cosTheta = 1f - u1 * (1f - cosThetaMax);
+    let sinTheta = sqrt(1f - cosTheta * cosTheta);
+    let phi = 2f * PI * u2;
+
+    let x = cos(phi) * sinTheta;
+    let y = sin(phi) * sinTheta;
+    let z = cosTheta;
+
+    return vec3(x, y, z);
 }
 
 @must_use
