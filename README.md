@@ -14,6 +14,7 @@ An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn
 - [scratchapixel/moller-trumbore-ray-triangle-intersection](https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection.html)
 - _The Reference Path Tracer_, _Ray Tracing Gems II_ and associated code sample [boksajak/referencePT](https://github.com/boksajak/referencePT/)
   - Rng initialization
+  - Next event estimation (direct light sampling) method
 - [Crash Course in BRDF implementation](https://boksajak.github.io/files/CrashCourseBRDF.pdf)
   - BRDF interface
   - Lambertian BRDF, `sampleLambertian`, `evalLambertian` 
@@ -21,6 +22,8 @@ An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn
   - Robust orthonormal axis, implemented in the `pixarOnb` function
 - _A Fast and Robust Method for Avoiding Self-Intersection_, _Ray Tracing Gems_
   - Method for the `offsetRay` function, for preventing ray self-intersections.
+- _Sampling Transformations Zoo_, _Ray Tracing Gems_
+  - The `rngNextInCone` method and source.
 - [ACES Filmic Tone Mapping Curve](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
   - filmic tonemapping function
 
