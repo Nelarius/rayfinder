@@ -187,6 +187,7 @@ struct Scatter {
     throughput: vec3f,
 }
 
+@must_use
 fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     var ray = primaryRay;
     var radiance = vec3(0f);
@@ -238,6 +239,7 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
     return radiance;
 }
 
+@must_use
 fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
     let origin = camera.origin;
     let direction = normalize(camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin);
@@ -314,11 +316,13 @@ fn evalImplicitLambertian(n: vec3f, albedo: vec3f, rngState: ptr<function, u32>)
     return Scatter(wi, albedo);
 }
 
+@must_use
 fn evalTexture(textureDescriptorIdx: u32, uv: vec2f) -> vec3f {
     let textureDesc = textureDescriptors[textureDescriptorIdx];
     return textureLookup(textureDesc, uv);
 }
 
+@must_use
 fn pixarOnb(n: vec3f) -> mat3x3f {
     // https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf
     let s = select(-1f, 1f, n.z >= 0f);
@@ -379,6 +383,7 @@ fn shadowRay(ray: Ray, rayTMax: f32) -> f32 {
     return 1f;
 }
 
+@must_use
 fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
     let intersector = rayAabbIntersector(ray);
     var toVisitOffset = 0u;
@@ -485,6 +490,7 @@ fn rayIntersectAabb(intersector: RayAabbIntersector, aabb: Aabb, rayTMax: f32) -
     return (tmin < rayTMax) && (tmax > 0.0);
 }
 
+@must_use
 fn rayIntersectTriangle(ray: Ray, tri: Positions, tmax: f32, hit: ptr<function, TriangleHit>) -> bool {
     // Mäller-Trumbore algorithm
     // https://en.wikipedia.org/wiki/Möller–Trumbore_intersection_algorithm
@@ -534,6 +540,7 @@ const ORIGIN = 1f / 32f;
 const FLOAT_SCALE = 1f / 65536f;
 const INT_SCALE = 256f;
 
+@must_use
 fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
     // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
@@ -545,9 +552,11 @@ fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
         bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
     );
 
-    return vec3f(select(po.x, p.x + FLOAT_SCALE * n.x, (abs(p.x) < ORIGIN)),
+    return vec3f(
+        select(po.x, p.x + FLOAT_SCALE * n.x, (abs(p.x) < ORIGIN)),
         select(po.y, p.y + FLOAT_SCALE * n.y, (abs(p.y) < ORIGIN)),
-        select(po.z, p.z + FLOAT_SCALE * n.z, (abs(p.z) < ORIGIN)));
+        select(po.z, p.z + FLOAT_SCALE * n.z, (abs(p.z) < ORIGIN))
+    );
 }
 
 struct TextureDescriptor {
