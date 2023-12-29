@@ -32,6 +32,10 @@ add_library(common ${COMMON_SOURCE_FILES})
 target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE_DIR} ${STB_INCLUDE_DIR})
 target_link_libraries(common PRIVATE glm::glm)
 
+# hosekwilkie-skylightmodel-source
+add_library(hosekwilkie-skylightmodel src/hosekwilkie-skylightmodel-source-1.4a/ArHosekSkyModel.c)
+target_include_directories(hosekwilkie-skylightmodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
 # hw-skymodel
 add_library(hw-skymodel src/hw-skymodel/hw_skymodel.c)
 target_include_directories(hw-skymodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
