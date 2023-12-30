@@ -2,6 +2,8 @@ extern "C" {
 #include <hosekwilkie-skylightmodel-source-1.4a/ArHosekSkyModel.h>
 }
 
+#include <common/assert.hpp>
+
 #include <glm/glm.hpp>
 #include <stb_image_write.h>
 
@@ -20,8 +22,8 @@ inline constexpr double PI = std::numbers::pi_v<double>;
 inline constexpr double PI_2 = PI / 2.0;
 inline constexpr double DEGREES_TO_RADIANS = PI / 180.0;
 
-inline constexpr int WIDTH = 720;
-inline constexpr int HEIGHT = 720;
+inline constexpr int WIDTH = 64;
+inline constexpr int HEIGHT = 64;
 
 static glm::dvec3 expose(const glm::dvec3& x, const double exposure)
 {
@@ -76,121 +78,173 @@ int main()
         -std::sin(sunZenith) * std::sin(sunAzimuth)));
 
     const double solarElevation = 0.5 * PI - sunZenith;
-    const double turbidity = 1.0;
     const double albedo = 1.0;
 
-    auto* skyState = arhosekskymodelstate_alloc_init(solarElevation, turbidity, albedo);
-
-    std::vector<std::uint32_t> pixelData;
-    pixelData.reserve(static_cast<std::size_t>(WIDTH * HEIGHT));
-
-    for (int i = 0; i < HEIGHT; ++i)
+    std::vector<ArHosekSkyModelState*> skyStates;
+    skyStates.reserve(10);
+    for (int i = 1; i <= 10; ++i)
     {
-        for (int j = 0; j < WIDTH; ++j)
-        {
-            const auto [x, y] = [](const int i, const int j) -> std::tuple<double, double> {
-                // coordinates in [0, 1]
-                const double u = static_cast<double>(j) / static_cast<double>(WIDTH);
-                const double v = static_cast<double>(i) / static_cast<double>(HEIGHT);
-
-                // coordinates in [-1, 1]
-                const double x = 2.0 * u - 1.0;
-                const double y = 1.0 - 2.0 * v; // flip y so that (left, top) is written first
-
-                return {x, y};
-            }(i, j);
-
-            const double radiusSqr = x * x + y * y;
-
-            glm::dvec4 rgba = glm::vec4(0.0);
-
-            if (radiusSqr < 1.0f)
-            {
-                // Pixel is inside the hemisphere, compute the ray direction.
-                const double     z = std::sqrt(1.0 - radiusSqr);
-                const glm::dvec3 v = glm::normalize(glm::vec3(x, z, -y));
-                const glm::dvec3 s = sunDirection;
-
-                // Compute the sky radiance.
-
-                [[maybe_unused]] const double theta = std::acos(v.y);
-                [[maybe_unused]] const double gamma =
-                    std::acos(std::clamp(glm::dot(v, s), -1.0, 1.0));
-
-                // Integrate XYZ tristimulus values over the visible spectrum using the Trapezoidal
-                // rule: https://en.wikipedia.org/wiki/Trapezoidal_rule#Uniform_grid
-
-#if 1
-                const double           exposure = 0.1;
-                std::array<double, 11> radiances = {};
-                for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
-                {
-                    radiances[idx] =
-                        arhosekskymodel_radiance(skyState, theta, gamma, wavelengths[idx]);
-                }
-#else
-                const double           exposure = 0.000002;
-                std::array<double, 11> radiances = {};
-                const double           solarDiskRadius = theta / PI_2;
-                for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
-                {
-                    radiances[idx] = arhosekskymodel_solar_disk_radiance(
-                        skyState, gamma, solarDiskRadius, wavelengths[idx]);
-                }
-#endif
-
-                constexpr std::size_t backIdx = wavelengths.size() - 1;
-                constexpr double      deltaWl = (wavelengths[backIdx] - wavelengths[0]) /
-                                           static_cast<double>(wavelengths.size());
-
-                assert(wavelengths.size() == radiances.size());
-                double xradiance = 0.5 * (cie1931X(wavelengths[0]) * radiances[0] +
-                                          cie1931X(wavelengths[backIdx]) * radiances[backIdx]);
-                for (std::size_t idx = 1; idx < backIdx; ++idx)
-                {
-                    xradiance += cie1931X(wavelengths[idx]) * radiances[idx];
-                }
-                xradiance *= deltaWl;
-
-                double yradiance = 0.5 * (cie1931Y(wavelengths[0]) * radiances[0] +
-                                          cie1931Y(wavelengths[backIdx]) * radiances[backIdx]);
-                for (std::size_t idx = 1; idx < backIdx; ++idx)
-                {
-                    yradiance += cie1931Y(wavelengths[idx]) * radiances[idx];
-                }
-                yradiance *= deltaWl;
-
-                double zradiance = 0.5 * (cie1931Z(wavelengths[0]) * radiances[0] +
-                                          cie1931Z(wavelengths[backIdx]) * radiances[backIdx]);
-                for (std::size_t idx = 1; idx < backIdx; ++idx)
-                {
-                    zradiance += cie1931Z(wavelengths[idx]) * radiances[idx];
-                }
-                zradiance *= deltaWl;
-
-                const glm::dvec3 radiance = xyzToSrgb * glm::dvec3(xradiance, yradiance, zradiance);
-                const glm::dvec3 color = expose(radiance, exposure);
-                rgba = glm::dvec4(color, 1.0);
-            }
-
-            const auto r = static_cast<std::uint32_t>(std::min(rgba.r, 1.0) * 255.0);
-            const auto g = static_cast<std::uint32_t>(std::min(rgba.g, 1.0) * 255.0);
-            const auto b = static_cast<std::uint32_t>(std::min(rgba.b, 1.0) * 255.0);
-            const auto a = static_cast<std::uint32_t>(std::min(rgba.a, 1.0) * 255.0);
-
-            const std::uint32_t pixel = (a << 24) | (b << 16) | (g << 8) | r;
-            pixelData.push_back(pixel);
-        }
+        const double turbidity = static_cast<double>(i);
+        skyStates.push_back(arhosekskymodelstate_alloc_init(solarElevation, turbidity, albedo));
     }
 
-    arhosekskymodelstate_free(skyState);
+    std::vector<glm::dvec3> sunSampleMeans;
+    sunSampleMeans.reserve(skyStates.size());
+    for (auto* skyState : skyStates)
+    {
+        std::vector<std::uint32_t> pixelData;
+        pixelData.reserve(static_cast<std::size_t>(WIDTH * HEIGHT));
 
-    const int numChannels = 4;
-    const int strideBytes = WIDTH * numChannels;
+        std::vector<glm::dvec3> sunSamples;
+        sunSamples.reserve(static_cast<std::size_t>(WIDTH * HEIGHT));
 
-    [[maybe_unused]] const int result = stbi_write_png(
-        "hw-sunmodel-integrator.png", WIDTH, HEIGHT, numChannels, pixelData.data(), strideBytes);
-    assert(result != 0);
+        for (int i = 0; i < HEIGHT; ++i)
+        {
+            for (int j = 0; j < WIDTH; ++j)
+            {
+                const auto [x, y] = [](const int i, const int j) -> std::tuple<double, double> {
+                    // coordinates in [0, 1]
+                    const double u = static_cast<double>(j) / static_cast<double>(WIDTH);
+                    const double v = static_cast<double>(i) / static_cast<double>(HEIGHT);
+
+                    // coordinates in [-1, 1]
+                    const double x = 2.0 * u - 1.0;
+                    const double y = 1.0 - 2.0 * v; // flip y so that (left, top) is written first
+
+                    return std::make_tuple(x, y);
+                }(i, j);
+
+                const double radiusSqr = x * x + y * y;
+
+                glm::dvec4 rgba = glm::vec4(0.0);
+
+                if (radiusSqr < 1.0f)
+                {
+                    // Pixel is inside the hemisphere, compute the ray direction.
+                    const double     z = std::sqrt(1.0 - radiusSqr);
+                    const glm::dvec3 v = glm::normalize(glm::vec3(x, z, -y));
+                    const glm::dvec3 s = sunDirection;
+
+                    // Compute the sky radiance.
+
+                    [[maybe_unused]] const double theta = std::acos(v.y);
+                    [[maybe_unused]] const double gamma =
+                        std::acos(std::clamp(glm::dot(v, s), -1.0, 1.0));
+
+                    // Integrate XYZ tristimulus values over the visible spectrum using the
+                    // Trapezoidal rule: https://en.wikipedia.org/wiki/Trapezoidal_rule#Uniform_grid
+
+#if 0
+                    const double           exposure = 0.1;
+                    std::array<double, 11> radiances = {};
+                    for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
+                    {
+                        radiances[idx] =
+                            arhosekskymodel_radiance(skyState, theta, gamma, wavelengths[idx]);
+                    }
+#else
+                    const double           exposure = 0.000002;
+                    std::array<double, 11> radiances = {};
+                    const double           solarDiskRadius = theta / PI_2;
+                    for (std::size_t idx = 0; idx < wavelengths.size(); ++idx)
+                    {
+                        radiances[idx] = arhosekskymodel_solar_disk_radiance(
+                            skyState, gamma, solarDiskRadius, wavelengths[idx]);
+                    }
+#endif
+
+                    constexpr std::size_t backIdx = wavelengths.size() - 1;
+                    constexpr double      deltaWl = (wavelengths[backIdx] - wavelengths[0]) /
+                                               static_cast<double>(wavelengths.size());
+
+                    NLRS_ASSERT(wavelengths.size() == radiances.size());
+                    double xradiance = 0.5 * (cie1931X(wavelengths[0]) * radiances[0] +
+                                              cie1931X(wavelengths[backIdx]) * radiances[backIdx]);
+                    for (std::size_t idx = 1; idx < backIdx; ++idx)
+                    {
+                        xradiance += cie1931X(wavelengths[idx]) * radiances[idx];
+                    }
+                    xradiance *= deltaWl;
+
+                    double yradiance = 0.5 * (cie1931Y(wavelengths[0]) * radiances[0] +
+                                              cie1931Y(wavelengths[backIdx]) * radiances[backIdx]);
+                    for (std::size_t idx = 1; idx < backIdx; ++idx)
+                    {
+                        yradiance += cie1931Y(wavelengths[idx]) * radiances[idx];
+                    }
+                    yradiance *= deltaWl;
+
+                    double zradiance = 0.5 * (cie1931Z(wavelengths[0]) * radiances[0] +
+                                              cie1931Z(wavelengths[backIdx]) * radiances[backIdx]);
+                    for (std::size_t idx = 1; idx < backIdx; ++idx)
+                    {
+                        zradiance += cie1931Z(wavelengths[idx]) * radiances[idx];
+                    }
+                    zradiance *= deltaWl;
+
+                    const glm::dvec3 radiance =
+                        xyzToSrgb * glm::dvec3(xradiance, yradiance, zradiance);
+                    sunSamples.push_back(radiance);
+                    const glm::dvec3 color = expose(radiance, exposure);
+                    rgba = glm::dvec4(glm::pow(color, glm::dvec3(1 / 2.2)), 1.0);
+                }
+
+                const auto r = static_cast<std::uint32_t>(std::min(rgba.r, 1.0) * 255.0);
+                const auto g = static_cast<std::uint32_t>(std::min(rgba.g, 1.0) * 255.0);
+                const auto b = static_cast<std::uint32_t>(std::min(rgba.b, 1.0) * 255.0);
+                const auto a = static_cast<std::uint32_t>(std::min(rgba.a, 1.0) * 255.0);
+
+                const std::uint32_t pixel = (a << 24) | (b << 16) | (g << 8) | r;
+                pixelData.push_back(pixel);
+            }
+        }
+
+        const int numChannels = 4;
+        const int strideBytes = WIDTH * numChannels;
+
+        const auto filenaname = std::format("sundisk-turbidity-{}.png", skyState->turbidity);
+        NLRS_ASSERT(
+            stbi_write_png(
+                filenaname.c_str(), WIDTH, HEIGHT, numChannels, pixelData.data(), strideBytes) !=
+            0);
+
+        const glm::dvec3 sunSampleSum =
+            std::accumulate(sunSamples.begin(), sunSamples.end(), glm::dvec3(0.0));
+        const glm::dvec3 sunSampleMean = sunSampleSum / static_cast<double>(sunSamples.size());
+        sunSampleMeans.push_back(sunSampleMean);
+    }
+
+    {
+        std::printf("const float solar_radiances_r[] = {\n");
+        for (const auto& sampleMean : sunSampleMeans)
+        {
+            std::printf("    %ff,\n", static_cast<float>(sampleMean.x));
+        }
+        std::printf("};\n");
+    }
+
+    {
+        std::printf("const float solar_radiances_g[] = {\n");
+        for (const auto& sampleMean : sunSampleMeans)
+        {
+            std::printf("    %ff,\n", static_cast<float>(sampleMean.y));
+        }
+        std::printf("};\n");
+    }
+
+    {
+        std::printf("const float solar_radiances_b[] = {\n");
+        for (const auto& sampleMean : sunSampleMeans)
+        {
+            std::printf("    %ff,\n", static_cast<float>(sampleMean.z));
+        }
+        std::printf("};\n");
+    }
+
+    for (auto* skyState : skyStates)
+    {
+        arhosekskymodelstate_free(skyState);
+    }
 
     return 0;
 }
