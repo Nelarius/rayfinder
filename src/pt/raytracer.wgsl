@@ -75,7 +75,8 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let tonemapFn = postProcessingParams.tonemapFn;
     let rgb = expose(tonemapFn, exposure * estimator);
 
-    return vec4f(rgb, 1f);
+    let srgb = pow(rgb, vec3(1f / 2.2f));
+    return vec4f(srgb, 1f);
 }
 
 const EPSILON = 0.00001f;
@@ -574,8 +575,10 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
     let i = u32(v * f32(desc.height));
     let idx = i * desc.width + j;
 
-    let rgba = textures[desc.offset + idx];
-    return vec3f(f32(rgba & 0xffu), f32((rgba >> 8u) & 0xffu), f32((rgba >> 16u) & 0xffu)) / 255f;
+    let pixel = textures[desc.offset + idx];
+    let srgb = vec3(f32(pixel & 0xffu), f32((pixel >> 8u) & 0xffu), f32((pixel >> 16u) & 0xffu)) / 255f;
+    let linearRgb = pow(srgb, vec3(2.2f));
+    return linearRgb;
 }
 
 @must_use
