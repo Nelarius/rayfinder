@@ -44,6 +44,10 @@ target_include_directories(hw-skymodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
 add_executable(hw-skymodel-demo src/hw-skymodel-demo/main.cpp)
 target_link_libraries(hw-skymodel-demo PRIVATE common hw-skymodel glm::glm)
 
+# hw-sunmodel-integrator
+add_executable(hw-sunmodel-integrator src/hw-sunmodel-integrator/main.cpp)
+target_link_libraries(hw-sunmodel-integrator PRIVATE common hosekwilkie-skylightmodel glm::glm)
+
 # pt
 set(PT_SOURCE_FILES
     fly_camera_controller.cpp
