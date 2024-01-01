@@ -1,13 +1,15 @@
+#include <common/assert.hpp>
 #include <hw-skymodel/hw_skymodel.h>
 
 #include <glm/glm.hpp>
 #include <stb_image_write.h>
 
-#include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <numbers>
 #include <vector>
+#include <tuple>
 
 inline constexpr float PI = std::numbers::pi_v<float>;
 
@@ -29,16 +31,15 @@ int main()
         std::cos(sunZenith),
         -std::sin(sunZenith) * std::sin(sunAzimuth)));
 
-    const SkyParams skyParams{
+    const sky_params skyParams{
         .elevation = 0.5f * PI - sunZenith,
         .turbidity = 1.0f,
         .albedo = {1.0f, 1.0f, 1.0f},
     };
 
-    SkyState skyState;
+    sky_state skyState;
 
-    [[maybe_unused]] const auto r = skyStateNew(&skyParams, &skyState);
-    assert(r == SkyStateResult_Success);
+    NLRS_ASSERT(sky_state_new(&skyParams, &skyState) == sky_state_result_success);
 
     std::vector<std::uint32_t> pixelData;
     pixelData.reserve(WIDTH * HEIGHT);
@@ -47,13 +48,17 @@ int main()
     {
         for (int j = 0; j < WIDTH; ++j)
         {
-            // coordinates in [0, 1]
-            const float u = static_cast<float>(j) / static_cast<float>(WIDTH);
-            const float v = static_cast<float>(i) / static_cast<float>(HEIGHT);
+            const auto [x, y] = [](const int i, const int j) -> std::tuple<float, float> {
+                // coordinates in [0, 1]
+                const float u = static_cast<float>(j) / static_cast<float>(WIDTH);
+                const float v = static_cast<float>(i) / static_cast<float>(HEIGHT);
 
-            // coordinates in [-1, 1]
-            const float x = 2.0f * u - 1.0f;
-            const float y = 1.0f - 2.0f * v; // flip y so that (left, top) is written first
+                // coordinates in [-1, 1]
+                const float x = 2.0f * u - 1.0f;
+                const float y = 1.0f - 2.0f * v; // flip y so that (left, top) is written first
+
+                return std::make_tuple(x, y);
+            }(i, j);
 
             const float radiusSqr = x * x + y * y;
 
@@ -70,9 +75,9 @@ int main()
                 const float     theta = std::acos(v.y);
                 const float     gamma = std::acos(std::clamp(glm::dot(v, s), -1.0f, 1.0f));
                 const glm::vec3 radiance = glm::vec3(
-                    skyStateRadiance(&skyState, theta, gamma, Channel_R),
-                    skyStateRadiance(&skyState, theta, gamma, Channel_G),
-                    skyStateRadiance(&skyState, theta, gamma, Channel_B));
+                    sky_state_radiance(&skyState, theta, gamma, channel_r),
+                    sky_state_radiance(&skyState, theta, gamma, channel_g),
+                    sky_state_radiance(&skyState, theta, gamma, channel_b));
 
                 const glm::vec3 color = expose(radiance, 0.1f);
                 rgba = glm::vec4(color, 1.0f);
