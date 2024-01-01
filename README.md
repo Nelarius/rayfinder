@@ -1,6 +1,12 @@
-# README
+# rayfinder
 
-An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn.googlesource.com/dawn) renderer.
+An interactive experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn.googlesource.com/dawn) renderer.
+
+## Showcase
+
+![sponza-1](/img/sponza-1.png)
+
+![sponza-2](/img/sponza-2.png)
 
 ## References
 
@@ -23,9 +29,13 @@ An experimental pathtracer, implemented using WebGPU via the [Dawn](https://dawn
 - _A Fast and Robust Method for Avoiding Self-Intersection_, _Ray Tracing Gems_
   - Method for the `offsetRay` function, for preventing ray self-intersections.
 - _Sampling Transformations Zoo_, _Ray Tracing Gems_
-  - The `rngNextInCone` method and source.
+  - The `rngNextInCone` method and source
 - [ACES Filmic Tone Mapping Curve](https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/)
   - filmic tonemapping function
+- [Simple Analytic Approximations to the CIE XYZ Color Matching Functions](https://jcgt.org/published/0002/02/01/)
+  - C code for the CIE XYZ color matching functions' multi-lobe Gaussian fit
+- [RGB / XYZ conversion matrices](http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html)
+  - XYZ to sRGB conversion matrix
 
 ## Build
 
