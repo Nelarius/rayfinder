@@ -32,6 +32,10 @@ add_library(common ${COMMON_SOURCE_FILES})
 target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE_DIR} ${STB_INCLUDE_DIR})
 target_link_libraries(common PRIVATE glm::glm)
 
+# hosekwilkie-skylightmodel-source
+add_library(hosekwilkie-skylightmodel src/hosekwilkie-skylightmodel-source-1.4a/ArHosekSkyModel.c)
+target_include_directories(hosekwilkie-skylightmodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
 # hw-skymodel
 add_library(hw-skymodel src/hw-skymodel/hw_skymodel.c)
 target_include_directories(hw-skymodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
@@ -39,6 +43,10 @@ target_include_directories(hw-skymodel PUBLIC ${CMAKE_SOURCE_DIR}/src)
 # hw-skymodel-demo
 add_executable(hw-skymodel-demo src/hw-skymodel-demo/main.cpp)
 target_link_libraries(hw-skymodel-demo PRIVATE common hw-skymodel glm::glm)
+
+# hw-sunmodel-integrator
+add_executable(hw-sunmodel-integrator src/hw-sunmodel-integrator/main.cpp)
+target_link_libraries(hw-sunmodel-integrator PRIVATE common hosekwilkie-skylightmodel glm::glm)
 
 # pt
 set(PT_SOURCE_FILES

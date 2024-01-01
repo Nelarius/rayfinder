@@ -100,17 +100,19 @@ struct SamplingStateLayout
 
 struct SkyStateLayout
 {
-    float     params[27];
-    float     radiances[3];
-    float     padding1[2];
-    glm::vec3 sunDirection;
-    float     padding2;
+    float     params[27];        // offset: 0
+    float     skyRadiances[3];   // offset: 27
+    float     solarRadiances[3]; // offset: 30
+    float     padding1[3];       // offset: 33
+    glm::vec3 sunDirection;      // offset: 36
+    float     padding2;          // offset: 39
 
     SkyStateLayout(const Sky& sky)
         : params{0},
-          radiances{0},
-          padding1{0.f, 0.f},
-          sunDirection(0.0f),
+          skyRadiances{0},
+          solarRadiances{0},
+          padding1{0.f, 0.f, 0.f},
+          sunDirection(0.f),
           padding2(0.0f)
     {
         const float sunZenith = sky.sunZenithDegrees * DEGREES_TO_RADIANS;
@@ -121,18 +123,19 @@ struct SkyStateLayout
             std::cos(sunZenith),
             -std::sin(sunZenith) * std::sin(sunAzimuth)));
 
-        const SkyParams skyParams{
+        const sky_params skyParams{
             .elevation = 0.5f * PI - sunZenith,
             .turbidity = sky.turbidity,
             .albedo = {sky.albedo[0], sky.albedo[1], sky.albedo[2]}};
 
-        SkyState                    skyState;
-        [[maybe_unused]] const auto r = skyStateNew(&skyParams, &skyState);
+        sky_state                   skyState;
+        [[maybe_unused]] const auto r = sky_state_new(&skyParams, &skyState);
         // TODO: exceptional error handling
-        assert(r == SkyStateResult_Success);
+        assert(r == sky_state_result_success);
 
         std::memcpy(params, skyState.params, sizeof(skyState.params));
-        std::memcpy(radiances, skyState.radiances, sizeof(skyState.radiances));
+        std::memcpy(skyRadiances, skyState.sky_radiances, sizeof(skyState.sky_radiances));
+        std::memcpy(solarRadiances, skyState.solar_radiances, sizeof(skyState.solar_radiances));
     }
 };
 
