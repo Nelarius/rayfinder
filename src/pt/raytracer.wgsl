@@ -130,7 +130,8 @@ struct PostProcessingParams {
 
 struct SkyState {
     params: array<f32, 27>,
-    radiances: array<f32, 3>,
+    skyRadiances: array<f32, 3>,
+    solarRadiances: array<f32, 3>,
     sunDirection: vec3<f32>,
 };
 
@@ -203,7 +204,11 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
             let p = hit.p;
 
             let lightDirection = sampleSolarDiskDirection(SOLAR_COS_THETA_MAX, skyState.sunDirection, rngState);
-            let lightIntensity = vec3f(1000000f, 1000000f, 1000000f);  // TODO: replace with more plausible solar intensity
+            let lightIntensity = vec3(
+                skyState.solarRadiances[CHANNEL_R],
+                skyState.solarRadiances[CHANNEL_G],
+                skyState.solarRadiances[CHANNEL_B]
+            );
             let brdf = albedo * FRAC_1_PI;
             let reflectance = brdf * dot(hit.n, lightDirection);
             let lightVisibility = shadowRay(Ray(p, lightDirection), T_MAX);
@@ -250,7 +255,7 @@ fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f3
 
 @must_use
 fn skyRadiance(theta: f32, gamma: f32, channel: u32) -> f32 {
-    let r = skyState.radiances[channel];
+    let r = skyState.skyRadiances[channel];
     let idx = 9u * channel;
     let p0 = skyState.params[idx + 0u];
     let p1 = skyState.params[idx + 1u];
