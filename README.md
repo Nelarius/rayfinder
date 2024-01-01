@@ -36,6 +36,9 @@ An interactive experimental pathtracer, implemented using WebGPU via the [Dawn](
   - C code for the CIE XYZ color matching functions' multi-lobe Gaussian fit
 - [RGB / XYZ conversion matrices](http://www.brucelindbloom.com/index.html?Eqn_RGB_XYZ_Matrix.html)
   - XYZ to sRGB conversion matrix
+- [Sky Dome Appearance Project](https://cgg.mff.cuni.cz/projects/SkylightModelling/)
+  - The original source of the sky and solar disk model
+  - The following [Rust implementation](https://github.com/phoekz/hw-skymodel) serves as the basis of the much simplified C code used in this project.
 
 ## Build
 
