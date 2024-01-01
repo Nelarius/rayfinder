@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-typedef struct SkyParams
+typedef struct sky_params
 {
     // The solar elevation (azimuth) angle, in radians. Elevation must be in `[0, π/2]`.
     float elevation;
@@ -13,35 +13,35 @@ typedef struct SkyParams
     float turbidity;
     // Ground albedo must be in `[0, 1]`.
     float albedo[3];
-} SkyParams;
+} sky_params;
 
-typedef struct SkyState
+typedef struct sky_state
 {
     float params[27];
-    float skyRadiance[3];
-    float solarRadiance[3];
-} SkyState;
+    float sky_radiances[3];
+    float solar_radiances[3];
+} sky_state;
 
-typedef enum SkyStateResult
+typedef enum sky_state_result
 {
-    SkyStateResult_Success,
-    SkyStateResult_ElevationOutOfRange,
-    SkyStateResult_TurbidityOutOfRange,
-    SkyStateResult_AlbedoOutOfRange,
-} SkyStateResult;
+    sky_state_result_success,
+    sky_state_result_elevation_out_of_range,
+    sky_state_result_turbidity_out_of_range,
+    sky_state_result_albedo_out_of_range,
+} sky_state_result;
 
 // Initialize a SkyState instance. Returns 1 if creating the skyState was succesful. Returns 0 if
 // any of the sky params are out of range.
-SkyStateResult skyStateNew(const SkyParams* skyParams, SkyState* skyState);
+sky_state_result sky_state_new(const sky_params* params, sky_state* skyState);
 
-typedef enum Channel
+typedef enum channel
 {
-    Channel_R,
-    Channel_G,
-    Channel_B
-} Channel;
+    channel_r = 0,
+    channel_g,
+    channel_b
+} channel;
 
-float skyStateRadiance(const SkyState* skyState, float theta, float gamma, Channel channel);
+float sky_state_radiance(const sky_state* state, float theta, float gamma, channel channel);
 
 #ifdef __cplusplus
 }
