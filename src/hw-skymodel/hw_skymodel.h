@@ -18,7 +18,8 @@ typedef struct SkyParams
 typedef struct SkyState
 {
     float params[27];
-    float radiances[3];
+    float skyRadiance[3];
+    float solarRadiance[3];
 } SkyState;
 
 typedef enum SkyStateResult

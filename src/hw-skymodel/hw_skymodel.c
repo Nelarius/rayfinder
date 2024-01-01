@@ -13,6 +13,7 @@
 #include <math.h>
 
 static const float PI = (float)M_PI;
+static const float SOLAR_RADIUS_RADIANS = 0.004450589f; // 0.255 degrees
 
 static float quintic_9(const float* const data, const float t)
 {
@@ -93,7 +94,7 @@ static void initParams(
     }
 }
 
-static void initRadiances(
+static void initSkyRadiance(
     float* const       outRadiance,
     const float* const data,
     const float        turbidity,
@@ -121,6 +122,20 @@ static void initRadiances(
     *outRadiance += s1 * quintic_1(p1, t);
     *outRadiance += s2 * quintic_1(p2, t);
     *outRadiance += s3 * quintic_1(p3, t);
+}
+
+static void initSolarRadiance(
+    float* const       outRadiance,
+    const float* const data,
+    const float        turbidity)
+{
+    const size_t turbidity_int = (size_t)turbidity;
+    assert(turbidity_int > 0);
+    const float  turbidity_rem = fmodf(turbidity, 1.0f);
+    const size_t turbidity_min = turbidity_int - 1;
+    const size_t turbidity_max = turbidity_int < 9 ? turbidity_int : 9;
+    *outRadiance =
+        data[turbidity_min] * (1.0f - turbidity_rem) + data[turbidity_max] * turbidity_rem;
 }
 
 SkyStateResult skyStateNew(const SkyParams* const skyParams, SkyState* const skyState)
@@ -154,9 +169,12 @@ SkyStateResult skyStateNew(const SkyParams* const skyParams, SkyState* const sky
     initParams(skyState->params + 0, paramsR, turbidity, albedo[0], t);
     initParams(skyState->params + 9, paramsG, turbidity, albedo[1], t);
     initParams(skyState->params + (9 * 2), paramsB, turbidity, albedo[2], t);
-    initRadiances(skyState->radiances + 0, radiancesR, turbidity, albedo[0], t);
-    initRadiances(skyState->radiances + 1, radiancesG, turbidity, albedo[1], t);
-    initRadiances(skyState->radiances + 2, radiancesB, turbidity, albedo[2], t);
+    initSkyRadiance(skyState->skyRadiance + 0, radiancesR, turbidity, albedo[0], t);
+    initSkyRadiance(skyState->skyRadiance + 1, radiancesG, turbidity, albedo[1], t);
+    initSkyRadiance(skyState->skyRadiance + 2, radiancesB, turbidity, albedo[2], t);
+    initSolarRadiance(skyState->solarRadiance + 0, solar_radiances_r, turbidity);
+    initSolarRadiance(skyState->solarRadiance + 1, solar_radiances_g, turbidity);
+    initSolarRadiance(skyState->solarRadiance + 2, solar_radiances_b, turbidity);
 
     return SkyStateResult_Success;
 }
@@ -168,7 +186,9 @@ float skyStateRadiance(
     const Channel         channel)
 {
     const size_t channelIdx = (size_t)channel;
-    const float  r = skyState->radiances[channelIdx];
+
+    // Sky dome radiance
+    const float  r = skyState->skyRadiance[channelIdx];
     const float* p = skyState->params + (9 * channelIdx);
     const float  p0 = p[0];
     const float  p1 = p[1];
@@ -194,5 +214,9 @@ float skyStateRadiance(
     const float radiance_rhs = p2 + p3 * expM + p5 * rayM + p6 * mieM + p7 * zenith;
     const float radiance_dist = radiance_lhs * radiance_rhs;
 
-    return r * radiance_dist;
+    // Solar radiance
+    const float solarDiskRadius = gamma / SOLAR_RADIUS_RADIANS;
+    const float solarRadiance = solarDiskRadius <= 1.f ? skyState->solarRadiance[channelIdx] : 0.f;
+
+    return r * radiance_dist + solarRadiance;
 }
