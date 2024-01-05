@@ -190,6 +190,7 @@ int main(int argc, char** argv)
 
                     ImGui::SliderFloat("sun zenith", &sunZenithDegrees, 0.0f, 90.0f, "%.2f");
                     ImGui::SliderFloat("sun azimuth", &sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
+                    ImGui::SliderFloat("sky turbidity", &skyTurbidity, 1.0f, 10.0f, "%.2f");
 
                     ImGui::SliderFloat(
                         "camera speed",
