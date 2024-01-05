@@ -32,6 +32,14 @@ add_library(common ${COMMON_SOURCE_FILES})
 target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE_DIR} ${STB_INCLUDE_DIR})
 target_link_libraries(common PRIVATE glm::glm)
 
+add_library(glfw3webgpu src/glfw3webgpu/glfw3webgpu.c)
+target_include_directories(glfw3webgpu PUBLIC ${CMAKE_SOURCE_DIR}/src/glfw3webgpu)
+target_link_libraries(glfw3webgpu PRIVATE glfw webgpu)
+if (APPLE)
+  target_compile_options(glfw3webgpu PRIVATE -x objective-c)
+  target_link_libraries(glfw3webgpu PRIVATE "-framework Cocoa" "-framework CoreVideo" "-framework IOKit" "-framework QuartzCore")
+endif ()
+
 # hosekwilkie-skylightmodel-source
 add_library(hosekwilkie-skylightmodel src/hosekwilkie-skylightmodel-source-1.4a/ArHosekSkyModel.c)
 target_include_directories(hosekwilkie-skylightmodel PUBLIC ${CMAKE_SOURCE_DIR}/src)

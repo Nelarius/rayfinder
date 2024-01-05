@@ -15,7 +15,6 @@
 #include <utility>
 
 #include <GLFW/glfw3.h>
-#include <glfw3webgpu.h>
 #include <imgui.h>
 #include <webgpu/webgpu.h>
 
