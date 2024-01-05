@@ -34,7 +34,7 @@ target_link_libraries(common PRIVATE glm::glm)
 
 add_library(glfw3webgpu src/glfw3webgpu/glfw3webgpu.c)
 target_include_directories(glfw3webgpu PUBLIC ${CMAKE_SOURCE_DIR}/src/glfw3webgpu)
-target_link_libraries(glfw3webgpu PRIVATE glfw webgpu)
+target_link_libraries(glfw3webgpu PRIVATE glfw webgpu_dawn)
 if (APPLE)
   target_compile_options(glfw3webgpu PRIVATE -x objective-c)
   target_link_libraries(glfw3webgpu PRIVATE "-framework Cocoa" "-framework CoreVideo" "-framework IOKit" "-framework QuartzCore")
@@ -68,7 +68,7 @@ set(PT_SOURCE_FILES
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 
 add_executable(pt ${PT_SOURCE_FILES})
-target_link_libraries(pt PRIVATE common glfw glfw3webgpu glm::glm hw-skymodel imgui webgpu)
+target_link_libraries(pt PRIVATE common glfw glfw3webgpu glm::glm hw-skymodel imgui webgpu_dawn)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 add_custom_command(
     TARGET pt POST_BUILD
