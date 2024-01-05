@@ -20,8 +20,8 @@
 #include <tuple>
 #include <utility>
 
-inline constexpr int defaultWindowWidth = 640;
-inline constexpr int defaultWindowHeight = 480;
+inline constexpr int defaultWindowWidth = 1489;
+inline constexpr int defaultWindowHeight = 876;
 
 void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
 
