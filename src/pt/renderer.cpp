@@ -644,9 +644,7 @@ Renderer::Renderer(
             .nextInChain = nullptr,
             .label = "renderpass timestamp query set",
             .type = WGPUQueryType_Timestamp,
-            .count = TimestampsLayout::QUERY_COUNT,
-            .pipelineStatistics = nullptr,
-            .pipelineStatisticsCount = 0u};
+            .count = TimestampsLayout::QUERY_COUNT};
         querySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
     }
 }
@@ -826,7 +824,6 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
                 .colorAttachments = &renderPassColorAttachment,
                 .depthStencilAttachment = nullptr,
                 .occlusionQuerySet = nullptr,
-                .timestampWriteCount = 0,
                 .timestampWrites = nullptr,
             };
 

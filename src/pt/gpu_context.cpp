@@ -184,9 +184,9 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
                     .next = nullptr,
                     .sType = WGPUSType_DawnTogglesDescriptor,
                 },
-            .enabledTogglesCount = 1,
+            .enabledToggleCount = 1,
             .enabledToggles = &allowUnsafeApisToggle,
-            .disabledTogglesCount = 0,
+            .disabledToggleCount = 0,
             .disabledToggles = nullptr,
         };
 
@@ -240,7 +240,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
 #ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
         const std::array<WGPUFeatureName, 2> requiredFeatures{
             WGPUFeatureName_TimestampQuery,
-            WGPUFeatureName_TimestampQueryInsidePasses,
+            WGPUFeatureName_ChromiumExperimentalTimestampQueryInsidePasses,
         };
 #else
         const std::array<WGPUFeatureName, 1> requiredFeatures{
@@ -251,7 +251,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
         const WGPUDeviceDescriptor deviceDesc{
             .nextInChain = nullptr,
             .label = "Device",
-            .requiredFeaturesCount = requiredFeatures.size(),
+            .requiredFeatureCount = requiredFeatures.size(),
             .requiredFeatures = requiredFeatures.data(),
             .requiredLimits = &requiredLimits,
             .defaultQueue = WGPUQueueDescriptor{.nextInChain = nullptr, .label = "Default queue"},
@@ -289,7 +289,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     }
 
     queue = wgpuDeviceGetQueue(device);
-    wgpuQueueOnSubmittedWorkDone(queue, 0, onQueueWorkDone, nullptr);
+    wgpuQueueOnSubmittedWorkDone(queue, onQueueWorkDone, nullptr);
 
     swapChain = createSwapChain(device, surface, swapChainFormat, framebufferSize);
 
