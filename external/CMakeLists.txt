@@ -9,6 +9,16 @@ FetchContent_Declare(cgltf
     GIT_REPOSITORY "https://github.com/jkuhlmann/cgltf"
     GIT_TAG c887e783d0f11046adda8848d5bd27aed5f9cb9b) # v.1.13
 
+FetchContent_Declare(dawn
+
+    # Manual download mode, even shallower than GIT_SHALLOW ON
+    DOWNLOAD_COMMAND
+    cd ${FETCHCONTENT_BASE_DIR}/dawn-src &&
+    git init &&
+    git fetch --depth=1 https://dawn.googlesource.com/dawn chromium/5869 &&
+    git reset --hard FETCH_HEAD
+)
+
 FetchContent_Declare(glfw
     GIT_REPOSITORY "https://github.com/glfw/glfw"
     GIT_TAG 7482de6) # 3.3.8
@@ -22,16 +32,6 @@ FetchContent_Declare(imgui GIT_REPOSITORY "https://github.com/ocornut/imgui"
 FetchContent_Declare(stb
     GIT_REPOSITORY "https://github.com/nothings/stb"
     GIT_TAG beebb24b945efdea3b9bba23affb8eb3ba8982e7) # Oct 12, 2023
-
-FetchContent_Declare(dawn
-
-    # Manual download mode, even shallower than GIT_SHALLOW ON
-    DOWNLOAD_COMMAND
-    cd ${FETCHCONTENT_BASE_DIR}/dawn-src &&
-    git init &&
-    git fetch --depth=1 https://dawn.googlesource.com/dawn chromium/5869 &&
-    git reset --hard FETCH_HEAD
-)
 
 # Fetch
 message(STATUS "Fetching Catch2...")
