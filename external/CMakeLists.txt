@@ -19,6 +19,10 @@ FetchContent_Declare(dawn
     git reset --hard FETCH_HEAD
 )
 
+FetchContent_Declare(fmt
+    GIT_REPOSITORY "https://github.com/fmtlib/fmt"
+    GIT_TAG e69e5f977d458f2650bb346dadf2ad30c5320281) # 10.2.1
+
 FetchContent_Declare(glfw
     GIT_REPOSITORY "https://github.com/glfw/glfw"
     GIT_TAG 7482de6) # 3.3.8
@@ -92,6 +96,9 @@ if(NOT dawn_POPULATED)
 
     add_subdirectory(${dawn_SOURCE_DIR} ${dawn_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif()
+
+message(STATUS "Fetching fmt...")
+FetchContent_MakeAvailable(fmt)
 
 message(STATUS "Fetching glfw...")
 FetchContent_MakeAvailable(glfw)

@@ -1,11 +1,11 @@
 #include <common/gltf_model.hpp>
 #include <common/texture.hpp>
 
+#include <fmt/core.h>
 #include <stb_image_write.h>
 
 #include <cassert>
 #include <cstdio>
-#include <format>
 
 void printHelp() { std::printf("Usage: textractor <input_gltf_file>\n"); }
 
@@ -26,7 +26,7 @@ int main(int argc, char** argv)
         const auto  dimensions = texture.dimensions();
         const auto  pixels = texture.pixels();
 
-        const std::string filename = std::format("base_color_texture_{}.png", textureIdx);
+        const std::string filename = fmt::format("base_color_texture_{}.png", textureIdx);
         const int         numChannels = 4;
         const int         strideBytes = dimensions.width * numChannels;
 

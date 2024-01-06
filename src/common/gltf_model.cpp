@@ -4,6 +4,7 @@
 #include "vector_set.hpp"
 
 #include <cgltf.h>
+#include <fmt/core.h>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -13,7 +14,6 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
-#include <format>
 #include <fstream>
 #include <iterator>
 #include <stdexcept>
@@ -79,7 +79,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
     if (!fs::exists(gltfPath))
     {
         throw std::runtime_error(
-            std::format("The gltf file {} does not exist.", gltfPath.string().c_str()));
+            fmt::format("The gltf file {} does not exist.", gltfPath.string()));
     }
 
     cgltf_options                 options = {};
@@ -302,7 +302,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 if (!fs::exists(imagePath))
                 {
                     throw std::runtime_error(
-                        std::format("The image {} does not exist.", imagePath.string()));
+                        fmt::format("The image {} does not exist.", imagePath.string()));
                 }
 
                 const std::size_t fileSize = static_cast<std::size_t>(fs::file_size(imagePath));

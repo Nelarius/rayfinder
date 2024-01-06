@@ -88,7 +88,7 @@ GpuBuffer::GpuBuffer(
 
     if (!mBuffer)
     {
-        throw std::runtime_error(std::format("Failed to create buffer: {}", label));
+        throw std::runtime_error(fmt::format("Failed to create buffer: {}.", label));
     }
 }
 

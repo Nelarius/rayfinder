@@ -30,7 +30,7 @@ list(TRANSFORM COMMON_SOURCE_FILES PREPEND src/common/)
 
 add_library(common ${COMMON_SOURCE_FILES})
 target_include_directories(common PUBLIC ${CMAKE_SOURCE_DIR}/src ${CGLTF_INCLUDE_DIR} ${STB_INCLUDE_DIR})
-target_link_libraries(common PRIVATE glm::glm)
+target_link_libraries(common PRIVATE glm::glm fmt)
 
 # glf3webgpu
 add_library(glfw3webgpu src/glfw3webgpu/glfw3webgpu.c)
@@ -56,7 +56,7 @@ target_link_libraries(hw-skymodel-demo PRIVATE common hw-skymodel glm::glm)
 
 # hw-sunmodel-integrator
 add_executable(hw-sunmodel-integrator src/hw-sunmodel-integrator/main.cpp)
-target_link_libraries(hw-sunmodel-integrator PRIVATE common hosekwilkie-skylightmodel glm::glm)
+target_link_libraries(hw-sunmodel-integrator PRIVATE common hosekwilkie-skylightmodel fmt glm::glm)
 
 # pt
 set(PT_SOURCE_FILES
@@ -70,7 +70,7 @@ set(PT_SOURCE_FILES
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 
 add_executable(pt ${PT_SOURCE_FILES})
-target_link_libraries(pt PRIVATE common glfw glfw3webgpu glm::glm hw-skymodel imgui webgpu_dawn)
+target_link_libraries(pt PRIVATE common fmt glfw glfw3webgpu glm::glm hw-skymodel imgui webgpu_dawn)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 add_custom_command(
     TARGET pt POST_BUILD
@@ -119,7 +119,7 @@ add_custom_command(
 )
 
 add_executable(textractor src/textractor/main.cpp)
-target_link_libraries(textractor PRIVATE common glm::glm)
+target_link_libraries(textractor PRIVATE common fmt glm::glm)
 add_custom_command(
     TARGET textractor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy

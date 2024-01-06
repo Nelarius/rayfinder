@@ -8,6 +8,7 @@
 #include <common/platform.hpp>
 #include <hw-skymodel/hw_skymodel.h>
 
+#include <fmt/core.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -17,7 +18,6 @@
 #include <cstring>
 #include <cstdio>
 #include <deque>
-#include <format>
 #include <fstream>
 #include <limits>
 #include <numbers>
@@ -340,8 +340,9 @@ Renderer::Renderer(
             static_cast<std::size_t>(wgpuRequiredLimits.limits.maxStorageBufferBindingSize);
         if (textureDataNumBytes > maxStorageBufferBindingSize)
         {
-            throw std::runtime_error(std::format(
-                "Texture buffer size ({}) exceeds maxStorageBufferBindingSize ({}).",
+            throw std::runtime_error(fmt::format(
+                "Texture buffer size ({}) exceeds "
+                "maxStorageBufferBindingSize ({}).",
                 textureDataNumBytes,
                 maxStorageBufferBindingSize));
         }
@@ -387,7 +388,7 @@ Renderer::Renderer(
             std::ifstream file(path.data());
             if (!file)
             {
-                throw std::runtime_error(std::format("Error opening file: {}.", path));
+                throw std::runtime_error(fmt::format("Error opening file: {}.", path));
             }
             std::stringstream buffer;
             buffer << file.rdbuf();

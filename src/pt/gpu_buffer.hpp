@@ -1,12 +1,12 @@
 #pragma once
 
+#include <fmt/core.h>
 #include <webgpu/webgpu.h>
 
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <format>
 #include <span>
 #include <stdexcept>
 
@@ -88,7 +88,7 @@ GpuBuffer::GpuBuffer(
 
     if (!mBuffer)
     {
-        throw std::runtime_error(std::format("Failed to create buffer: {}", label));
+        throw std::runtime_error(fmt::format("Failed to create buffer: {}.", label));
     }
 
     // It's legal to set mappedAtCreation = true and use the mapped range even if the usage doesn't

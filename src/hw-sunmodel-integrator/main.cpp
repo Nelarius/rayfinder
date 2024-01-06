@@ -4,6 +4,7 @@ extern "C" {
 
 #include <common/assert.hpp>
 
+#include <fmt/core.h>
 #include <glm/glm.hpp>
 #include <stb_image_write.h>
 
@@ -12,7 +13,6 @@ extern "C" {
 #include <cmath>
 #include <cstdio>
 #include <cstddef>
-#include <format>
 #include <numbers>
 #include <numeric>
 #include <tuple>
@@ -202,7 +202,7 @@ int main()
         const int numChannels = 4;
         const int strideBytes = WIDTH * numChannels;
 
-        const auto filenaname = std::format("sundisk-turbidity-{}.png", skyState->turbidity);
+        const auto filenaname = fmt::format("sundisk-turbidity-{}.png", skyState->turbidity);
         NLRS_ASSERT(
             stbi_write_png(
                 filenaname.c_str(), WIDTH, HEIGHT, numChannels, pixelData.data(), strideBytes) !=
