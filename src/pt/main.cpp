@@ -51,7 +51,7 @@ struct UiState
     int   rendererType = RendererType_Deferred;
     float vfovDegrees = 70.0f;
     // sampling
-    int numSamplesPerPixel = 128;
+    int numSamplesPerPixel = 256;
     int numBounces = 2;
     // sky
     float                sunZenithDegrees = 30.0f;
@@ -376,11 +376,11 @@ try
 
             ImGui::Text("num samples:");
             ImGui::SameLine();
-            ImGui::RadioButton("64", &appState.ui.numSamplesPerPixel, 64);
-            ImGui::SameLine();
-            ImGui::RadioButton("128", &appState.ui.numSamplesPerPixel, 128);
-            ImGui::SameLine();
             ImGui::RadioButton("256", &appState.ui.numSamplesPerPixel, 256);
+            ImGui::SameLine();
+            ImGui::RadioButton("512", &appState.ui.numSamplesPerPixel, 512);
+            ImGui::SameLine();
+            ImGui::RadioButton("1024", &appState.ui.numSamplesPerPixel, 1024);
 
             ImGui::Text("num bounces:");
             ImGui::SameLine();
