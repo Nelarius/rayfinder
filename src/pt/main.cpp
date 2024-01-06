@@ -105,7 +105,7 @@ int main(int argc, char** argv)
             // camera
             float vfovDegrees = 70.0f;
             // sampling
-            int numSamplesPerPixel = 128;
+            int numSamplesPerPixel = 256;
             int numBounces = 4;
             // sky
             float                sunZenithDegrees = 30.0f;
@@ -173,11 +173,11 @@ int main(int argc, char** argv)
 
                     ImGui::Text("num samples:");
                     ImGui::SameLine();
-                    ImGui::RadioButton("64", &numSamplesPerPixel, 64);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("128", &numSamplesPerPixel, 128);
-                    ImGui::SameLine();
                     ImGui::RadioButton("256", &numSamplesPerPixel, 256);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("512", &numSamplesPerPixel, 512);
+                    ImGui::SameLine();
+                    ImGui::RadioButton("1024", &numSamplesPerPixel, 1024);
 
                     ImGui::Text("num bounces:");
                     ImGui::SameLine();
