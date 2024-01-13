@@ -23,6 +23,22 @@ inline constexpr int defaultWindowHeight = 480;
 
 void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
 
+struct Ui
+{
+    float vfovDegrees = 70.0f;
+    // sampling
+    int numSamplesPerPixel = 128;
+    int numBounces = 4;
+    // sky
+    float                sunZenithDegrees = 30.0f;
+    float                sunAzimuthDegrees = 0.0f;
+    float                skyTurbidity = 1.0f;
+    std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
+    // tonemapping
+    int exposureStops = 3;
+    int tonemapFn = 1;
+};
+
 int main(int argc, char** argv)
 {
     if (argc != 2)
@@ -101,22 +117,10 @@ int main(int argc, char** argv)
         }();
 
         {
+            Ui ui{};
+
             nlrs::Extent2i curFramebufferSize = window.resolution();
-            // camera
-            float vfovDegrees = 70.0f;
-            // sampling
-            int numSamplesPerPixel = 128;
-            int numBounces = 4;
-            // sky
-            float                sunZenithDegrees = 30.0f;
-            float                sunAzimuthDegrees = 0.0f;
-            float                skyTurbidity = 1.0f;
-            std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
-            // tonemapping
-            int exposureStops = 3;
-            int tonemapFn = 1;
-            // timestep
-            auto lastTime = std::chrono::steady_clock::now();
+            auto           lastTime = std::chrono::steady_clock::now();
             while (!glfwWindowShouldClose(window.ptr()))
             {
                 const auto  currentTime = std::chrono::steady_clock::now();
@@ -168,23 +172,23 @@ int main(int argc, char** argv)
 
                     ImGui::Text("num samples:");
                     ImGui::SameLine();
-                    ImGui::RadioButton("64", &numSamplesPerPixel, 64);
+                    ImGui::RadioButton("64", &ui.numSamplesPerPixel, 64);
                     ImGui::SameLine();
-                    ImGui::RadioButton("128", &numSamplesPerPixel, 128);
+                    ImGui::RadioButton("128", &ui.numSamplesPerPixel, 128);
                     ImGui::SameLine();
-                    ImGui::RadioButton("256", &numSamplesPerPixel, 256);
+                    ImGui::RadioButton("256", &ui.numSamplesPerPixel, 256);
 
                     ImGui::Text("num bounces:");
                     ImGui::SameLine();
-                    ImGui::RadioButton("2", &numBounces, 2);
+                    ImGui::RadioButton("2", &ui.numBounces, 2);
                     ImGui::SameLine();
-                    ImGui::RadioButton("4", &numBounces, 4);
+                    ImGui::RadioButton("4", &ui.numBounces, 4);
                     ImGui::SameLine();
-                    ImGui::RadioButton("8", &numBounces, 8);
+                    ImGui::RadioButton("8", &ui.numBounces, 8);
 
-                    ImGui::SliderFloat("sun zenith", &sunZenithDegrees, 0.0f, 90.0f, "%.2f");
-                    ImGui::SliderFloat("sun azimuth", &sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
-                    ImGui::SliderFloat("sky turbidity", &skyTurbidity, 1.0f, 10.0f, "%.2f");
+                    ImGui::SliderFloat("sun zenith", &ui.sunZenithDegrees, 0.0f, 90.0f, "%.2f");
+                    ImGui::SliderFloat("sun azimuth", &ui.sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
+                    ImGui::SliderFloat("sky turbidity", &ui.skyTurbidity, 1.0f, 10.0f, "%.2f");
 
                     ImGui::SliderFloat(
                         "camera speed",
@@ -193,28 +197,28 @@ int main(int argc, char** argv)
                         100.0f,
                         "%.2f",
                         ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat("camera vfov", &vfovDegrees, 10.0f, 120.0f);
-                    cameraController.vfov() = nlrs::Angle::degrees(vfovDegrees);
+                    ImGui::SliderFloat("camera vfov", &ui.vfovDegrees, 10.0f, 120.0f);
+                    cameraController.vfov() = nlrs::Angle::degrees(ui.vfovDegrees);
 
                     ImGui::Separator();
                     ImGui::Text("Post processing");
 
-                    ImGui::SliderInt("exposure stops", &exposureStops, 0, 10);
+                    ImGui::SliderInt("exposure stops", &ui.exposureStops, 0, 10);
                     ImGui::Text("tonemap fn");
                     ImGui::SameLine();
-                    ImGui::RadioButton("linear", &tonemapFn, 0);
+                    ImGui::RadioButton("linear", &ui.tonemapFn, 0);
                     ImGui::SameLine();
-                    ImGui::RadioButton("filmic", &tonemapFn, 1);
+                    ImGui::RadioButton("filmic", &ui.tonemapFn, 1);
 
                     ImGui::Separator();
                     ImGui::Text("Camera");
                     {
-                        const glm::vec3 camPos = cameraController.position();
-                        const auto      camYaw = cameraController.yaw();
-                        const auto      camPitch = cameraController.pitch();
-                        ImGui::Text("position: (%.2f, %.2f, %.2f)", camPos.x, camPos.y, camPos.z);
-                        ImGui::Text("yaw: %.2f", camYaw.asDegrees());
-                        ImGui::Text("pitch: %.2f", camPitch.asDegrees());
+                        const glm::vec3 pos = cameraController.position();
+                        const auto      yaw = cameraController.yaw();
+                        const auto      pitch = cameraController.pitch();
+                        ImGui::Text("position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
+                        ImGui::Text("yaw: %.2f", yaw.asDegrees());
+                        ImGui::Text("pitch: %.2f", pitch.asDegrees());
                     }
 
                     ImGui::End();
@@ -242,21 +246,21 @@ int main(int argc, char** argv)
                         nlrs::Extent2u(window.resolution()),
                         cameraController.getCamera(),
                         nlrs::SamplingParams{
-                            static_cast<std::uint32_t>(numSamplesPerPixel),
-                            static_cast<std::uint32_t>(numBounces),
+                            static_cast<std::uint32_t>(ui.numSamplesPerPixel),
+                            static_cast<std::uint32_t>(ui.numBounces),
                         },
                         nlrs::Sky{
-                            skyTurbidity,
-                            skyAlbedo,
-                            sunZenithDegrees,
-                            sunAzimuthDegrees,
+                            ui.skyTurbidity,
+                            ui.skyAlbedo,
+                            ui.sunZenithDegrees,
+                            ui.sunAzimuthDegrees,
                         },
                     };
                     renderer.setRenderParameters(renderParams);
 
                     const nlrs::PostProcessingParameters postProcessingParams{
-                        static_cast<std::uint32_t>(exposureStops),
-                        static_cast<nlrs::Tonemapping>(tonemapFn),
+                        static_cast<std::uint32_t>(ui.exposureStops),
+                        static_cast<nlrs::Tonemapping>(ui.tonemapFn),
                     };
                     renderer.setPostProcessingParameters(postProcessingParams);
 
