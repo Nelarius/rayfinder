@@ -76,5 +76,5 @@ $ (cd build-debug && ./tests)
 For validating that textures are loaded correctly. Loads the specified glTF model and its base color textures, and dumps the textures into `.png` files.
 
 ```sh
-$ ./build-release/textractor assets/Sponza.png
+$ ./build-release/textractor assets/Sponza.glb
 ```
