@@ -1,4 +1,3 @@
-#include "configuration.hpp"
 #include "gpu_context.hpp"
 #include "gui.hpp"
 #include "renderer.hpp"
@@ -161,10 +160,8 @@ struct TimestampsLayout
 {
     std::uint64_t renderPassBegin;
     std::uint64_t renderPassEnd;
-    std::uint64_t drawBegin;
-    std::uint64_t drawEnd;
 
-    static constexpr std::uint32_t QUERY_COUNT = 4;
+    static constexpr std::uint32_t QUERY_COUNT = 2;
 };
 
 void querySetSafeRelease(const WGPUQuerySet querySet)
@@ -256,7 +253,6 @@ Renderer::Renderer(
       currentPostProcessingParams(),
       frameCount(0),
       accumulatedSampleCount(0),
-      drawDurationsNs(),
       renderPassDurationsNs()
 {
     {
@@ -684,7 +680,6 @@ Renderer::Renderer(Renderer&& other)
         frameCount = other.frameCount;
         accumulatedSampleCount = other.accumulatedSampleCount;
 
-        drawDurationsNs = std::move(other.drawDurationsNs);
         renderPassDurationsNs = std::move(other.renderPassDurationsNs);
     }
 }
@@ -724,7 +719,6 @@ Renderer& Renderer::operator=(Renderer&& other)
         frameCount = other.frameCount;
         accumulatedSampleCount = other.accumulatedSampleCount;
 
-        drawDurationsNs = std::move(other.drawDurationsNs);
         renderPassDurationsNs = std::move(other.renderPassDurationsNs);
     }
     return *this;
@@ -842,14 +836,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
             wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 3, imageBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
-
-#ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
-            wgpuRenderPassEncoderWriteTimestamp(renderPassEncoder, querySet, 2);
-#endif
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
-#if TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
-            wgpuRenderPassEncoderWriteTimestamp(renderPassEncoder, querySet, 3);
-#endif
         }
 
         gui.render(renderPassEncoder);
@@ -903,16 +890,6 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
                     renderPassDurations.pop_front();
                 }
 
-#ifdef TIMESTAMP_QUERY_INSIDE_PASSES_SUPPORTED
-                std::deque<std::uint64_t>& drawDurations = renderer.drawDurationsNs;
-                const std::uint64_t        drawDelta = timestamps->drawEnd - timestamps->drawBegin;
-                drawDurations.push_back(drawDelta);
-                if (drawDurations.size() > 30)
-                {
-                    drawDurations.pop_front();
-                }
-#endif
-
                 wgpuBufferUnmap(timestampBuffer.handle());
             }
             else
@@ -921,18 +898,6 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
             }
         },
         this);
-}
-
-float Renderer::averageDrawDurationMs() const
-{
-    if (drawDurationsNs.empty())
-    {
-        return 0.0f;
-    }
-
-    const std::uint64_t sum =
-        std::accumulate(drawDurationsNs.begin(), drawDurationsNs.end(), std::uint64_t(0));
-    return 0.000001f * static_cast<float>(sum) / drawDurationsNs.size();
 }
 
 float Renderer::averageRenderpassDurationMs() const

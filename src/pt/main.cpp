@@ -154,13 +154,8 @@ int main(int argc, char** argv)
 
                     ImGui::Text("Renderer stats");
                     {
-                        const float drawAverageMs = renderer.averageDrawDurationMs();
                         const float renderAverageMs = renderer.averageRenderpassDurationMs();
                         const float progressPercentage = renderer.renderProgressPercentage();
-                        ImGui::Text(
-                            "render pass draw: %.2f ms (%.1f FPS)",
-                            drawAverageMs,
-                            1000.0f / drawAverageMs);
                         ImGui::Text(
                             "render pass: %.2f ms (%.1f FPS)",
                             renderAverageMs,

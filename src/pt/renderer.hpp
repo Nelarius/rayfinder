@@ -132,7 +132,6 @@ struct Renderer
     std::uint32_t            frameCount;
     std::uint32_t            accumulatedSampleCount;
 
-    std::deque<std::uint64_t> drawDurationsNs;
     std::deque<std::uint64_t> renderPassDurationsNs;
 
     Renderer(const RendererDescriptor&, const GpuContext&, Scene);
@@ -149,7 +148,6 @@ struct Renderer
     void setPostProcessingParameters(const PostProcessingParameters&);
     void render(const GpuContext&, Gui&);
 
-    float averageDrawDurationMs() const;
     float averageRenderpassDurationMs() const;
     float renderProgressPercentage() const;
 
