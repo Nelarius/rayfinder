@@ -811,6 +811,9 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui)
             const WGPURenderPassColorAttachment renderPassColorAttachment{
                 .nextInChain = nullptr,
                 .view = nextTexture,
+                .depthSlice =
+                    WGPU_DEPTH_SLICE_UNDEFINED, // depthSlice must be initialized with 'undefined'
+                                                // value for 2d color attachments.
                 .resolveTarget = nullptr,
                 .loadOp = WGPULoadOp_Clear,
                 .storeOp = WGPUStoreOp_Store,
