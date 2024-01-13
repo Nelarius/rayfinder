@@ -6,9 +6,9 @@
 
 #include <common/bvh.hpp>
 #include <common/gltf_model.hpp>
+#include <common/ray_intersection.hpp>
 #include <common/triangle_attributes.hpp>
 
-#include <fmt/format.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <webgpu/webgpu.h>
@@ -28,6 +28,7 @@ void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
 struct UiState
 {
     float vfovDegrees = 70.0f;
+    float focusDistance = 5.0f;
     // sampling
     int numSamplesPerPixel = 128;
     int numBounces = 4;
@@ -47,6 +48,7 @@ struct AppState
     std::vector<nlrs::BvhNode>   bvhNodes;
     std::vector<nlrs::Positions> positions;
     UiState                      ui;
+    bool                         focusPressed = false;
 };
 
 int main(int argc, char** argv)
@@ -124,6 +126,7 @@ int main(int argc, char** argv)
                 .bvhNodes = std::move(bvhNodes),
                 .positions = std::move(positions),
                 .ui = UiState{},
+                .focusPressed = false,
             };
 
             nlrs::Renderer renderer{rendererDesc, gpuContext, std::move(scene)};
@@ -132,7 +135,6 @@ int main(int argc, char** argv)
         }();
 
         {
-
             nlrs::Extent2i curFramebufferSize = window.resolution();
             auto           lastTime = std::chrono::steady_clock::now();
             while (!glfwWindowShouldClose(window.ptr()))
@@ -217,6 +219,13 @@ int main(int argc, char** argv)
                     ImGui::SliderFloat("camera vfov", &appState.ui.vfovDegrees, 10.0f, 120.0f);
                     appState.cameraController.vfov() =
                         nlrs::Angle::degrees(appState.ui.vfovDegrees);
+                    ImGui::SliderFloat(
+                        "camera focus distance",
+                        &appState.ui.focusDistance,
+                        0.1f,
+                        50.0f,
+                        "%.2f",
+                        ImGuiSliderFlags_Logarithmic);
 
                     ImGui::Separator();
                     ImGui::Text("Post processing");
@@ -254,6 +263,45 @@ int main(int argc, char** argv)
                     if (!ImGui::GetIO().WantCaptureMouse)
                     {
                         appState.cameraController.update(window.ptr(), deltaTime);
+                    }
+
+                    // Check if mouse button pressed
+                    if (glfwGetMouseButton(window.ptr(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS &&
+                        !appState.focusPressed)
+                    {
+                        appState.focusPressed = true;
+
+                        double x, y;
+                        glfwGetCursorPos(window.ptr(), &x, &y);
+
+                        const auto windowResolution = window.resolution();
+
+                        const float u =
+                            static_cast<float>(x) / static_cast<float>(windowResolution.x);
+                        const float v =
+                            1.f - static_cast<float>(y) / static_cast<float>(windowResolution.y);
+
+                        const auto camera = appState.cameraController.getCamera();
+                        const auto ray = nlrs::generateCameraRay(camera, u, v);
+
+                        nlrs::Intersection hitData;
+                        if (nlrs::rayIntersectBvh(
+                                ray,
+                                appState.bvhNodes,
+                                appState.positions,
+                                1000.f,
+                                hitData,
+                                nullptr))
+                        {
+                            const float focusDistance =
+                                glm::distance(appState.cameraController.position(), hitData.p);
+                            appState.ui.focusDistance = focusDistance;
+                        }
+                    }
+
+                    if (glfwGetMouseButton(window.ptr(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE)
+                    {
+                        appState.focusPressed = false;
                     }
                 }
 
