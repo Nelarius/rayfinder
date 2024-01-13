@@ -217,7 +217,7 @@ Renderer::Renderer(
           gpuContext.device,
           "bvh nodes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const BvhNode>(scene.bvh.nodes)),
+          std::span<const BvhNode>(scene.bvhNodes)),
       positionAttributesBuffer(
           gpuContext.device,
           "position attributes buffer",

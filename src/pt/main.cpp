@@ -107,7 +107,7 @@ int main(int argc, char** argv)
             }
 
             nlrs::Scene scene{
-                .bvh = bvh,
+                .bvhNodes = bvh.nodes,
                 .positionAttributes = positionAttributes,
                 .vertexAttributes = vertexAttributes,
                 .baseColorTextures = model.baseColorTextures(),
