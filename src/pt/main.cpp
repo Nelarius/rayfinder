@@ -8,22 +8,24 @@
 #include <common/gltf_model.hpp>
 #include <common/triangle_attributes.hpp>
 
+#include <fmt/format.h>
+#include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <webgpu/webgpu.h>
+
 #include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <tuple>
 #include <utility>
-
-#include <GLFW/glfw3.h>
-#include <imgui.h>
-#include <webgpu/webgpu.h>
 
 inline constexpr int defaultWindowWidth = 640;
 inline constexpr int defaultWindowHeight = 480;
 
 void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
 
-struct Ui
+struct UiState
 {
     float vfovDegrees = 70.0f;
     // sampling
@@ -37,6 +39,14 @@ struct Ui
     // tonemapping
     int exposureStops = 3;
     int tonemapFn = 1;
+};
+
+struct AppState
+{
+    nlrs::FlyCameraController    cameraController;
+    std::vector<nlrs::BvhNode>   bvhNodes;
+    std::vector<nlrs::Positions> positions;
+    UiState                      ui;
 };
 
 int main(int argc, char** argv)
@@ -53,32 +63,19 @@ int main(int argc, char** argv)
     }};
 
     {
-        nlrs::FlyCameraController cameraController;
-        nlrs::GpuContext          gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);
-        nlrs::Gui                 gui(window.ptr(), gpuContext);
+        nlrs::GpuContext gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);
+        nlrs::Gui        gui(window.ptr(), gpuContext);
 
-        nlrs::Renderer renderer =
-            [&cameraController, &gpuContext, &window, argv]() -> nlrs::Renderer {
-            const nlrs::RendererDescriptor rendererDesc{
-                [&window, &cameraController]() -> nlrs::RenderParameters {
-                    const nlrs::Extent2i framebufferSize = window.resolution();
-                    return nlrs::RenderParameters{
-                        nlrs::Extent2u(framebufferSize),
-                        cameraController.getCamera(),
-                        nlrs::SamplingParams(),
-                        nlrs::Sky()};
-                }(),
-                window.largestMonitorResolution(),
-            };
-
+        auto [appState, renderer] =
+            [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::Renderer> {
             const nlrs::GltfModel model(argv[1]);
-            const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
+            auto [bvhNodes, triangleIndices] = nlrs::buildBvh(model.positions());
 
-            const auto positions = nlrs::reorderAttributes(model.positions(), bvh.triangleIndices);
-            const auto normals = nlrs::reorderAttributes(model.normals(), bvh.triangleIndices);
-            const auto texCoords = nlrs::reorderAttributes(model.texCoords(), bvh.triangleIndices);
+            const auto positions = nlrs::reorderAttributes(model.positions(), triangleIndices);
+            const auto normals = nlrs::reorderAttributes(model.normals(), triangleIndices);
+            const auto texCoords = nlrs::reorderAttributes(model.texCoords(), triangleIndices);
             const auto textureIndices =
-                nlrs::reorderAttributes(model.baseColorTextureIndices(), bvh.triangleIndices);
+                nlrs::reorderAttributes(model.baseColorTextureIndices(), triangleIndices);
 
             assert(positions.size() == normals.size());
             assert(positions.size() == texCoords.size());
@@ -106,18 +103,35 @@ int main(int argc, char** argv)
                     .textureIdx = textureIdx});
             }
 
+            const nlrs::RendererDescriptor rendererDesc{
+                nlrs::RenderParameters{
+                    nlrs::Extent2u(window.resolution()),
+                    nlrs::FlyCameraController{}.getCamera(),
+                    nlrs::SamplingParams(),
+                    nlrs::Sky()},
+                window.largestMonitorResolution(),
+            };
+
             nlrs::Scene scene{
-                .bvhNodes = bvh.nodes,
+                .bvhNodes = bvhNodes,
                 .positionAttributes = positionAttributes,
                 .vertexAttributes = vertexAttributes,
                 .baseColorTextures = model.baseColorTextures(),
             };
 
-            return nlrs::Renderer(rendererDesc, gpuContext, std::move(scene));
+            AppState app{
+                .cameraController{},
+                .bvhNodes = std::move(bvhNodes),
+                .positions = std::move(positions),
+                .ui = UiState{},
+            };
+
+            nlrs::Renderer renderer{rendererDesc, gpuContext, std::move(scene)};
+
+            return std::make_tuple(std::move(app), std::move(renderer));
         }();
 
         {
-            Ui ui{};
 
             nlrs::Extent2i curFramebufferSize = window.resolution();
             auto           lastTime = std::chrono::steady_clock::now();
@@ -172,50 +186,54 @@ int main(int argc, char** argv)
 
                     ImGui::Text("num samples:");
                     ImGui::SameLine();
-                    ImGui::RadioButton("64", &ui.numSamplesPerPixel, 64);
+                    ImGui::RadioButton("64", &appState.ui.numSamplesPerPixel, 64);
                     ImGui::SameLine();
-                    ImGui::RadioButton("128", &ui.numSamplesPerPixel, 128);
+                    ImGui::RadioButton("128", &appState.ui.numSamplesPerPixel, 128);
                     ImGui::SameLine();
-                    ImGui::RadioButton("256", &ui.numSamplesPerPixel, 256);
+                    ImGui::RadioButton("256", &appState.ui.numSamplesPerPixel, 256);
 
                     ImGui::Text("num bounces:");
                     ImGui::SameLine();
-                    ImGui::RadioButton("2", &ui.numBounces, 2);
+                    ImGui::RadioButton("2", &appState.ui.numBounces, 2);
                     ImGui::SameLine();
-                    ImGui::RadioButton("4", &ui.numBounces, 4);
+                    ImGui::RadioButton("4", &appState.ui.numBounces, 4);
                     ImGui::SameLine();
-                    ImGui::RadioButton("8", &ui.numBounces, 8);
+                    ImGui::RadioButton("8", &appState.ui.numBounces, 8);
 
-                    ImGui::SliderFloat("sun zenith", &ui.sunZenithDegrees, 0.0f, 90.0f, "%.2f");
-                    ImGui::SliderFloat("sun azimuth", &ui.sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
-                    ImGui::SliderFloat("sky turbidity", &ui.skyTurbidity, 1.0f, 10.0f, "%.2f");
+                    ImGui::SliderFloat(
+                        "sun zenith", &appState.ui.sunZenithDegrees, 0.0f, 90.0f, "%.2f");
+                    ImGui::SliderFloat(
+                        "sun azimuth", &appState.ui.sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
+                    ImGui::SliderFloat(
+                        "sky turbidity", &appState.ui.skyTurbidity, 1.0f, 10.0f, "%.2f");
 
                     ImGui::SliderFloat(
                         "camera speed",
-                        &cameraController.speed(),
+                        &appState.cameraController.speed(),
                         0.05f,
                         100.0f,
                         "%.2f",
                         ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat("camera vfov", &ui.vfovDegrees, 10.0f, 120.0f);
-                    cameraController.vfov() = nlrs::Angle::degrees(ui.vfovDegrees);
+                    ImGui::SliderFloat("camera vfov", &appState.ui.vfovDegrees, 10.0f, 120.0f);
+                    appState.cameraController.vfov() =
+                        nlrs::Angle::degrees(appState.ui.vfovDegrees);
 
                     ImGui::Separator();
                     ImGui::Text("Post processing");
 
-                    ImGui::SliderInt("exposure stops", &ui.exposureStops, 0, 10);
+                    ImGui::SliderInt("exposure stops", &appState.ui.exposureStops, 0, 10);
                     ImGui::Text("tonemap fn");
                     ImGui::SameLine();
-                    ImGui::RadioButton("linear", &ui.tonemapFn, 0);
+                    ImGui::RadioButton("linear", &appState.ui.tonemapFn, 0);
                     ImGui::SameLine();
-                    ImGui::RadioButton("filmic", &ui.tonemapFn, 1);
+                    ImGui::RadioButton("filmic", &appState.ui.tonemapFn, 1);
 
                     ImGui::Separator();
                     ImGui::Text("Camera");
                     {
-                        const glm::vec3 pos = cameraController.position();
-                        const auto      yaw = cameraController.yaw();
-                        const auto      pitch = cameraController.pitch();
+                        const glm::vec3 pos = appState.cameraController.position();
+                        const auto      yaw = appState.cameraController.yaw();
+                        const auto      pitch = appState.cameraController.pitch();
                         ImGui::Text("position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
                         ImGui::Text("yaw: %.2f", yaw.asDegrees());
                         ImGui::Text("pitch: %.2f", pitch.asDegrees());
@@ -235,7 +253,7 @@ int main(int argc, char** argv)
                     // Skip input if ImGui captured input
                     if (!ImGui::GetIO().WantCaptureMouse)
                     {
-                        cameraController.update(window.ptr(), deltaTime);
+                        appState.cameraController.update(window.ptr(), deltaTime);
                     }
                 }
 
@@ -244,23 +262,23 @@ int main(int argc, char** argv)
                 {
                     const nlrs::RenderParameters renderParams{
                         nlrs::Extent2u(window.resolution()),
-                        cameraController.getCamera(),
+                        appState.cameraController.getCamera(),
                         nlrs::SamplingParams{
-                            static_cast<std::uint32_t>(ui.numSamplesPerPixel),
-                            static_cast<std::uint32_t>(ui.numBounces),
+                            static_cast<std::uint32_t>(appState.ui.numSamplesPerPixel),
+                            static_cast<std::uint32_t>(appState.ui.numBounces),
                         },
                         nlrs::Sky{
-                            ui.skyTurbidity,
-                            ui.skyAlbedo,
-                            ui.sunZenithDegrees,
-                            ui.sunAzimuthDegrees,
+                            appState.ui.skyTurbidity,
+                            appState.ui.skyAlbedo,
+                            appState.ui.sunZenithDegrees,
+                            appState.ui.sunAzimuthDegrees,
                         },
                     };
                     renderer.setRenderParameters(renderParams);
 
                     const nlrs::PostProcessingParameters postProcessingParams{
-                        static_cast<std::uint32_t>(ui.exposureStops),
-                        static_cast<nlrs::Tonemapping>(ui.tonemapFn),
+                        static_cast<std::uint32_t>(appState.ui.exposureStops),
+                        static_cast<nlrs::Tonemapping>(appState.ui.tonemapFn),
                     };
                     renderer.setPostProcessingParameters(postProcessingParams);
 
