@@ -28,7 +28,6 @@ void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
 struct UiState
 {
     float vfovDegrees = 70.0f;
-    float focusDistance = 5.0f;
     // sampling
     int numSamplesPerPixel = 128;
     int numBounces = 4;
@@ -221,11 +220,17 @@ int main(int argc, char** argv)
                         nlrs::Angle::degrees(appState.ui.vfovDegrees);
                     ImGui::SliderFloat(
                         "camera focus distance",
-                        &appState.ui.focusDistance,
+                        &appState.cameraController.focusDistance(),
                         0.1f,
                         50.0f,
                         "%.2f",
                         ImGuiSliderFlags_Logarithmic);
+                    ImGui::SliderFloat(
+                        "camera lens radius",
+                        &appState.cameraController.aperture(),
+                        0.0f,
+                        0.5f,
+                        "%.2f");
 
                     ImGui::Separator();
                     ImGui::Text("Post processing");
@@ -273,29 +278,34 @@ int main(int argc, char** argv)
 
                         double x, y;
                         glfwGetCursorPos(window.ptr(), &x, &y);
-
-                        const auto windowResolution = window.resolution();
-
-                        const float u =
-                            static_cast<float>(x) / static_cast<float>(windowResolution.x);
-                        const float v =
-                            1.f - static_cast<float>(y) / static_cast<float>(windowResolution.y);
-
-                        const auto camera = appState.cameraController.getCamera();
-                        const auto ray = nlrs::generateCameraRay(camera, u, v);
-
-                        nlrs::Intersection hitData;
-                        if (nlrs::rayIntersectBvh(
-                                ray,
-                                appState.bvhNodes,
-                                appState.positions,
-                                1000.f,
-                                hitData,
-                                nullptr))
+                        const auto windowSize = window.size();
+                        if ((x >= 0.0 && x < static_cast<double>(windowSize.x)) &&
+                            (y >= 0.0 && y < static_cast<double>(windowSize.y)))
                         {
-                            const float focusDistance =
-                                glm::distance(appState.cameraController.position(), hitData.p);
-                            appState.ui.focusDistance = focusDistance;
+                            const float u =
+                                static_cast<float>(x) / static_cast<float>(windowSize.x);
+                            const float v =
+                                1.f - static_cast<float>(y) / static_cast<float>(windowSize.y);
+
+                            const auto camera = appState.cameraController.getCamera();
+                            const auto ray = nlrs::generateCameraRay(camera, u, v);
+
+                            nlrs::Intersection hitData;
+                            if (nlrs::rayIntersectBvh(
+                                    ray,
+                                    appState.bvhNodes,
+                                    appState.positions,
+                                    1000.f,
+                                    hitData,
+                                    nullptr))
+                            {
+                                const glm::vec3 dir =
+                                    hitData.p - appState.cameraController.position();
+                                const glm::vec3 cameraForward =
+                                    appState.cameraController.orientation().forward;
+                                const float focusDistance = glm::dot(dir, cameraForward);
+                                appState.cameraController.focusDistance() = focusDistance;
+                            }
                         }
                     }
 

@@ -114,6 +114,8 @@ struct Camera {
     lowerLeftCorner: vec3f,
     horizontal: vec3f,
     vertical: vec3f,
+    up: vec3f,
+    right: vec3f,
     lensRadius: f32,
 }
 
@@ -247,7 +249,10 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
 
 @must_use
 fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
-    let origin = camera.origin;
+    let randomPointInLens = camera.lensRadius * rngNextVec2InUnitDisk(rngState);
+    let lensOffset = randomPointInLens.x * camera.right + randomPointInLens.y * camera.up;
+
+    let origin = camera.origin + lensOffset;
     let direction = normalize(camera.lowerLeftCorner + u * camera.horizontal + v * camera.vertical - origin);
 
     return Ray(origin, direction);
@@ -615,6 +620,21 @@ fn rngNextInCosineWeightedHemisphere(state: ptr<function, u32>) -> vec3f {
     let z = sqrt(u1);
 
     return vec3(x, y, z);
+}
+
+@must_use
+fn rngNextVec2InUnitDisk(state: ptr<function, u32>) -> vec2f {
+    // Generate numbers uniformly in a disk:
+    // https://stats.stackexchange.com/a/481559
+
+    // r^2 is distributed as U(0, 1).
+    let r = sqrt(rngNextFloat(state));
+    let alpha = 2f * PI * rngNextFloat(state);
+
+    let x = r * cos(alpha);
+    let y = r * sin(alpha);
+
+    return vec2(x, y);
 }
 
 @must_use

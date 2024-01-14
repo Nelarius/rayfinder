@@ -13,6 +13,8 @@ struct Camera
     glm::vec3 lowerLeftCorner;
     glm::vec3 horizontal;
     glm::vec3 vertical;
+    glm::vec3 up;
+    glm::vec3 right;
     float     lensRadius;
 
     bool operator==(const Camera& rhs) const noexcept = default;
