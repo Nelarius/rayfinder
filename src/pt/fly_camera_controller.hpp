@@ -52,7 +52,7 @@ private:
 
     // Input state
 
-    float mSpeed = 5.0f;
+    float mSpeed = 1.0f;
     bool  mLeftPressed = false;
     bool  mRightPressed = false;
     bool  mForwardPressed = false;

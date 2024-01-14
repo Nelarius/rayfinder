@@ -30,14 +30,14 @@ struct UiState
     float vfovDegrees = 70.0f;
     // sampling
     int numSamplesPerPixel = 128;
-    int numBounces = 4;
+    int numBounces = 2;
     // sky
     float                sunZenithDegrees = 30.0f;
     float                sunAzimuthDegrees = 0.0f;
     float                skyTurbidity = 1.0f;
     std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
     // tonemapping
-    int exposureStops = 3;
+    int exposureStops = 2;
     int tonemapFn = 1;
 };
 
