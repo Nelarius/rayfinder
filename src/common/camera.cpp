@@ -33,20 +33,14 @@ Camera createCamera(
         .lowerLeftCorner = lowerLeftCorner,
         .horizontal = horizontal,
         .vertical = vertical,
+        .up = up,
+        .right = right,
         .lensRadius = lensRadius,
     };
 }
 
 Ray generateCameraRay(const Camera& camera, const float u, const float v)
 {
-    // TODO: this does not implement lens offsets using the lens radius. It is not needed for tests
-    // at the moment. CPU-raytracing would need it for depth of field effects. Here is a quick
-    // sketch of what it could look like (WGSL code):
-    // ````
-    // let randomPointInLens = camera.lensRadius * rngNextVec3InUnitDisk(rngState);
-    // let lensOffset = randomPointInLens.x * camera.u + randomPointInLens.y * camera.v;
-    // let origin = camera.origin + lensOffset;
-    // ```
     const glm::vec3 origin = camera.origin;
     const glm::vec3 direction =
         camera.lowerLeftCorner + camera.horizontal * u + camera.vertical * v - origin;

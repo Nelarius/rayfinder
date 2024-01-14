@@ -64,6 +64,10 @@ struct CameraLayout
     glm::vec3 horizontal;
     float     padding2;
     glm::vec3 vertical;
+    float     padding3;
+    glm::vec3 up;
+    float     padding4;
+    glm::vec3 right;
     float     lensRadius;
 
     CameraLayout(const Camera& c)
@@ -74,6 +78,10 @@ struct CameraLayout
           horizontal(c.horizontal),
           padding2(0.0f),
           vertical(c.vertical),
+          padding3(0.0f),
+          up(c.up),
+          padding4(0.0f),
+          right(c.right),
           lensRadius(c.lensRadius)
     {
     }
@@ -217,7 +225,7 @@ Renderer::Renderer(
           gpuContext.device,
           "bvh nodes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-          std::span<const BvhNode>(scene.bvh.nodes)),
+          std::span<const BvhNode>(scene.bvhNodes)),
       positionAttributesBuffer(
           gpuContext.device,
           "position attributes buffer",
