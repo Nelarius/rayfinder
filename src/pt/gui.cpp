@@ -1,5 +1,6 @@
 #include "gpu_context.hpp"
 #include "gui.hpp"
+#include "window.hpp"
 
 #include <GLFW/glfw3.h>
 #include <imgui_impl_glfw.h>
@@ -30,7 +31,7 @@ Gui::Gui(GLFWwindow* window, const GpuContext& gpuContext)
     ImGui_ImplWGPU_Init(
         gpuContext.device,
         swapchainFramesInFlight,
-        GpuContext::swapChainFormat,
+        Window::SWAP_CHAIN_FORMAT,
         depthStencilTextureFormat);
 }
 

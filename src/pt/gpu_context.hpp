@@ -10,16 +10,11 @@ namespace nlrs
 {
 struct GpuContext
 {
-    WGPUSurface   surface;
-    WGPUDevice    device;
-    WGPUQueue     queue;
-    WGPUSwapChain swapChain;
+    WGPUInstance instance;
+    WGPUDevice   device;
+    WGPUQueue    queue;
 
-    GpuContext(GLFWwindow*, const WGPURequiredLimits&);
+    GpuContext(const WGPURequiredLimits&);
     ~GpuContext();
-
-    void resizeFramebuffer(const Extent2i&);
-
-    constexpr static WGPUTextureFormat swapChainFormat = WGPUTextureFormat_BGRA8Unorm;
 };
 } // namespace nlrs

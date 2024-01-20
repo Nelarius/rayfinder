@@ -3,7 +3,6 @@
 #include <common/platform.hpp>
 
 #include <GLFW/glfw3.h>
-#include <glfw3webgpu.h>
 
 #include <array>
 #include <cassert>
@@ -93,37 +92,11 @@ void onQueueWorkDone(WGPUQueueWorkDoneStatus status, void* /*userdata*/)
     std::fprintf(stderr, "Queue work done status: %s\n", WGPUQueueWorkDoneStatusToStr(status));
 }
 
-WGPUSwapChain createSwapChain(
-    const WGPUDevice        device,
-    const WGPUSurface       surface,
-    const WGPUTextureFormat swapChainFormat,
-    const Extent2i          framebufferSize)
-{
-    const WGPUSwapChainDescriptor swapChainDesc{
-        .nextInChain = nullptr,
-        .label = "Swap chain",
-        .usage = WGPUTextureUsage_RenderAttachment,
-        .format = swapChainFormat,
-        .width = static_cast<std::uint32_t>(framebufferSize.x),
-        .height = static_cast<std::uint32_t>(framebufferSize.y),
-        .presentMode = WGPUPresentMode_Fifo,
-    };
-    return wgpuDeviceCreateSwapChain(device, surface, &swapChainDesc);
-}
-
 void instanceSafeRelease(const WGPUInstance instance)
 {
     if (instance != nullptr)
     {
         wgpuInstanceRelease(instance);
-    }
-}
-
-void surfaceSafeRelease(const WGPUSurface surface)
-{
-    if (surface != nullptr)
-    {
-        wgpuSurfaceRelease(surface);
     }
 }
 
@@ -150,28 +123,14 @@ void queueSafeRelease(const WGPUQueue queue)
         wgpuQueueRelease(queue);
     }
 }
-
-void swapChainSafeRelease(const WGPUSwapChain swapChain)
-{
-    if (swapChain != nullptr)
-    {
-        wgpuSwapChainRelease(swapChain);
-    }
-}
 } // namespace
 
-GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requiredLimits)
-    : surface(nullptr),
+GpuContext::GpuContext(const WGPURequiredLimits& requiredLimits)
+    : instance(nullptr),
       device(nullptr),
-      queue(nullptr),
-      swapChain(nullptr)
+      queue(nullptr)
 {
-    assert(window != nullptr);
-
-    Extent2i framebufferSize;
-    glfwGetFramebufferSize(window, &framebufferSize.x, &framebufferSize.y);
-
-    const WGPUInstance instance = []() -> WGPUInstance {
+    instance = []() -> WGPUInstance {
         // GPU timers are an unsafe API and are disabled by default due to exposing client
         // information. E.g. `ValidationTest::SetUp()` in
         // `src/dawn/tests/unittests/validation/ValidationTest.cpp` contains an example of how this
@@ -200,12 +159,7 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
         throw std::runtime_error("Failed to create WGPUInstance instance.");
     }
 
-    // TODO: passing in `WGPUSurfaceDescriptor` instance would be a way to not require a GLFW window
-    // pointer. `glfwGetWGPUSurface` creates that instance under the hood using platform-specific
-    // code.
-    surface = glfwGetWGPUSurface(instance, window);
-
-    const WGPUAdapter adapter = [instance]() -> WGPUAdapter {
+    const WGPUAdapter adapter = [this]() -> WGPUAdapter {
         const WGPURequestAdapterOptions adapterOptions = {};
         WGPUAdapter                     adapter = nullptr;
 
@@ -283,32 +237,16 @@ GpuContext::GpuContext(GLFWwindow* const window, const WGPURequiredLimits& requi
     queue = wgpuDeviceGetQueue(device);
     wgpuQueueOnSubmittedWorkDone(queue, onQueueWorkDone, nullptr);
 
-    swapChain = createSwapChain(device, surface, swapChainFormat, framebufferSize);
-
     adapterSafeRelease(adapter);
-    instanceSafeRelease(instance);
 }
 
 GpuContext::~GpuContext()
 {
-    swapChainSafeRelease(swapChain);
-    swapChain = nullptr;
     queueSafeRelease(queue);
     queue = nullptr;
     deviceSafeRelease(device);
     device = nullptr;
-    surfaceSafeRelease(surface);
-    surface = nullptr;
-}
-
-void GpuContext::resizeFramebuffer(const Extent2i& newSize)
-{
-    if (newSize.x == 0 || newSize.y == 0)
-    {
-        return;
-    }
-
-    swapChainSafeRelease(swapChain);
-    swapChain = createSwapChain(device, surface, swapChainFormat, newSize);
+    instanceSafeRelease(instance);
+    instance = nullptr;
 }
 } // namespace nlrs

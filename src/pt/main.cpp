@@ -58,14 +58,17 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    nlrs::Window window{nlrs::WindowDescriptor{
-        .windowSize = nlrs::Extent2i{defaultWindowWidth, defaultWindowHeight},
-        .title = "pt-playground 🛝",
-    }};
+    nlrs::GpuContext gpuContext{nlrs::Renderer::wgpuRequiredLimits};
+    nlrs::Window     window = [&gpuContext]() -> nlrs::Window {
+        const nlrs::WindowDescriptor windowDesc{
+                .windowSize = nlrs::Extent2i{defaultWindowWidth, defaultWindowHeight},
+                .title = "pt-playground 🛝",
+        };
+        return nlrs::Window{windowDesc, gpuContext};
+    }();
 
     {
-        nlrs::GpuContext gpuContext(window.ptr(), nlrs::Renderer::wgpuRequiredLimits);
-        nlrs::Gui        gui(window.ptr(), gpuContext);
+        nlrs::Gui gui(window.ptr(), gpuContext);
 
         auto [appState, renderer] =
             [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::Renderer> {
@@ -152,7 +155,7 @@ int main(int argc, char** argv)
                     if (newFramebufferSize != curFramebufferSize)
                     {
                         curFramebufferSize = newFramebufferSize;
-                        gpuContext.resizeFramebuffer(curFramebufferSize);
+                        window.resizeFramebuffer(curFramebufferSize, gpuContext);
                     }
                 }
 
@@ -340,10 +343,10 @@ int main(int argc, char** argv)
                     };
                     renderer.setPostProcessingParameters(postProcessingParams);
 
-                    renderer.render(gpuContext, gui);
+                    renderer.render(gpuContext, window, gui);
                 }
 
-                wgpuSwapChainPresent(gpuContext.swapChain);
+                window.present();
             }
         }
     }

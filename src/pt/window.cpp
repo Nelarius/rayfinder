@@ -1,19 +1,61 @@
+#include "gpu_context.hpp"
 #include "window.hpp"
 
+#include <common/assert.hpp>
+
 #include <GLFW/glfw3.h>
+#include <glfw3webgpu.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 
-#include <cassert>
 #include <format>
 #include <stdexcept>
 
 namespace nlrs
 {
+namespace
+{
+void surfaceSafeRelease(const WGPUSurface surface)
+{
+    if (surface != nullptr)
+    {
+        wgpuSurfaceRelease(surface);
+    }
+}
+
+void swapChainSafeRelease(const WGPUSwapChain swapChain)
+{
+    if (swapChain != nullptr)
+    {
+        wgpuSwapChainRelease(swapChain);
+    }
+}
+
+WGPUSwapChain createSwapChain(
+    const WGPUDevice        device,
+    const WGPUSurface       surface,
+    const WGPUTextureFormat swapChainFormat,
+    const Extent2i          framebufferSize)
+{
+    const WGPUSwapChainDescriptor swapChainDesc{
+        .nextInChain = nullptr,
+        .label = "Swap chain",
+        .usage = WGPUTextureUsage_RenderAttachment,
+        .format = swapChainFormat,
+        .width = static_cast<std::uint32_t>(framebufferSize.x),
+        .height = static_cast<std::uint32_t>(framebufferSize.y),
+        .presentMode = WGPUPresentMode_Fifo,
+    };
+    return wgpuDeviceCreateSwapChain(device, surface, &swapChainDesc);
+}
+} // namespace
+
 int Window::glfwRefCount = 0;
 
-Window::Window(const WindowDescriptor& windowDesc)
-    : mWindow(nullptr)
+Window::Window(const WindowDescriptor& windowDesc, const GpuContext& gpuContext)
+    : mWindow(nullptr),
+      mSurface(nullptr),
+      mSwapChain(nullptr)
 {
     if (glfwRefCount++ == 0)
     {
@@ -37,6 +79,48 @@ Window::Window(const WindowDescriptor& windowDesc)
     {
         throw std::runtime_error("Failed to create GLFW window.");
     }
+
+    mSurface = glfwGetWGPUSurface(gpuContext.instance, mWindow);
+    Extent2i framebufferSize;
+    glfwGetFramebufferSize(mWindow, &framebufferSize.x, &framebufferSize.y);
+    mSwapChain = createSwapChain(gpuContext.device, mSurface, SWAP_CHAIN_FORMAT, framebufferSize);
+}
+
+Window::Window(Window&& other)
+    : mWindow(other.mWindow),
+      mSurface(other.mSurface),
+      mSwapChain(other.mSwapChain)
+{
+    other.mWindow = nullptr;
+    other.mSurface = nullptr;
+    other.mSwapChain = nullptr;
+}
+
+Window& Window::operator=(Window&& other)
+{
+    if (this != &other)
+    {
+        if (mWindow)
+        {
+            glfwDestroyWindow(mWindow);
+        }
+
+        surfaceSafeRelease(mSurface);
+        swapChainSafeRelease(mSwapChain);
+
+        glfwRefCount -= 1;
+        NLRS_ASSERT(glfwRefCount > 0);
+
+        mWindow = other.mWindow;
+        mSurface = other.mSurface;
+        mSwapChain = other.mSwapChain;
+
+        other.mWindow = nullptr;
+        other.mSurface = nullptr;
+        other.mSwapChain = nullptr;
+    }
+
+    return *this;
 }
 
 Window::~Window()
@@ -46,6 +130,11 @@ Window::~Window()
         glfwDestroyWindow(mWindow);
         mWindow = nullptr;
     }
+
+    surfaceSafeRelease(mSurface);
+    mSurface = nullptr;
+    swapChainSafeRelease(mSwapChain);
+    mSwapChain = nullptr;
 
     if (--glfwRefCount == 0)
     {
@@ -72,7 +161,7 @@ Extent2i Window::largestMonitorResolution() const
     int           monitorCount;
     GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
 
-    assert(monitorCount > 0);
+    NLRS_ASSERT(monitorCount > 0);
 
     int      maxArea = 0;
     Extent2i maxResolution;
@@ -99,4 +188,17 @@ Extent2i Window::largestMonitorResolution() const
 
     return maxResolution;
 }
+
+void Window::resizeFramebuffer(const Extent2i& newSize, const GpuContext& gpuContext)
+{
+    if (newSize.x == 0 || newSize.y == 0)
+    {
+        return;
+    }
+
+    swapChainSafeRelease(mSwapChain);
+    mSwapChain = createSwapChain(gpuContext.device, mSurface, SWAP_CHAIN_FORMAT, newSize);
+}
+
+void Window::present() { wgpuSwapChainPresent(mSwapChain); }
 } // namespace nlrs
