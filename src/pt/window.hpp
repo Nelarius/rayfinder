@@ -37,7 +37,6 @@ public:
     // Returns the size of the window in pixels.
     Extent2i resolution() const;
     // Returns the largest monitor, in pixels, by pixel count.
-    Extent2i largestMonitorResolution() const;
 
     // Update
 

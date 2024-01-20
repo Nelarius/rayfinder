@@ -4,6 +4,7 @@
 #include "renderer.hpp"
 #include "window.hpp"
 
+#include <common/assert.hpp>
 #include <common/bvh.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
@@ -49,6 +50,39 @@ struct AppState
     UiState                      ui;
     bool                         focusPressed = false;
 };
+
+nlrs::Extent2i largestMonitorResolution()
+{
+    int           monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+
+    NLRS_ASSERT(monitorCount > 0);
+
+    int            maxArea = 0;
+    nlrs::Extent2i maxResolution;
+
+    for (int i = 0; i < monitorCount; ++i)
+    {
+        GLFWmonitor* const monitor = monitors[i];
+
+        float xscale, yscale;
+        glfwGetMonitorContentScale(monitor, &xscale, &yscale);
+
+        const GLFWvidmode* const mode = glfwGetVideoMode(monitor);
+
+        const int xpixels = static_cast<int>(xscale * mode->width + 0.5f);
+        const int ypixels = static_cast<int>(yscale * mode->height + 0.5f);
+        const int area = xpixels * ypixels;
+
+        if (area > maxArea)
+        {
+            maxArea = area;
+            maxResolution = nlrs::Extent2i(xpixels, ypixels);
+        }
+    }
+
+    return maxResolution;
+}
 
 int main(int argc, char** argv)
 {
@@ -113,7 +147,7 @@ int main(int argc, char** argv)
                     nlrs::FlyCameraController{}.getCamera(),
                     nlrs::SamplingParams(),
                     nlrs::Sky()},
-                window.largestMonitorResolution(),
+                largestMonitorResolution(),
             };
 
             nlrs::Scene scene{

@@ -156,39 +156,6 @@ Extent2i Window::resolution() const
     return result;
 }
 
-Extent2i Window::largestMonitorResolution() const
-{
-    int           monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-
-    NLRS_ASSERT(monitorCount > 0);
-
-    int      maxArea = 0;
-    Extent2i maxResolution;
-
-    for (int i = 0; i < monitorCount; ++i)
-    {
-        GLFWmonitor* const monitor = monitors[i];
-
-        float xscale, yscale;
-        glfwGetMonitorContentScale(monitor, &xscale, &yscale);
-
-        const GLFWvidmode* const mode = glfwGetVideoMode(monitor);
-
-        const int xpixels = static_cast<int>(xscale * mode->width + 0.5f);
-        const int ypixels = static_cast<int>(yscale * mode->height + 0.5f);
-        const int area = xpixels * ypixels;
-
-        if (area > maxArea)
-        {
-            maxArea = area;
-            maxResolution = Extent2i(xpixels, ypixels);
-        }
-    }
-
-    return maxResolution;
-}
-
 void Window::resizeFramebuffer(const Extent2i& newSize, const GpuContext& gpuContext)
 {
     if (newSize.x == 0 || newSize.y == 0)
