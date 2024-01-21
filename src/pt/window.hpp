@@ -4,6 +4,7 @@
 
 #include <webgpu/webgpu.h>
 
+#include <functional>
 #include <string_view>
 
 struct GLFWwindow;
@@ -17,6 +18,10 @@ struct WindowDescriptor
     Extent2i         windowSize;
     std::string_view title;
 };
+
+using NewFrameCallback = std::function<void()>;
+using UpdateCallback = std::function<void(GLFWwindow*, float)>;
+using RenderCallback = std::function<void(GLFWwindow*, WGPUSwapChain)>;
 
 class Window
 {
@@ -38,16 +43,13 @@ public:
     Extent2i resolution() const;
     // Returns the largest monitor, in pixels, by pixel count.
 
-    // Update
+    // Run loop
 
-    void resizeFramebuffer(const Extent2i&, const GpuContext&);
-    void present();
+    void run(const GpuContext&, NewFrameCallback&&, UpdateCallback&&, RenderCallback&&);
 
     // Raw access
 
     GLFWwindow* ptr() const { return mWindow; }
-
-    WGPUSwapChain swapChain() const { return mSwapChain; }
 
     constexpr static WGPUTextureFormat SWAP_CHAIN_FORMAT = WGPUTextureFormat_BGRA8Unorm;
 

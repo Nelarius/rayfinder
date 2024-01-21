@@ -101,289 +101,240 @@ int main(int argc, char** argv)
         return nlrs::Window{windowDesc, gpuContext};
     }();
 
-    {
-        nlrs::Gui gui(window.ptr(), gpuContext);
+    nlrs::Gui gui(window.ptr(), gpuContext);
 
-        auto [appState, renderer] =
-            [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::Renderer> {
-            const nlrs::GltfModel model(argv[1]);
-            auto [bvhNodes, triangleIndices] = nlrs::buildBvh(model.positions());
+    auto [appState, renderer] =
+        [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::Renderer> {
+        const nlrs::GltfModel model(argv[1]);
+        auto [bvhNodes, triangleIndices] = nlrs::buildBvh(model.positions());
 
-            const auto positions = nlrs::reorderAttributes(model.positions(), triangleIndices);
-            const auto normals = nlrs::reorderAttributes(model.normals(), triangleIndices);
-            const auto texCoords = nlrs::reorderAttributes(model.texCoords(), triangleIndices);
-            const auto textureIndices =
-                nlrs::reorderAttributes(model.baseColorTextureIndices(), triangleIndices);
+        const auto positions = nlrs::reorderAttributes(model.positions(), triangleIndices);
+        const auto normals = nlrs::reorderAttributes(model.normals(), triangleIndices);
+        const auto texCoords = nlrs::reorderAttributes(model.texCoords(), triangleIndices);
+        const auto textureIndices =
+            nlrs::reorderAttributes(model.baseColorTextureIndices(), triangleIndices);
 
-            assert(positions.size() == normals.size());
-            assert(positions.size() == texCoords.size());
-            assert(positions.size() == textureIndices.size());
-            std::vector<nlrs::PositionAttribute> positionAttributes;
-            std::vector<nlrs::VertexAttributes>  vertexAttributes;
-            positionAttributes.reserve(positions.size());
-            vertexAttributes.reserve(positions.size());
-            for (std::size_t i = 0; i < normals.size(); ++i)
+        NLRS_ASSERT(positions.size() == normals.size());
+        NLRS_ASSERT(positions.size() == texCoords.size());
+        NLRS_ASSERT(positions.size() == textureIndices.size());
+        std::vector<nlrs::PositionAttribute> positionAttributes;
+        std::vector<nlrs::VertexAttributes>  vertexAttributes;
+        positionAttributes.reserve(positions.size());
+        vertexAttributes.reserve(positions.size());
+        for (std::size_t i = 0; i < normals.size(); ++i)
+        {
+            const auto& ps = positions[i];
+            const auto& ns = normals[i];
+            const auto& uvs = texCoords[i];
+            const auto  textureIdx = textureIndices[i];
+
+            positionAttributes.push_back(
+                nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
+            vertexAttributes.push_back(nlrs::VertexAttributes{
+                .n0 = ns.n0,
+                .n1 = ns.n1,
+                .n2 = ns.n2,
+                .uv0 = uvs.uv0,
+                .uv1 = uvs.uv1,
+                .uv2 = uvs.uv2,
+                .textureIdx = textureIdx});
+        }
+
+        const nlrs::RendererDescriptor rendererDesc{
+            nlrs::RenderParameters{
+                nlrs::Extent2u(window.resolution()),
+                nlrs::FlyCameraController{}.getCamera(),
+                nlrs::SamplingParams(),
+                nlrs::Sky()},
+            largestMonitorResolution(),
+        };
+
+        nlrs::Scene scene{
+            .bvhNodes = bvhNodes,
+            .positionAttributes = positionAttributes,
+            .vertexAttributes = vertexAttributes,
+            .baseColorTextures = model.baseColorTextures(),
+        };
+
+        AppState app{
+            .cameraController{},
+            .bvhNodes = std::move(bvhNodes),
+            .positions = std::move(positions),
+            .ui = UiState{},
+            .focusPressed = false,
+        };
+
+        nlrs::Renderer renderer{rendererDesc, gpuContext, std::move(scene)};
+
+        return std::make_tuple(std::move(app), std::move(renderer));
+    }();
+
+    auto onNewFrame = [&gpuContext, &gui, &renderer]() -> void {
+        // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
+        // TODO: implement some kind of pending buffer map queue and tick them here
+        while (wgpuBufferGetMapState(renderer.timestampBuffer.handle()) !=
+               WGPUBufferMapState_Unmapped)
+        {
+            wgpuDeviceTick(gpuContext.device);
+        }
+
+        gui.beginFrame();
+    };
+
+    auto onUpdate = [&appState, &renderer](GLFWwindow* windowPtr, float deltaTime) -> void {
+        {
+            // Skip input if ImGui captured input
+            if (!ImGui::GetIO().WantCaptureMouse)
             {
-                const auto& ps = positions[i];
-                const auto& ns = normals[i];
-                const auto& uvs = texCoords[i];
-                const auto  textureIdx = textureIndices[i];
-
-                positionAttributes.push_back(
-                    nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
-                vertexAttributes.push_back(nlrs::VertexAttributes{
-                    .n0 = ns.n0,
-                    .n1 = ns.n1,
-                    .n2 = ns.n2,
-                    .uv0 = uvs.uv0,
-                    .uv1 = uvs.uv1,
-                    .uv2 = uvs.uv2,
-                    .textureIdx = textureIdx});
+                appState.cameraController.update(windowPtr, deltaTime);
             }
 
-            const nlrs::RendererDescriptor rendererDesc{
-                nlrs::RenderParameters{
-                    nlrs::Extent2u(window.resolution()),
-                    nlrs::FlyCameraController{}.getCamera(),
-                    nlrs::SamplingParams(),
-                    nlrs::Sky()},
-                largestMonitorResolution(),
-            };
-
-            nlrs::Scene scene{
-                .bvhNodes = bvhNodes,
-                .positionAttributes = positionAttributes,
-                .vertexAttributes = vertexAttributes,
-                .baseColorTextures = model.baseColorTextures(),
-            };
-
-            AppState app{
-                .cameraController{},
-                .bvhNodes = std::move(bvhNodes),
-                .positions = std::move(positions),
-                .ui = UiState{},
-                .focusPressed = false,
-            };
-
-            nlrs::Renderer renderer{rendererDesc, gpuContext, std::move(scene)};
-
-            return std::make_tuple(std::move(app), std::move(renderer));
-        }();
-
-        {
-            nlrs::Extent2i curFramebufferSize = window.resolution();
-            auto           lastTime = std::chrono::steady_clock::now();
-            while (!glfwWindowShouldClose(window.ptr()))
+            // Check if mouse button pressed
+            if (glfwGetMouseButton(windowPtr, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS &&
+                !appState.focusPressed)
             {
-                const auto  currentTime = std::chrono::steady_clock::now();
-                const float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(
-                                            currentTime - lastTime)
-                                            .count();
-                lastTime = currentTime;
+                appState.focusPressed = true;
 
-                glfwPollEvents();
-
-                // Resize
+                double x, y;
+                glfwGetCursorPos(windowPtr, &x, &y);
+                nlrs::Extent2i windowSize;
+                glfwGetWindowSize(windowPtr, &windowSize.x, &windowSize.y);
+                if ((x >= 0.0 && x < static_cast<double>(windowSize.x)) &&
+                    (y >= 0.0 && y < static_cast<double>(windowSize.y)))
                 {
-                    const nlrs::Extent2i newFramebufferSize = window.resolution();
-                    if (newFramebufferSize != curFramebufferSize)
+                    const float u = static_cast<float>(x) / static_cast<float>(windowSize.x);
+                    const float v = 1.f - static_cast<float>(y) / static_cast<float>(windowSize.y);
+
+                    const auto camera = appState.cameraController.getCamera();
+                    const auto ray = nlrs::generateCameraRay(camera, u, v);
+
+                    nlrs::Intersection hitData;
+                    if (nlrs::rayIntersectBvh(
+                            ray, appState.bvhNodes, appState.positions, 1000.f, hitData, nullptr))
                     {
-                        curFramebufferSize = newFramebufferSize;
-                        window.resizeFramebuffer(curFramebufferSize, gpuContext);
+                        const glm::vec3 dir = hitData.p - appState.cameraController.position();
+                        const glm::vec3 cameraForward =
+                            appState.cameraController.orientation().forward;
+                        const float focusDistance = glm::dot(dir, cameraForward);
+                        appState.cameraController.focusDistance() = focusDistance;
                     }
                 }
+            }
 
-                // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
-                // TODO: implement some kind of pending buffer map queue and tick them here
-                while (wgpuBufferGetMapState(renderer.timestampBuffer.handle()) !=
-                       WGPUBufferMapState_Unmapped)
-                {
-                    wgpuDeviceTick(gpuContext.device);
-                }
-
-                gui.beginFrame();
-
-                // ImGui
-
-                {
-                    ImGui::Begin("pt");
-
-                    ImGui::Text("Renderer stats");
-                    {
-                        const float renderAverageMs = renderer.averageRenderpassDurationMs();
-                        const float progressPercentage = renderer.renderProgressPercentage();
-                        ImGui::Text(
-                            "render pass: %.2f ms (%.1f FPS)",
-                            renderAverageMs,
-                            1000.0f / renderAverageMs);
-                        ImGui::Text("render progress: %.2f %%", progressPercentage);
-                    }
-                    ImGui::Separator();
-
-                    ImGui::Text("Parameters");
-
-                    ImGui::Text("num samples:");
-                    ImGui::SameLine();
-                    ImGui::RadioButton("64", &appState.ui.numSamplesPerPixel, 64);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("128", &appState.ui.numSamplesPerPixel, 128);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("256", &appState.ui.numSamplesPerPixel, 256);
-
-                    ImGui::Text("num bounces:");
-                    ImGui::SameLine();
-                    ImGui::RadioButton("2", &appState.ui.numBounces, 2);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("4", &appState.ui.numBounces, 4);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("8", &appState.ui.numBounces, 8);
-
-                    ImGui::SliderFloat(
-                        "sun zenith", &appState.ui.sunZenithDegrees, 0.0f, 90.0f, "%.2f");
-                    ImGui::SliderFloat(
-                        "sun azimuth", &appState.ui.sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
-                    ImGui::SliderFloat(
-                        "sky turbidity", &appState.ui.skyTurbidity, 1.0f, 10.0f, "%.2f");
-
-                    ImGui::SliderFloat(
-                        "camera speed",
-                        &appState.cameraController.speed(),
-                        0.05f,
-                        100.0f,
-                        "%.2f",
-                        ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat("camera vfov", &appState.ui.vfovDegrees, 10.0f, 120.0f);
-                    appState.cameraController.vfov() =
-                        nlrs::Angle::degrees(appState.ui.vfovDegrees);
-                    ImGui::SliderFloat(
-                        "camera focus distance",
-                        &appState.cameraController.focusDistance(),
-                        0.1f,
-                        50.0f,
-                        "%.2f",
-                        ImGuiSliderFlags_Logarithmic);
-                    ImGui::SliderFloat(
-                        "camera lens radius",
-                        &appState.cameraController.aperture(),
-                        0.0f,
-                        0.5f,
-                        "%.2f");
-
-                    ImGui::Separator();
-                    ImGui::Text("Post processing");
-
-                    ImGui::SliderInt("exposure stops", &appState.ui.exposureStops, 0, 10);
-                    ImGui::Text("tonemap fn");
-                    ImGui::SameLine();
-                    ImGui::RadioButton("linear", &appState.ui.tonemapFn, 0);
-                    ImGui::SameLine();
-                    ImGui::RadioButton("filmic", &appState.ui.tonemapFn, 1);
-
-                    ImGui::Separator();
-                    ImGui::Text("Camera");
-                    {
-                        const glm::vec3 pos = appState.cameraController.position();
-                        const auto      yaw = appState.cameraController.yaw();
-                        const auto      pitch = appState.cameraController.pitch();
-                        ImGui::Text("position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
-                        ImGui::Text("yaw: %.2f", yaw.asDegrees());
-                        ImGui::Text("pitch: %.2f", pitch.asDegrees());
-                    }
-
-                    ImGui::End();
-                }
-
-                // Update
-
-                {
-                    if (glfwGetKey(window.ptr(), GLFW_KEY_ESCAPE) == GLFW_PRESS)
-                    {
-                        glfwSetWindowShouldClose(window.ptr(), GLFW_TRUE);
-                    }
-
-                    // Skip input if ImGui captured input
-                    if (!ImGui::GetIO().WantCaptureMouse)
-                    {
-                        appState.cameraController.update(window.ptr(), deltaTime);
-                    }
-
-                    // Check if mouse button pressed
-                    if (glfwGetMouseButton(window.ptr(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS &&
-                        !appState.focusPressed)
-                    {
-                        appState.focusPressed = true;
-
-                        double x, y;
-                        glfwGetCursorPos(window.ptr(), &x, &y);
-                        const auto windowSize = window.size();
-                        if ((x >= 0.0 && x < static_cast<double>(windowSize.x)) &&
-                            (y >= 0.0 && y < static_cast<double>(windowSize.y)))
-                        {
-                            const float u =
-                                static_cast<float>(x) / static_cast<float>(windowSize.x);
-                            const float v =
-                                1.f - static_cast<float>(y) / static_cast<float>(windowSize.y);
-
-                            const auto camera = appState.cameraController.getCamera();
-                            const auto ray = nlrs::generateCameraRay(camera, u, v);
-
-                            nlrs::Intersection hitData;
-                            if (nlrs::rayIntersectBvh(
-                                    ray,
-                                    appState.bvhNodes,
-                                    appState.positions,
-                                    1000.f,
-                                    hitData,
-                                    nullptr))
-                            {
-                                const glm::vec3 dir =
-                                    hitData.p - appState.cameraController.position();
-                                const glm::vec3 cameraForward =
-                                    appState.cameraController.orientation().forward;
-                                const float focusDistance = glm::dot(dir, cameraForward);
-                                appState.cameraController.focusDistance() = focusDistance;
-                            }
-                        }
-                    }
-
-                    if (glfwGetMouseButton(window.ptr(), GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE)
-                    {
-                        appState.focusPressed = false;
-                    }
-                }
-
-                // Render
-
-                {
-                    const nlrs::RenderParameters renderParams{
-                        nlrs::Extent2u(window.resolution()),
-                        appState.cameraController.getCamera(),
-                        nlrs::SamplingParams{
-                            static_cast<std::uint32_t>(appState.ui.numSamplesPerPixel),
-                            static_cast<std::uint32_t>(appState.ui.numBounces),
-                        },
-                        nlrs::Sky{
-                            appState.ui.skyTurbidity,
-                            appState.ui.skyAlbedo,
-                            appState.ui.sunZenithDegrees,
-                            appState.ui.sunAzimuthDegrees,
-                        },
-                    };
-                    renderer.setRenderParameters(renderParams);
-
-                    const nlrs::PostProcessingParameters postProcessingParams{
-                        static_cast<std::uint32_t>(appState.ui.exposureStops),
-                        static_cast<nlrs::Tonemapping>(appState.ui.tonemapFn),
-                    };
-                    renderer.setPostProcessingParameters(postProcessingParams);
-
-                    renderer.render(gpuContext, window, gui);
-                }
-
-                window.present();
+            if (glfwGetMouseButton(windowPtr, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE)
+            {
+                appState.focusPressed = false;
             }
         }
-    }
+        {
+            ImGui::Begin("pt");
+
+            ImGui::Text("Renderer stats");
+            {
+                const float renderAverageMs = renderer.averageRenderpassDurationMs();
+                const float progressPercentage = renderer.renderProgressPercentage();
+                ImGui::Text(
+                    "render pass: %.2f ms (%.1f FPS)", renderAverageMs, 1000.0f / renderAverageMs);
+                ImGui::Text("render progress: %.2f %%", progressPercentage);
+            }
+            ImGui::Separator();
+
+            ImGui::Text("Parameters");
+
+            ImGui::Text("num samples:");
+            ImGui::SameLine();
+            ImGui::RadioButton("64", &appState.ui.numSamplesPerPixel, 64);
+            ImGui::SameLine();
+            ImGui::RadioButton("128", &appState.ui.numSamplesPerPixel, 128);
+            ImGui::SameLine();
+            ImGui::RadioButton("256", &appState.ui.numSamplesPerPixel, 256);
+
+            ImGui::Text("num bounces:");
+            ImGui::SameLine();
+            ImGui::RadioButton("2", &appState.ui.numBounces, 2);
+            ImGui::SameLine();
+            ImGui::RadioButton("4", &appState.ui.numBounces, 4);
+            ImGui::SameLine();
+            ImGui::RadioButton("8", &appState.ui.numBounces, 8);
+
+            ImGui::SliderFloat("sun zenith", &appState.ui.sunZenithDegrees, 0.0f, 90.0f, "%.2f");
+            ImGui::SliderFloat("sun azimuth", &appState.ui.sunAzimuthDegrees, 0.0f, 360.0f, "%.2f");
+            ImGui::SliderFloat("sky turbidity", &appState.ui.skyTurbidity, 1.0f, 10.0f, "%.2f");
+
+            ImGui::SliderFloat(
+                "camera speed",
+                &appState.cameraController.speed(),
+                0.05f,
+                100.0f,
+                "%.2f",
+                ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat("camera vfov", &appState.ui.vfovDegrees, 10.0f, 120.0f);
+            appState.cameraController.vfov() = nlrs::Angle::degrees(appState.ui.vfovDegrees);
+            ImGui::SliderFloat(
+                "camera focus distance",
+                &appState.cameraController.focusDistance(),
+                0.1f,
+                50.0f,
+                "%.2f",
+                ImGuiSliderFlags_Logarithmic);
+            ImGui::SliderFloat(
+                "camera lens radius", &appState.cameraController.aperture(), 0.0f, 0.5f, "%.2f");
+
+            ImGui::Separator();
+            ImGui::Text("Post processing");
+
+            ImGui::SliderInt("exposure stops", &appState.ui.exposureStops, 0, 10);
+            ImGui::Text("tonemap fn");
+            ImGui::SameLine();
+            ImGui::RadioButton("linear", &appState.ui.tonemapFn, 0);
+            ImGui::SameLine();
+            ImGui::RadioButton("filmic", &appState.ui.tonemapFn, 1);
+
+            ImGui::Separator();
+            ImGui::Text("Camera");
+            {
+                const glm::vec3 pos = appState.cameraController.position();
+                const auto      yaw = appState.cameraController.yaw();
+                const auto      pitch = appState.cameraController.pitch();
+                ImGui::Text("position: (%.2f, %.2f, %.2f)", pos.x, pos.y, pos.z);
+                ImGui::Text("yaw: %.2f", yaw.asDegrees());
+                ImGui::Text("pitch: %.2f", pitch.asDegrees());
+            }
+
+            ImGui::End();
+        }
+    };
+
+    auto onRender = [&appState, &gpuContext, &gui, &renderer](
+                        GLFWwindow* windowPtr, WGPUSwapChain swapChain) -> void {
+        nlrs::Extent2i windowResolution;
+        glfwGetFramebufferSize(windowPtr, &windowResolution.x, &windowResolution.y);
+        const nlrs::RenderParameters renderParams{
+            nlrs::Extent2u(windowResolution),
+            appState.cameraController.getCamera(),
+            nlrs::SamplingParams{
+                static_cast<std::uint32_t>(appState.ui.numSamplesPerPixel),
+                static_cast<std::uint32_t>(appState.ui.numBounces),
+            },
+            nlrs::Sky{
+                appState.ui.skyTurbidity,
+                appState.ui.skyAlbedo,
+                appState.ui.sunZenithDegrees,
+                appState.ui.sunAzimuthDegrees,
+            },
+        };
+        renderer.setRenderParameters(renderParams);
+
+        const nlrs::PostProcessingParameters postProcessingParams{
+            static_cast<std::uint32_t>(appState.ui.exposureStops),
+            static_cast<nlrs::Tonemapping>(appState.ui.tonemapFn),
+        };
+        renderer.setPostProcessingParameters(postProcessingParams);
+
+        renderer.render(gpuContext, gui, swapChain);
+    };
+
+    window.run(gpuContext, std::move(onNewFrame), std::move(onUpdate), std::move(onRender));
 
     return 0;
 }

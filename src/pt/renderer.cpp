@@ -763,9 +763,9 @@ void Renderer::setPostProcessingParameters(const PostProcessingParameters& postP
     currentPostProcessingParams = postProcessingParameters;
 }
 
-void Renderer::render(const GpuContext& gpuContext, const Window& window, Gui& gui)
+void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
 {
-    const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(window.swapChain());
+    const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(swapChain);
     if (!nextTexture)
     {
         // Getting the next texture can fail, if e.g. the window has been resized.

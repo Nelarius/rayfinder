@@ -156,16 +156,52 @@ Extent2i Window::resolution() const
     return result;
 }
 
-void Window::resizeFramebuffer(const Extent2i& newSize, const GpuContext& gpuContext)
+void Window::run(
+    const GpuContext&  gpuContext,
+    NewFrameCallback&& newFrameCallback,
+    UpdateCallback&&   updateCallback,
+    RenderCallback&&   renderCallback)
 {
-    if (newSize.x == 0 || newSize.y == 0)
+    Extent2i currentFramebufferSize = resolution();
+    auto     lastTime = std::chrono::steady_clock::now();
+    while (!glfwWindowShouldClose(mWindow))
     {
-        return;
+        const auto  currentTime = std::chrono::steady_clock::now();
+        const float deltaTime =
+            std::chrono::duration<float, std::chrono::seconds::period>(currentTime - lastTime)
+                .count();
+        lastTime = currentTime;
+
+        glfwPollEvents();
+
+        // Resize
+        {
+            const Extent2i newFramebufferSize = resolution();
+            if (newFramebufferSize != currentFramebufferSize)
+            {
+                currentFramebufferSize = newFramebufferSize;
+
+                if (newFramebufferSize.x == 0 || newFramebufferSize.y == 0)
+                {
+                    return;
+                }
+
+                swapChainSafeRelease(mSwapChain);
+                mSwapChain = createSwapChain(
+                    gpuContext.device, mSurface, SWAP_CHAIN_FORMAT, newFramebufferSize);
+            }
+        }
+
+        if (glfwGetKey(mWindow, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+        {
+            glfwSetWindowShouldClose(mWindow, GLFW_TRUE);
+        }
+
+        newFrameCallback();
+        updateCallback(mWindow, deltaTime);
+        renderCallback(mWindow, mSwapChain);
+
+        wgpuSwapChainPresent(mSwapChain);
     }
-
-    swapChainSafeRelease(mSwapChain);
-    mSwapChain = createSwapChain(gpuContext.device, mSurface, SWAP_CHAIN_FORMAT, newSize);
 }
-
-void Window::present() { wgpuSwapChainPresent(mSwapChain); }
 } // namespace nlrs
