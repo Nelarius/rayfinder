@@ -1,6 +1,7 @@
 #include "gpu_context.hpp"
 #include "gui.hpp"
 #include "renderer.hpp"
+#include "window.hpp"
 
 #include <common/bvh.hpp>
 #include <common/gltf_model.hpp>
@@ -380,7 +381,7 @@ Renderer::Renderer(
 
         const WGPUColorTargetState colorTarget{
             .nextInChain = nullptr,
-            .format = GpuContext::swapChainFormat,
+            .format = Window::SWAP_CHAIN_FORMAT,
             .blend = &blendState,
             // We could write to only some of the color channels.
             .writeMask = WGPUColorWriteMask_All,
@@ -762,9 +763,9 @@ void Renderer::setPostProcessingParameters(const PostProcessingParameters& postP
     currentPostProcessingParams = postProcessingParameters;
 }
 
-void Renderer::render(const GpuContext& gpuContext, Gui& gui)
+void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
 {
-    const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(gpuContext.swapChain);
+    const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(swapChain);
     if (!nextTexture)
     {
         // Getting the next texture can fail, if e.g. the window has been resized.

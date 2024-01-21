@@ -18,6 +18,7 @@ namespace nlrs
 {
 struct GpuContext;
 class Gui;
+class Window;
 
 struct SamplingParams
 {
@@ -146,7 +147,7 @@ struct Renderer
 
     void setRenderParameters(const RenderParameters&);
     void setPostProcessingParameters(const PostProcessingParameters&);
-    void render(const GpuContext&, Gui&);
+    void render(const GpuContext&, Gui&, WGPUSwapChain);
 
     float averageRenderpassDurationMs() const;
     float renderProgressPercentage() const;
