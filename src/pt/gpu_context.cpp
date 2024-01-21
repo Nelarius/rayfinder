@@ -112,6 +112,7 @@ void deviceSafeRelease(const WGPUDevice device)
 {
     if (device != nullptr)
     {
+        wgpuDeviceDestroy(device);
         wgpuDeviceRelease(device);
     }
 }
