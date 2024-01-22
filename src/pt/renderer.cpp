@@ -765,6 +765,12 @@ void Renderer::setPostProcessingParameters(const PostProcessingParameters& postP
 
 void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
 {
+    // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
+    do
+    {
+        wgpuDeviceTick(gpuContext.device);
+    } while (wgpuBufferGetMapState(timestampBuffer.handle()) != WGPUBufferMapState_Unmapped);
+
     const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(swapChain);
     if (!nextTexture)
     {

@@ -169,17 +169,7 @@ int main(int argc, char** argv)
         return std::make_tuple(std::move(app), std::move(renderer));
     }();
 
-    auto onNewFrame = [&gpuContext, &gui, &renderer]() -> void {
-        // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
-        // TODO: implement some kind of pending buffer map queue and tick them here
-        while (wgpuBufferGetMapState(renderer.timestampBuffer.handle()) !=
-               WGPUBufferMapState_Unmapped)
-        {
-            wgpuDeviceTick(gpuContext.device);
-        }
-
-        gui.beginFrame();
-    };
+    auto onNewFrame = [&gui]() -> void { gui.beginFrame(); };
 
     auto onUpdate = [&appState, &renderer](GLFWwindow* windowPtr, float deltaTime) -> void {
         {
