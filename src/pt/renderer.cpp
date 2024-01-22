@@ -203,66 +203,66 @@ Renderer::Renderer(
     const RendererDescriptor& rendererDesc,
     const GpuContext&         gpuContext,
     const Scene               scene)
-    : vertexBuffer(),
-      uniformsBuffer(),
-      uniformsBindGroup(nullptr),
-      renderParamsBuffer(
+    : mVertexBuffer(),
+      mUniformsBuffer(),
+      mUniformsBindGroup(nullptr),
+      mRenderParamsBuffer(
           gpuContext.device,
           "render params buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(RenderParamsLayout)),
-      postProcessingParamsBuffer(
+      mPostProcessingParamsBuffer(
           gpuContext.device,
           "post processing params buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(PostProcessingParameters)),
-      skyStateBuffer(
+      mSkyStateBuffer(
           gpuContext.device,
           "sky state buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           sizeof(SkyStateLayout)),
-      renderParamsBindGroup(nullptr),
-      bvhNodeBuffer(
+      mRenderParamsBindGroup(nullptr),
+      mBvhNodeBuffer(
           gpuContext.device,
           "bvh nodes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           std::span<const BvhNode>(scene.bvhNodes)),
-      positionAttributesBuffer(
+      mPositionAttributesBuffer(
           gpuContext.device,
           "position attributes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           std::span<const PositionAttribute>(scene.positionAttributes)),
-      vertexAttributesBuffer(
+      mVertexAttributesBuffer(
           gpuContext.device,
           "vertex attributes buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           std::span<const VertexAttributes>(scene.vertexAttributes)),
-      textureDescriptorBuffer(),
-      textureBuffer(),
-      sceneBindGroup(nullptr),
-      imageBuffer(
+      mTextureDescriptorBuffer(),
+      mTextureBuffer(),
+      mSceneBindGroup(nullptr),
+      mImageBuffer(
           gpuContext.device,
           "image buffer",
           WGPUBufferUsage_Storage,
           sizeof(float[4]) * rendererDesc.maxFramebufferSize.x * rendererDesc.maxFramebufferSize.y),
-      imageBindGroup(nullptr),
-      querySet(nullptr),
-      queryBuffer(
+      mImageBindGroup(nullptr),
+      mQuerySet(nullptr),
+      mQueryBuffer(
           gpuContext.device,
           "render pass query buffer",
           WGPUBufferUsage_QueryResolve | WGPUBufferUsage_CopySrc,
           sizeof(TimestampsLayout)),
-      timestampBuffer(
+      mTimestampBuffer(
           gpuContext.device,
           "render pass timestamp buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_MapRead,
           sizeof(TimestampsLayout)),
-      renderPipeline(nullptr),
-      currentRenderParams(rendererDesc.renderParams),
-      currentPostProcessingParams(),
-      frameCount(0),
-      accumulatedSampleCount(0),
-      renderPassDurationsNs()
+      mRenderPipeline(nullptr),
+      mCurrentRenderParams(rendererDesc.renderParams),
+      mCurrentPostProcessingParams(),
+      mFrameCount(0),
+      mAccumulatedSampleCount(0),
+      mRenderPassDurationsNs()
 {
     {
         const std::array<Vertex, 6> vertexData{
@@ -274,7 +274,7 @@ Renderer::Renderer(
             Vertex{{-0.5f, -0.5f}, {0.0f, 0.0f}},
         };
 
-        vertexBuffer = GpuBuffer(
+        mVertexBuffer = GpuBuffer(
             gpuContext.device,
             "Vertex buffer",
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
@@ -287,7 +287,7 @@ Renderer::Renderer(
         // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
         const glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
 
-        uniformsBuffer = GpuBuffer(
+        mUniformsBuffer = GpuBuffer(
             gpuContext.device,
             "uniforms buffer",
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
@@ -334,7 +334,7 @@ Renderer::Renderer(
             textureDescriptors.push_back({width, height, offset});
         }
 
-        textureDescriptorBuffer = GpuBuffer(
+        mTextureDescriptorBuffer = GpuBuffer(
             gpuContext.device,
             "texture descriptor buffer",
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
@@ -352,7 +352,7 @@ Renderer::Renderer(
                 maxStorageBufferBindingSize));
         }
 
-        textureBuffer = GpuBuffer(
+        mTextureBuffer = GpuBuffer(
             gpuContext.device,
             "texture buffer",
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
@@ -456,7 +456,7 @@ Renderer::Renderer(
         // uniforms bind group layout
 
         const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
-            uniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
+            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
 
         const WGPUBindGroupLayoutDescriptor uniformsBindGroupLayoutDesc{
             .nextInChain = nullptr,
@@ -470,9 +470,9 @@ Renderer::Renderer(
         // renderParams group layout
 
         const std::array<WGPUBindGroupLayoutEntry, 3> renderParamsBindGroupLayoutEntries{
-            renderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            postProcessingParamsBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
-            skyStateBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
+            mRenderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            mPostProcessingParamsBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            mSkyStateBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
         };
 
         const WGPUBindGroupLayoutDescriptor renderParamsBindGroupLayoutDesc{
@@ -487,11 +487,11 @@ Renderer::Renderer(
         // scene bind group layout
 
         const std::array<WGPUBindGroupLayoutEntry, 5> sceneBindGroupLayoutEntries{
-            bvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            positionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
-            vertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
-            textureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
-            textureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
+            mBvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            mPositionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            mVertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
+            mTextureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
+            mTextureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
         };
 
         const WGPUBindGroupLayoutDescriptor sceneBindGroupLayoutDesc{
@@ -507,7 +507,7 @@ Renderer::Renderer(
         // image bind group layout
 
         const WGPUBindGroupLayoutEntry imageBindGroupLayoutEntry =
-            imageBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
+            mImageBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
 
         const WGPUBindGroupLayoutDescriptor imageBindGroupLayoutDesc{
             .nextInChain = nullptr,
@@ -539,7 +539,7 @@ Renderer::Renderer(
 
         // uniforms bind group
 
-        const WGPUBindGroupEntry uniformsBindGroupEntry = uniformsBuffer.bindGroupEntry(0);
+        const WGPUBindGroupEntry uniformsBindGroupEntry = mUniformsBuffer.bindGroupEntry(0);
 
         const WGPUBindGroupDescriptor uniformsBindGroupDesc{
             .nextInChain = nullptr,
@@ -548,14 +548,14 @@ Renderer::Renderer(
             .entryCount = 1,
             .entries = &uniformsBindGroupEntry,
         };
-        uniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
+        mUniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
 
         // renderParams bind group
 
         const std::array<WGPUBindGroupEntry, 3> renderParamsBindGroupEntries{
-            renderParamsBuffer.bindGroupEntry(0),
-            postProcessingParamsBuffer.bindGroupEntry(1),
-            skyStateBuffer.bindGroupEntry(2),
+            mRenderParamsBuffer.bindGroupEntry(0),
+            mPostProcessingParamsBuffer.bindGroupEntry(1),
+            mSkyStateBuffer.bindGroupEntry(2),
         };
 
         const WGPUBindGroupDescriptor renderParamsBindGroupDesc{
@@ -565,17 +565,17 @@ Renderer::Renderer(
             .entryCount = renderParamsBindGroupEntries.size(),
             .entries = renderParamsBindGroupEntries.data(),
         };
-        renderParamsBindGroup =
+        mRenderParamsBindGroup =
             wgpuDeviceCreateBindGroup(gpuContext.device, &renderParamsBindGroupDesc);
 
         // scene bind group
 
         const std::array<WGPUBindGroupEntry, 5> sceneBindGroupEntries{
-            bvhNodeBuffer.bindGroupEntry(0),
-            positionAttributesBuffer.bindGroupEntry(1),
-            vertexAttributesBuffer.bindGroupEntry(2),
-            textureDescriptorBuffer.bindGroupEntry(3),
-            textureBuffer.bindGroupEntry(4),
+            mBvhNodeBuffer.bindGroupEntry(0),
+            mPositionAttributesBuffer.bindGroupEntry(1),
+            mVertexAttributesBuffer.bindGroupEntry(2),
+            mTextureDescriptorBuffer.bindGroupEntry(3),
+            mTextureBuffer.bindGroupEntry(4),
         };
 
         const WGPUBindGroupDescriptor sceneBindGroupDesc{
@@ -585,11 +585,11 @@ Renderer::Renderer(
             .entryCount = sceneBindGroupEntries.size(),
             .entries = sceneBindGroupEntries.data(),
         };
-        sceneBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &sceneBindGroupDesc);
+        mSceneBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &sceneBindGroupDesc);
 
         // image bind group
 
-        const WGPUBindGroupEntry imageBindGroupEntry = imageBuffer.bindGroupEntry(0);
+        const WGPUBindGroupEntry imageBindGroupEntry = mImageBuffer.bindGroupEntry(0);
 
         const WGPUBindGroupDescriptor imageBindGroupDesc{
             .nextInChain = nullptr,
@@ -599,7 +599,7 @@ Renderer::Renderer(
             .entries = &imageBindGroupEntry,
         };
 
-        imageBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &imageBindGroupDesc);
+        mImageBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &imageBindGroupDesc);
 
         // pipeline
 
@@ -640,7 +640,7 @@ Renderer::Renderer(
             .fragment = &fragmentState,
         };
 
-        renderPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
+        mRenderPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
     }
 
     // Timestamp query sets
@@ -650,7 +650,7 @@ Renderer::Renderer(
             .label = "renderpass timestamp query set",
             .type = WGPUQueryType_Timestamp,
             .count = TimestampsLayout::QUERY_COUNT};
-        querySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
+        mQuerySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
     }
 }
 
@@ -658,38 +658,38 @@ Renderer::Renderer(Renderer&& other)
 {
     if (this != &other)
     {
-        vertexBuffer = std::move(other.vertexBuffer);
-        uniformsBuffer = std::move(other.uniformsBuffer);
-        uniformsBindGroup = other.uniformsBindGroup;
-        other.uniformsBindGroup = nullptr;
-        renderParamsBuffer = std::move(other.renderParamsBuffer);
-        postProcessingParamsBuffer = std::move(other.postProcessingParamsBuffer);
-        skyStateBuffer = std::move(other.skyStateBuffer);
-        renderParamsBindGroup = other.renderParamsBindGroup;
-        other.renderParamsBindGroup = nullptr;
-        bvhNodeBuffer = std::move(other.bvhNodeBuffer);
-        positionAttributesBuffer = std::move(other.positionAttributesBuffer);
-        vertexAttributesBuffer = std::move(other.vertexAttributesBuffer);
-        textureDescriptorBuffer = std::move(other.textureDescriptorBuffer);
-        textureBuffer = std::move(other.textureBuffer);
-        sceneBindGroup = other.sceneBindGroup;
-        other.sceneBindGroup = nullptr;
-        imageBuffer = std::move(other.imageBuffer);
-        imageBindGroup = other.imageBindGroup;
-        other.imageBindGroup = nullptr;
-        querySet = other.querySet;
-        other.querySet = nullptr;
-        queryBuffer = std::move(other.queryBuffer);
-        timestampBuffer = std::move(other.timestampBuffer);
-        renderPipeline = other.renderPipeline;
-        other.renderPipeline = nullptr;
+        mVertexBuffer = std::move(other.mVertexBuffer);
+        mUniformsBuffer = std::move(other.mUniformsBuffer);
+        mUniformsBindGroup = other.mUniformsBindGroup;
+        other.mUniformsBindGroup = nullptr;
+        mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
+        mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
+        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
+        mRenderParamsBindGroup = other.mRenderParamsBindGroup;
+        other.mRenderParamsBindGroup = nullptr;
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mSceneBindGroup = other.mSceneBindGroup;
+        other.mSceneBindGroup = nullptr;
+        mImageBuffer = std::move(other.mImageBuffer);
+        mImageBindGroup = other.mImageBindGroup;
+        other.mImageBindGroup = nullptr;
+        mQuerySet = other.mQuerySet;
+        other.mQuerySet = nullptr;
+        mQueryBuffer = std::move(other.mQueryBuffer);
+        mTimestampBuffer = std::move(other.mTimestampBuffer);
+        mRenderPipeline = other.mRenderPipeline;
+        other.mRenderPipeline = nullptr;
 
-        currentRenderParams = other.currentRenderParams;
-        currentPostProcessingParams = other.currentPostProcessingParams;
-        frameCount = other.frameCount;
-        accumulatedSampleCount = other.accumulatedSampleCount;
+        mCurrentRenderParams = other.mCurrentRenderParams;
+        mCurrentPostProcessingParams = other.mCurrentPostProcessingParams;
+        mFrameCount = other.mFrameCount;
+        mAccumulatedSampleCount = other.mAccumulatedSampleCount;
 
-        renderPassDurationsNs = std::move(other.renderPassDurationsNs);
+        mRenderPassDurationsNs = std::move(other.mRenderPassDurationsNs);
     }
 }
 
@@ -697,70 +697,70 @@ Renderer& Renderer::operator=(Renderer&& other)
 {
     if (this != &other)
     {
-        vertexBuffer = std::move(other.vertexBuffer);
-        uniformsBuffer = std::move(other.uniformsBuffer);
-        uniformsBindGroup = other.uniformsBindGroup;
-        other.uniformsBindGroup = nullptr;
-        renderParamsBuffer = std::move(other.renderParamsBuffer);
-        postProcessingParamsBuffer = std::move(other.postProcessingParamsBuffer);
-        skyStateBuffer = std::move(other.skyStateBuffer);
-        renderParamsBindGroup = other.renderParamsBindGroup;
-        other.renderParamsBindGroup = nullptr;
-        bvhNodeBuffer = std::move(other.bvhNodeBuffer);
-        positionAttributesBuffer = std::move(other.positionAttributesBuffer);
-        vertexAttributesBuffer = std::move(other.vertexAttributesBuffer);
-        textureDescriptorBuffer = std::move(other.textureDescriptorBuffer);
-        textureBuffer = std::move(other.textureBuffer);
-        sceneBindGroup = other.sceneBindGroup;
-        other.sceneBindGroup = nullptr;
-        imageBuffer = std::move(other.imageBuffer);
-        imageBindGroup = other.imageBindGroup;
-        other.imageBindGroup = nullptr;
-        querySet = other.querySet;
-        other.querySet = nullptr;
-        queryBuffer = std::move(other.queryBuffer);
-        timestampBuffer = std::move(other.timestampBuffer);
-        renderPipeline = other.renderPipeline;
-        other.renderPipeline = nullptr;
+        mVertexBuffer = std::move(other.mVertexBuffer);
+        mUniformsBuffer = std::move(other.mUniformsBuffer);
+        mUniformsBindGroup = other.mUniformsBindGroup;
+        other.mUniformsBindGroup = nullptr;
+        mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
+        mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
+        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
+        mRenderParamsBindGroup = other.mRenderParamsBindGroup;
+        other.mRenderParamsBindGroup = nullptr;
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mSceneBindGroup = other.mSceneBindGroup;
+        other.mSceneBindGroup = nullptr;
+        mImageBuffer = std::move(other.mImageBuffer);
+        mImageBindGroup = other.mImageBindGroup;
+        other.mImageBindGroup = nullptr;
+        mQuerySet = other.mQuerySet;
+        other.mQuerySet = nullptr;
+        mQueryBuffer = std::move(other.mQueryBuffer);
+        mTimestampBuffer = std::move(other.mTimestampBuffer);
+        mRenderPipeline = other.mRenderPipeline;
+        other.mRenderPipeline = nullptr;
 
-        currentRenderParams = other.currentRenderParams;
-        currentPostProcessingParams = other.currentPostProcessingParams;
-        frameCount = other.frameCount;
-        accumulatedSampleCount = other.accumulatedSampleCount;
+        mCurrentRenderParams = other.mCurrentRenderParams;
+        mCurrentPostProcessingParams = other.mCurrentPostProcessingParams;
+        mFrameCount = other.mFrameCount;
+        mAccumulatedSampleCount = other.mAccumulatedSampleCount;
 
-        renderPassDurationsNs = std::move(other.renderPassDurationsNs);
+        mRenderPassDurationsNs = std::move(other.mRenderPassDurationsNs);
     }
     return *this;
 }
 
 Renderer::~Renderer()
 {
-    renderPipelineSafeRelease(renderPipeline);
-    renderPipeline = nullptr;
-    querySetSafeRelease(querySet);
-    querySet = nullptr;
-    bindGroupSafeRelease(imageBindGroup);
-    imageBindGroup = nullptr;
-    bindGroupSafeRelease(sceneBindGroup);
-    sceneBindGroup = nullptr;
-    bindGroupSafeRelease(renderParamsBindGroup);
-    renderParamsBindGroup = nullptr;
-    bindGroupSafeRelease(uniformsBindGroup);
-    uniformsBindGroup = nullptr;
+    renderPipelineSafeRelease(mRenderPipeline);
+    mRenderPipeline = nullptr;
+    querySetSafeRelease(mQuerySet);
+    mQuerySet = nullptr;
+    bindGroupSafeRelease(mImageBindGroup);
+    mImageBindGroup = nullptr;
+    bindGroupSafeRelease(mSceneBindGroup);
+    mSceneBindGroup = nullptr;
+    bindGroupSafeRelease(mRenderParamsBindGroup);
+    mRenderParamsBindGroup = nullptr;
+    bindGroupSafeRelease(mUniformsBindGroup);
+    mUniformsBindGroup = nullptr;
 }
 
 void Renderer::setRenderParameters(const RenderParameters& renderParams)
 {
-    if (currentRenderParams != renderParams)
+    if (mCurrentRenderParams != renderParams)
     {
-        currentRenderParams = renderParams;
-        accumulatedSampleCount = 0; // reset the temporal accumulation
+        mCurrentRenderParams = renderParams;
+        mAccumulatedSampleCount = 0; // reset the temporal accumulation
     }
 }
 
 void Renderer::setPostProcessingParameters(const PostProcessingParameters& postProcessingParameters)
 {
-    currentPostProcessingParams = postProcessingParameters;
+    mCurrentPostProcessingParams = postProcessingParameters;
 }
 
 void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
@@ -769,7 +769,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
     do
     {
         wgpuDeviceTick(gpuContext.device);
-    } while (wgpuBufferGetMapState(timestampBuffer.handle()) != WGPUBufferMapState_Unmapped);
+    } while (wgpuBufferGetMapState(mTimestampBuffer.handle()) != WGPUBufferMapState_Unmapped);
 
     const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(swapChain);
     if (!nextTexture)
@@ -780,29 +780,29 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
     }
 
     {
-        assert(accumulatedSampleCount <= currentRenderParams.samplingParams.numSamplesPerPixel);
+        assert(mAccumulatedSampleCount <= mCurrentRenderParams.samplingParams.numSamplesPerPixel);
         const RenderParamsLayout renderParamsLayout{
-            currentRenderParams.framebufferSize,
-            frameCount++,
-            currentRenderParams,
-            accumulatedSampleCount};
+            mCurrentRenderParams.framebufferSize,
+            mFrameCount++,
+            mCurrentRenderParams,
+            mAccumulatedSampleCount};
         wgpuQueueWriteBuffer(
             gpuContext.queue,
-            renderParamsBuffer.handle(),
+            mRenderParamsBuffer.handle(),
             0,
             &renderParamsLayout,
             sizeof(RenderParamsLayout));
-        accumulatedSampleCount = std::min(
-            accumulatedSampleCount + 1, currentRenderParams.samplingParams.numSamplesPerPixel);
+        mAccumulatedSampleCount = std::min(
+            mAccumulatedSampleCount + 1, mCurrentRenderParams.samplingParams.numSamplesPerPixel);
         wgpuQueueWriteBuffer(
             gpuContext.queue,
-            postProcessingParamsBuffer.handle(),
+            mPostProcessingParamsBuffer.handle(),
             0,
-            &currentPostProcessingParams,
+            &mCurrentPostProcessingParams,
             sizeof(PostProcessingParameters));
-        const SkyStateLayout skyStateLayout{currentRenderParams.sky};
+        const SkyStateLayout skyStateLayout{mCurrentRenderParams.sky};
         wgpuQueueWriteBuffer(
-            gpuContext.queue, skyStateBuffer.handle(), 0, &skyStateLayout, sizeof(SkyStateLayout));
+            gpuContext.queue, mSkyStateBuffer.handle(), 0, &skyStateLayout, sizeof(SkyStateLayout));
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {
@@ -813,7 +813,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
         return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
     }();
 
-    wgpuCommandEncoderWriteTimestamp(encoder, querySet, 0);
+    wgpuCommandEncoderWriteTimestamp(encoder, mQuerySet, 0);
     {
         const WGPURenderPassEncoder renderPassEncoder = [encoder,
                                                          nextTexture]() -> WGPURenderPassEncoder {
@@ -843,14 +843,14 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
         }();
 
         {
-            wgpuRenderPassEncoderSetPipeline(renderPassEncoder, renderPipeline);
-            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, uniformsBindGroup, 0, nullptr);
+            wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mRenderPipeline);
+            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, mUniformsBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetBindGroup(
-                renderPassEncoder, 1, renderParamsBindGroup, 0, nullptr);
-            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 2, sceneBindGroup, 0, nullptr);
-            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 3, imageBindGroup, 0, nullptr);
+                renderPassEncoder, 1, mRenderParamsBindGroup, 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 2, mSceneBindGroup, 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 3, mImageBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
-                renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
+                renderPassEncoder, 0, mVertexBuffer.handle(), 0, mVertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
         }
 
@@ -858,12 +858,12 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
 
         wgpuRenderPassEncoderEnd(renderPassEncoder);
     }
-    wgpuCommandEncoderWriteTimestamp(encoder, querySet, 1);
+    wgpuCommandEncoderWriteTimestamp(encoder, mQuerySet, 1);
 
     wgpuCommandEncoderResolveQuerySet(
-        encoder, querySet, 0, TimestampsLayout::QUERY_COUNT, queryBuffer.handle(), 0);
+        encoder, mQuerySet, 0, TimestampsLayout::QUERY_COUNT, mQueryBuffer.handle(), 0);
     wgpuCommandEncoderCopyBufferToBuffer(
-        encoder, queryBuffer.handle(), 0, timestampBuffer.handle(), 0, sizeof(TimestampsLayout));
+        encoder, mQueryBuffer.handle(), 0, mTimestampBuffer.handle(), 0, sizeof(TimestampsLayout));
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -878,7 +878,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
 
     // Map query timers
     wgpuBufferMapAsync(
-        timestampBuffer.handle(),
+        mTimestampBuffer.handle(),
         WGPUMapMode_Read,
         0,
         sizeof(TimestampsLayout),
@@ -887,7 +887,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
             {
                 assert(userdata);
                 Renderer&   renderer = *static_cast<Renderer*>(userdata);
-                GpuBuffer&  timestampBuffer = renderer.timestampBuffer;
+                GpuBuffer&  timestampBuffer = renderer.mTimestampBuffer;
                 const void* bufferData = wgpuBufferGetConstMappedRange(
                     timestampBuffer.handle(), 0, sizeof(TimestampsLayout));
                 assert(bufferData);
@@ -895,7 +895,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
                 const TimestampsLayout* const timestamps =
                     reinterpret_cast<const TimestampsLayout*>(bufferData);
 
-                std::deque<std::uint64_t>& renderPassDurations = renderer.renderPassDurationsNs;
+                std::deque<std::uint64_t>& renderPassDurations = renderer.mRenderPassDurationsNs;
                 const std::uint64_t        renderPassDelta =
                     timestamps->renderPassEnd - timestamps->renderPassBegin;
 
@@ -917,19 +917,19 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
 
 float Renderer::averageRenderpassDurationMs() const
 {
-    if (renderPassDurationsNs.empty())
+    if (mRenderPassDurationsNs.empty())
     {
         return 0.0f;
     }
 
     const std::uint64_t sum = std::accumulate(
-        renderPassDurationsNs.begin(), renderPassDurationsNs.end(), std::uint64_t(0));
-    return 0.000001f * static_cast<float>(sum) / renderPassDurationsNs.size();
+        mRenderPassDurationsNs.begin(), mRenderPassDurationsNs.end(), std::uint64_t(0));
+    return 0.000001f * static_cast<float>(sum) / mRenderPassDurationsNs.size();
 }
 
 float Renderer::renderProgressPercentage() const
 {
-    return 100.0f * static_cast<float>(accumulatedSampleCount) /
-           static_cast<float>(currentRenderParams.samplingParams.numSamplesPerPixel);
+    return 100.0f * static_cast<float>(mAccumulatedSampleCount) /
+           static_cast<float>(mCurrentRenderParams.samplingParams.numSamplesPerPixel);
 }
 } // namespace nlrs

@@ -106,35 +106,9 @@ struct RendererDescriptor
     Extent2i         maxFramebufferSize;
 };
 
-struct Renderer
+class Renderer
 {
-    GpuBuffer          vertexBuffer;
-    GpuBuffer          uniformsBuffer;
-    WGPUBindGroup      uniformsBindGroup;
-    GpuBuffer          renderParamsBuffer;
-    GpuBuffer          postProcessingParamsBuffer;
-    GpuBuffer          skyStateBuffer;
-    WGPUBindGroup      renderParamsBindGroup;
-    GpuBuffer          bvhNodeBuffer;
-    GpuBuffer          positionAttributesBuffer;
-    GpuBuffer          vertexAttributesBuffer;
-    GpuBuffer          textureDescriptorBuffer;
-    GpuBuffer          textureBuffer;
-    WGPUBindGroup      sceneBindGroup;
-    GpuBuffer          imageBuffer;
-    WGPUBindGroup      imageBindGroup;
-    WGPUQuerySet       querySet;
-    GpuBuffer          queryBuffer;
-    GpuBuffer          timestampBuffer;
-    WGPURenderPipeline renderPipeline;
-
-    RenderParameters         currentRenderParams;
-    PostProcessingParameters currentPostProcessingParams;
-    std::uint32_t            frameCount;
-    std::uint32_t            accumulatedSampleCount;
-
-    std::deque<std::uint64_t> renderPassDurationsNs;
-
+public:
     Renderer(const RendererDescriptor&, const GpuContext&, Scene);
 
     Renderer(const Renderer&) = delete;
@@ -190,5 +164,33 @@ struct Renderer
                 .maxComputeWorkgroupsPerDimension = 0,
             },
     };
+
+private:
+    GpuBuffer          mVertexBuffer;
+    GpuBuffer          mUniformsBuffer;
+    WGPUBindGroup      mUniformsBindGroup;
+    GpuBuffer          mRenderParamsBuffer;
+    GpuBuffer          mPostProcessingParamsBuffer;
+    GpuBuffer          mSkyStateBuffer;
+    WGPUBindGroup      mRenderParamsBindGroup;
+    GpuBuffer          mBvhNodeBuffer;
+    GpuBuffer          mPositionAttributesBuffer;
+    GpuBuffer          mVertexAttributesBuffer;
+    GpuBuffer          mTextureDescriptorBuffer;
+    GpuBuffer          mTextureBuffer;
+    WGPUBindGroup      mSceneBindGroup;
+    GpuBuffer          mImageBuffer;
+    WGPUBindGroup      mImageBindGroup;
+    WGPUQuerySet       mQuerySet;
+    GpuBuffer          mQueryBuffer;
+    GpuBuffer          mTimestampBuffer;
+    WGPURenderPipeline mRenderPipeline;
+
+    RenderParameters         mCurrentRenderParams;
+    PostProcessingParameters mCurrentPostProcessingParams;
+    std::uint32_t            mFrameCount;
+    std::uint32_t            mAccumulatedSampleCount;
+
+    std::deque<std::uint64_t> mRenderPassDurationsNs;
 };
 } // namespace nlrs
