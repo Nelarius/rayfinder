@@ -1,6 +1,6 @@
 #include "gpu_context.hpp"
 #include "gui.hpp"
-#include "renderer.hpp"
+#include "reference_path_tracer.hpp"
 #include "window.hpp"
 
 #include <common/bvh.hpp>
@@ -199,7 +199,7 @@ void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
 }
 } // namespace
 
-Renderer::Renderer(
+ReferencePathTracer::ReferencePathTracer(
     const RendererDescriptor& rendererDesc,
     const GpuContext&         gpuContext,
     const Scene               scene)
@@ -400,7 +400,7 @@ Renderer::Renderer(
             return buffer.str();
         };
 
-        const std::string shaderSource = loadShaderSource("raytracer.wgsl");
+        const std::string shaderSource = loadShaderSource("reference_path_tracer.wgsl");
 
         const WGPUShaderModuleWGSLDescriptor shaderCodeDesc = {
             .chain =
@@ -654,7 +654,7 @@ Renderer::Renderer(
     }
 }
 
-Renderer::Renderer(Renderer&& other)
+ReferencePathTracer::ReferencePathTracer(ReferencePathTracer&& other)
 {
     if (this != &other)
     {
@@ -693,7 +693,7 @@ Renderer::Renderer(Renderer&& other)
     }
 }
 
-Renderer& Renderer::operator=(Renderer&& other)
+ReferencePathTracer& ReferencePathTracer::operator=(ReferencePathTracer&& other)
 {
     if (this != &other)
     {
@@ -733,7 +733,7 @@ Renderer& Renderer::operator=(Renderer&& other)
     return *this;
 }
 
-Renderer::~Renderer()
+ReferencePathTracer::~ReferencePathTracer()
 {
     renderPipelineSafeRelease(mRenderPipeline);
     mRenderPipeline = nullptr;
@@ -749,7 +749,7 @@ Renderer::~Renderer()
     mUniformsBindGroup = nullptr;
 }
 
-void Renderer::setRenderParameters(const RenderParameters& renderParams)
+void ReferencePathTracer::setRenderParameters(const RenderParameters& renderParams)
 {
     if (mCurrentRenderParams != renderParams)
     {
@@ -758,12 +758,13 @@ void Renderer::setRenderParameters(const RenderParameters& renderParams)
     }
 }
 
-void Renderer::setPostProcessingParameters(const PostProcessingParameters& postProcessingParameters)
+void ReferencePathTracer::setPostProcessingParameters(
+    const PostProcessingParameters& postProcessingParameters)
 {
     mCurrentPostProcessingParams = postProcessingParameters;
 }
 
-void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
+void ReferencePathTracer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
 {
     // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
     do
@@ -886,9 +887,9 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
             if (status == WGPUBufferMapAsyncStatus_Success)
             {
                 assert(userdata);
-                Renderer&   renderer = *static_cast<Renderer*>(userdata);
-                GpuBuffer&  timestampBuffer = renderer.mTimestampBuffer;
-                const void* bufferData = wgpuBufferGetConstMappedRange(
+                ReferencePathTracer& renderer = *static_cast<ReferencePathTracer*>(userdata);
+                GpuBuffer&           timestampBuffer = renderer.mTimestampBuffer;
+                const void*          bufferData = wgpuBufferGetConstMappedRange(
                     timestampBuffer.handle(), 0, sizeof(TimestampsLayout));
                 assert(bufferData);
 
@@ -915,7 +916,7 @@ void Renderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swap
         this);
 }
 
-float Renderer::averageRenderpassDurationMs() const
+float ReferencePathTracer::averageRenderpassDurationMs() const
 {
     if (mRenderPassDurationsNs.empty())
     {
@@ -927,7 +928,7 @@ float Renderer::averageRenderpassDurationMs() const
     return 0.000001f * static_cast<float>(sum) / mRenderPassDurationsNs.size();
 }
 
-float Renderer::renderProgressPercentage() const
+float ReferencePathTracer::renderProgressPercentage() const
 {
     return 100.0f * static_cast<float>(mAccumulatedSampleCount) /
            static_cast<float>(mCurrentRenderParams.samplingParams.numSamplesPerPixel);

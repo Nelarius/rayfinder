@@ -1,7 +1,7 @@
 #include "fly_camera_controller.hpp"
 #include "gpu_context.hpp"
 #include "gui.hpp"
-#include "renderer.hpp"
+#include "reference_path_tracer.hpp"
 #include "window.hpp"
 
 #include <common/assert.hpp>
@@ -92,7 +92,7 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    nlrs::GpuContext gpuContext{nlrs::Renderer::wgpuRequiredLimits};
+    nlrs::GpuContext gpuContext{nlrs::ReferencePathTracer::wgpuRequiredLimits};
     nlrs::Window     window = [&gpuContext]() -> nlrs::Window {
         const nlrs::WindowDescriptor windowDesc{
                 .windowSize = nlrs::Extent2i{defaultWindowWidth, defaultWindowHeight},
@@ -104,7 +104,7 @@ int main(int argc, char** argv)
     nlrs::Gui gui(window.ptr(), gpuContext);
 
     auto [appState, renderer] =
-        [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::Renderer> {
+        [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
         const nlrs::GltfModel model(argv[1]);
         auto [bvhNodes, triangleIndices] = nlrs::buildBvh(model.positions());
 
@@ -164,7 +164,7 @@ int main(int argc, char** argv)
             .focusPressed = false,
         };
 
-        nlrs::Renderer renderer{rendererDesc, gpuContext, std::move(scene)};
+        nlrs::ReferencePathTracer renderer{rendererDesc, gpuContext, std::move(scene)};
 
         return std::make_tuple(std::move(app), std::move(renderer));
     }();

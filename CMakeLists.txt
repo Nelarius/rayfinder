@@ -65,7 +65,7 @@ set(PT_SOURCE_FILES
     gpu_buffer.cpp
     gpu_context.cpp
     gui.cpp
-    renderer.cpp
+    reference_path_tracer.cpp
     window.cpp)
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 
@@ -75,9 +75,9 @@ set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 add_custom_command(
     TARGET pt POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${CMAKE_SOURCE_DIR}/src/pt/raytracer.wgsl
-    $<TARGET_FILE_DIR:pt>/raytracer.wgsl
-    COMMENT "Copying $<TARGET_FILE_DIR:pt>/raytracer.wgsl"
+    ${CMAKE_SOURCE_DIR}/src/pt/reference_path_tracer.wgsl
+    $<TARGET_FILE_DIR:pt>/reference_path_tracer.wgsl
+    COMMENT "Copying $<TARGET_FILE_DIR:pt>/reference_path_tracer.wgsl"
 )
 add_custom_command(
     TARGET pt POST_BUILD

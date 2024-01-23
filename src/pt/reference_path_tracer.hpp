@@ -106,18 +106,18 @@ struct RendererDescriptor
     Extent2i         maxFramebufferSize;
 };
 
-class Renderer
+class ReferencePathTracer
 {
 public:
-    Renderer(const RendererDescriptor&, const GpuContext&, Scene);
+    ReferencePathTracer(const RendererDescriptor&, const GpuContext&, Scene);
 
-    Renderer(const Renderer&) = delete;
-    Renderer& operator=(const Renderer&) = delete;
+    ReferencePathTracer(const ReferencePathTracer&) = delete;
+    ReferencePathTracer& operator=(const ReferencePathTracer&) = delete;
 
-    Renderer(Renderer&&);
-    Renderer& operator=(Renderer&&);
+    ReferencePathTracer(ReferencePathTracer&&);
+    ReferencePathTracer& operator=(ReferencePathTracer&&);
 
-    ~Renderer();
+    ~ReferencePathTracer();
 
     void setRenderParameters(const RenderParameters&);
     void setPostProcessingParameters(const PostProcessingParameters&);
