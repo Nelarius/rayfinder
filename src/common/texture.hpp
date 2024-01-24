@@ -23,6 +23,12 @@ public:
     {
     }
 
+    Texture(const Texture&) = delete;
+    Texture& operator=(const Texture&) = delete;
+
+    Texture(Texture&&) = default;
+    Texture& operator=(Texture&&) = default;
+
     std::span<const RgbaPixel> pixels() const { return mPixels; }
     Dimensions                 dimensions() const { return mDimensions; }
 

@@ -6,6 +6,7 @@
 
 #include <common/assert.hpp>
 #include <common/bvh.hpp>
+#include <common/flattened_model.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/triangle_attributes.hpp>
@@ -103,14 +104,15 @@ int main(int argc, char** argv)
 
     auto [appState, renderer] =
         [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
-        const nlrs::GltfModel model(argv[1]);
-        auto [bvhNodes, triangleIndices] = nlrs::buildBvh(model.positions());
+        const nlrs::GltfModel      model(argv[1]);
+        const nlrs::FlattenedModel flattenedModel(model);
+        auto [bvhNodes, triangleIndices] = nlrs::buildBvh(flattenedModel.positions());
 
-        const auto positions = nlrs::reorderAttributes(model.positions(), triangleIndices);
-        const auto normals = nlrs::reorderAttributes(model.normals(), triangleIndices);
-        const auto texCoords = nlrs::reorderAttributes(model.texCoords(), triangleIndices);
+        const auto positions = nlrs::reorderAttributes(flattenedModel.positions(), triangleIndices);
+        const auto normals = nlrs::reorderAttributes(flattenedModel.normals(), triangleIndices);
+        const auto texCoords = nlrs::reorderAttributes(flattenedModel.texCoords(), triangleIndices);
         const auto textureIndices =
-            nlrs::reorderAttributes(model.baseColorTextureIndices(), triangleIndices);
+            nlrs::reorderAttributes(flattenedModel.baseColorTextureIndices(), triangleIndices);
 
         NLRS_ASSERT(positions.size() == normals.size());
         NLRS_ASSERT(positions.size() == texCoords.size());

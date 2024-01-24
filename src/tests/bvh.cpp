@@ -1,6 +1,7 @@
 #include <common/aabb.hpp>
 #include <common/bvh.hpp>
 #include <common/camera.hpp>
+#include <common/flattened_model.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray.hpp>
 #include <common/ray_intersection.hpp>
@@ -32,11 +33,11 @@ bool bruteForceRayIntersectModel(
 
 TEST_CASE("Bvh intersection matches brute-force intersection", "[bvh]")
 {
-    GltfModel model("Duck.glb");
-    REQUIRE_FALSE(model.positions().empty());
+    GltfModel      model("Duck.glb");
+    FlattenedModel flattenedModel(model);
 
-    const Bvh  bvh = buildBvh(model.positions());
-    const auto triangles = nlrs::reorderAttributes(model.positions(), bvh.triangleIndices);
+    const Bvh  bvh = buildBvh(flattenedModel.positions());
+    const auto triangles = reorderAttributes(flattenedModel.positions(), bvh.triangleIndices);
     REQUIRE_FALSE(bvh.nodes.empty());
     REQUIRE_FALSE(bvh.triangleIndices.empty());
 

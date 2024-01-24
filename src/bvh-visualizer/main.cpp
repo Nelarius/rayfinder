@@ -2,6 +2,7 @@
 #include <common/bvh.hpp>
 #include <common/camera.hpp>
 #include <common/extent.hpp>
+#include <common/flattened_model.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/units/angle.hpp>
@@ -26,9 +27,10 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    const nlrs::GltfModel model(argv[1]);
-    const nlrs::Bvh       bvh = nlrs::buildBvh(model.positions());
-    const auto            triangles = reorderAttributes(model.positions(), bvh.triangleIndices);
+    const GltfModel      model(argv[1]);
+    const FlattenedModel flattenedModel(model);
+    const Bvh            bvh = buildBvh(flattenedModel.positions());
+    const auto triangles = reorderAttributes(flattenedModel.positions(), bvh.triangleIndices);
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];

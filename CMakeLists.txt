@@ -21,6 +21,7 @@ set(COMMON_SOURCE_FILES
     bvh.cpp
     camera.cpp
     cgltf.c
+    flattened_model.cpp
     gltf_model.cpp
     ray_intersection.cpp
     stb_image.c
