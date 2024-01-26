@@ -3,7 +3,6 @@
 #include "aabb.hpp"
 #include "triangle_attributes.hpp"
 
-#include <concepts>
 #include <cstdint>
 #include <cstddef>
 #include <span>

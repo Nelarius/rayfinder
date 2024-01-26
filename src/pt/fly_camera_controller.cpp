@@ -2,7 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
-#include <algorithm> // std::clamp
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 

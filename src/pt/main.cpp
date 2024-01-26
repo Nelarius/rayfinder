@@ -14,8 +14,6 @@
 #include <imgui.h>
 #include <webgpu/webgpu.h>
 
-#include <cassert>
-#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <tuple>

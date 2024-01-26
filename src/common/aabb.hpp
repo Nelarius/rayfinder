@@ -4,7 +4,6 @@
 
 #include <glm/glm.hpp>
 
-#include <cstddef>
 #include <limits>
 
 namespace nlrs

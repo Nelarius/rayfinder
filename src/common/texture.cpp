@@ -2,7 +2,6 @@
 
 #include <stb_image.h>
 
-#include <algorithm>
 #include <cassert>
 #include <cstring>
 

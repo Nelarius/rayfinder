@@ -6,9 +6,7 @@
 
 #include <array>
 #include <cassert>
-#include <cstdint>
 #include <cstdio>
-#include <format>
 #include <stdexcept>
 
 namespace nlrs

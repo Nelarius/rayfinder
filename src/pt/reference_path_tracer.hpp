@@ -9,7 +9,6 @@
 #include <webgpu/webgpu.h>
 
 #include <array>
-#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <span>
