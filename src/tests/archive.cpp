@@ -3,6 +3,7 @@
 #include <common/flattened_model.hpp>
 #include <common/gltf_model.hpp>
 
+#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
 #include <zstd.h>
@@ -115,7 +116,11 @@ public:
         const std::size_t compressedSize = ZSTD_compressBound(mBuffer.size());
         std::vector<char> compressedBuffer(compressedSize);
         const std::size_t compressedBytes = ZSTD_compress(
-            compressedBuffer.data(), compressedSize, mBuffer.data(), mBuffer.size(), 1);
+            compressedBuffer.data(),
+            compressedSize,
+            mBuffer.data(),
+            mBuffer.size(),
+            ZSTD_maxCLevel());
         NLRS_ASSERT(ZSTD_isError(compressedBytes) == 0);
         mOutputStream.write(compressedBuffer.data(), compressedBytes);
     }
@@ -226,7 +231,127 @@ void deserialize(InputStream& istream, Bvh& bvh)
             numBytes);
     }
 }
+
+void serialize(OutputStream& ostream, const GltfModel& model)
+{
+    const std::size_t numMeshes = model.meshes().size();
+    ostream.write(reinterpret_cast<const char*>(&numMeshes), sizeof(std::size_t));
+    for (const GltfMesh& mesh : model.meshes())
+    {
+        const std::size_t numPositions = mesh.positions().size();
+        ostream.write(reinterpret_cast<const char*>(&numPositions), sizeof(std::size_t));
+        ostream.write(
+            reinterpret_cast<const char*>(mesh.positions().data()),
+            sizeof(glm::vec3) * numPositions);
+
+        const std::size_t numNormals = mesh.normals().size();
+        ostream.write(reinterpret_cast<const char*>(&numNormals), sizeof(std::size_t));
+        ostream.write(
+            reinterpret_cast<const char*>(mesh.normals().data()), sizeof(glm::vec3) * numNormals);
+
+        const std::size_t numTexCoords = mesh.texCoords().size();
+        ostream.write(reinterpret_cast<const char*>(&numTexCoords), sizeof(std::size_t));
+        ostream.write(
+            reinterpret_cast<const char*>(mesh.texCoords().data()),
+            sizeof(glm::vec2) * numTexCoords);
+
+        const std::size_t numIndices = mesh.indices().size();
+        ostream.write(reinterpret_cast<const char*>(&numIndices), sizeof(std::size_t));
+        ostream.write(
+            reinterpret_cast<const char*>(mesh.indices().data()),
+            sizeof(std::uint32_t) * numIndices);
+
+        const std::size_t baseColorTextureIndex = mesh.baseColorTextureIndex();
+        ostream.write(reinterpret_cast<const char*>(&baseColorTextureIndex), sizeof(std::size_t));
+    }
+
+    const std::size_t numTextures = model.baseColorTextures().size();
+    ostream.write(reinterpret_cast<const char*>(&numTextures), sizeof(std::size_t));
+    for (const Texture& texture : model.baseColorTextures())
+    {
+        const std::size_t numPixels = texture.pixels().size();
+        ostream.write(reinterpret_cast<const char*>(&numPixels), sizeof(std::size_t));
+        ostream.write(
+            reinterpret_cast<const char*>(texture.pixels().data()),
+            sizeof(Texture::RgbaPixel) * numPixels);
+
+        const auto dimensions = texture.dimensions();
+        ostream.write(reinterpret_cast<const char*>(&dimensions), sizeof(Texture::Dimensions));
+    }
+}
+
+void deserialize(InputStream& istream, GltfModel& model)
+{
+    std::vector<GltfMesh> meshes;
+    std::size_t           numMeshes;
+    istream.read(reinterpret_cast<char*>(&numMeshes), sizeof(std::size_t));
+    meshes.reserve(numMeshes);
+    for (std::size_t i = 0; i < numMeshes; ++i)
+    {
+        std::size_t numPositions;
+        istream.read(reinterpret_cast<char*>(&numPositions), sizeof(std::size_t));
+        std::vector<glm::vec3> positions(numPositions);
+        const std::size_t      numBytes = sizeof(glm::vec3) * numPositions;
+        NLRS_ASSERT(istream.read(reinterpret_cast<char*>(positions.data()), numBytes) == numBytes);
+
+        std::size_t numNormals;
+        istream.read(reinterpret_cast<char*>(&numNormals), sizeof(std::size_t));
+        std::vector<glm::vec3> normals(numNormals);
+        const std::size_t      numBytesNormals = sizeof(glm::vec3) * numNormals;
+        NLRS_ASSERT(
+            istream.read(reinterpret_cast<char*>(normals.data()), numBytesNormals) ==
+            numBytesNormals);
+
+        std::size_t numTexCoords;
+        istream.read(reinterpret_cast<char*>(&numTexCoords), sizeof(std::size_t));
+        std::vector<glm::vec2> texCoords(numTexCoords);
+        const std::size_t      numBytesTexCoords = sizeof(glm::vec2) * numTexCoords;
+        NLRS_ASSERT(
+            istream.read(reinterpret_cast<char*>(texCoords.data()), numBytesTexCoords) ==
+            numBytesTexCoords);
+
+        std::size_t numIndices;
+        istream.read(reinterpret_cast<char*>(&numIndices), sizeof(std::size_t));
+        std::vector<std::uint32_t> indices(numIndices);
+        const std::size_t          numBytesIndices = sizeof(std::uint32_t) * numIndices;
+        NLRS_ASSERT(
+            istream.read(reinterpret_cast<char*>(indices.data()), numBytesIndices) ==
+            numBytesIndices);
+
+        std::size_t baseColorTextureIndex;
+        istream.read(reinterpret_cast<char*>(&baseColorTextureIndex), sizeof(std::size_t));
+
+        meshes.emplace_back(
+            std::move(positions),
+            std::move(normals),
+            std::move(texCoords),
+            std::move(indices),
+            baseColorTextureIndex);
+    }
+
+    std::vector<Texture> textures;
+    std::size_t          numTextures;
+    istream.read(reinterpret_cast<char*>(&numTextures), sizeof(std::size_t));
+    textures.reserve(numTextures);
+    for (std::size_t i = 0; i < numTextures; ++i)
+    {
+        std::size_t numPixels;
+        istream.read(reinterpret_cast<char*>(&numPixels), sizeof(std::size_t));
+        std::vector<Texture::RgbaPixel> pixels(numPixels);
+        const std::size_t               numBytes = sizeof(Texture::RgbaPixel) * numPixels;
+        NLRS_ASSERT(istream.read(reinterpret_cast<char*>(pixels.data()), numBytes) == numBytes);
+
+        Texture::Dimensions dimensions;
+        istream.read(reinterpret_cast<char*>(&dimensions), sizeof(Texture::Dimensions));
+
+        textures.emplace_back(std::move(pixels), dimensions);
+    }
+
+    model = GltfModel{std::move(meshes), std::move(textures)};
+}
 } // namespace nlrs
+
+namespace fs = std::filesystem;
 
 SCENARIO("Serialize and deserializing a bvh", "[archive]")
 {
@@ -265,9 +390,8 @@ SCENARIO("Serialize and deserializing a bvh", "[archive]")
             }
         }
 
-        WHEN("serializing to a OutputFileStream")
+        WHEN("serializing to OutputFileStream")
         {
-            namespace fs = std::filesystem;
             const fs::path testFile = fs::current_path() / fs::path("bvh.testbin");
             {
                 nlrs::OutputFileStream file(testFile);
@@ -328,5 +452,78 @@ SCENARIO("Serialize and deserializing a bvh", "[archive]")
                         byteSizeIndices) == 0);
             }
         }
+    }
+}
+
+SCENARIO("Archiving a model without compression", "[archive]")
+{
+    GIVEN("a model")
+    {
+        const nlrs::GltfModel model{"Duck.glb"};
+        const fs::path        testFile = fs::current_path() / fs::path("model.testbin");
+
+        WHEN("serializing to OutputFileStream")
+        {
+            {
+                nlrs::OutputFileStream file(testFile);
+                nlrs::serialize(file, model);
+            }
+
+            THEN("deserializing using InputFileStream should yield the same model")
+            {
+                nlrs::GltfModel deserializedModel;
+                {
+                    nlrs::InputFileStream file(testFile);
+                    nlrs::deserialize(file, deserializedModel);
+                }
+                REQUIRE(deserializedModel == model);
+
+                BENCHMARK("deserializing uncompressed data from a file")
+                {
+                    nlrs::InputFileStream file(testFile);
+                    nlrs::deserialize(file, deserializedModel);
+                };
+            }
+        }
+
+        fs::remove(testFile);
+    }
+}
+
+SCENARIO("Archiving a model with compression", "[archive]")
+{
+    GIVEN("a model")
+    {
+        const nlrs::GltfModel model{"Duck.glb"};
+        const fs::path        testFile = fs::current_path() / fs::path("model.testbin");
+
+        WHEN("serializing to OutputFileStream")
+        {
+            {
+                nlrs::OutputFileStream         file(testFile);
+                nlrs::CompressingStreamAdapter compressingStream(file);
+                nlrs::serialize(compressingStream, model);
+            }
+
+            THEN("deserializing using InputFileStream should yield the same model")
+            {
+                nlrs::GltfModel deserializedModel;
+                {
+                    nlrs::InputFileStream            file(testFile);
+                    nlrs::DecompressingStreamAdapter decompressingStream(file);
+                    nlrs::deserialize(decompressingStream, deserializedModel);
+                }
+                REQUIRE(deserializedModel == model);
+
+                BENCHMARK("deserializing compressed data from a file")
+                {
+                    nlrs::InputFileStream            file(testFile);
+                    nlrs::DecompressingStreamAdapter decompressingStream(file);
+                    nlrs::deserialize(decompressingStream, deserializedModel);
+                };
+            }
+        }
+
+        fs::remove(testFile);
     }
 }

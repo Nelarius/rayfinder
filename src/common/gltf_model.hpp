@@ -34,6 +34,8 @@ public:
     std::span<const std::uint32_t> indices() const { return mIndices; }
     size_t                         baseColorTextureIndex() const { return mBaseColorTextureIndex; }
 
+    bool operator==(const GltfMesh&) const = default;
+
 private:
     std::vector<glm::vec3>     mPositions;
     std::vector<glm::vec3>     mNormals;
@@ -45,10 +47,20 @@ private:
 class GltfModel
 {
 public:
+    GltfModel() = default;
     GltfModel(std::filesystem::path gltfPath);
+    GltfModel(std::vector<GltfMesh> meshes, std::vector<Texture> baseColorTextures);
+
+    GltfModel(const GltfModel&) = delete;
+    GltfModel& operator=(const GltfModel&) = delete;
+
+    GltfModel(GltfModel&&) = default;
+    GltfModel& operator=(GltfModel&&) = default;
 
     std::span<const GltfMesh> meshes() const { return mMeshes; }
     std::span<const Texture>  baseColorTextures() const { return mBaseColorTextures; }
+
+    bool operator==(const GltfModel&) const = default;
 
 private:
     std::vector<GltfMesh> mMeshes;

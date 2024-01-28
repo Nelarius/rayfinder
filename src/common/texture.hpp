@@ -15,6 +15,8 @@ public:
     {
         std::uint32_t width;
         std::uint32_t height;
+
+        bool operator==(const Dimensions&) const = default;
     };
 
     Texture(std::vector<RgbaPixel>&& pixels, Dimensions dimensions)
@@ -28,6 +30,8 @@ public:
 
     Texture(Texture&&) = default;
     Texture& operator=(Texture&&) = default;
+
+    bool operator==(const Texture&) const = default;
 
     std::span<const RgbaPixel> pixels() const { return mPixels; }
     Dimensions                 dimensions() const { return mDimensions; }

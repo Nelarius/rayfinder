@@ -341,4 +341,10 @@ GltfModel::GltfModel(const fs::path gltfPath)
 
     cgltf_free(data);
 }
+
+GltfModel::GltfModel(std::vector<GltfMesh> meshes, std::vector<Texture> baseColorTextures)
+    : mMeshes(std::move(meshes)),
+      mBaseColorTextures(std::move(baseColorTextures))
+{
+}
 } // namespace nlrs
