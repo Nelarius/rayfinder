@@ -37,6 +37,13 @@ FetchContent_Declare(stb
     GIT_REPOSITORY "https://github.com/nothings/stb"
     GIT_TAG beebb24b945efdea3b9bba23affb8eb3ba8982e7) # Oct 12, 2023
 
+set(ZSTD_BUILD_STATIC ON)
+set(ZSTD_BUILD_SHARED OFF)
+FetchContent_Declare(zstd
+    GIT_REPOSITORY "https://github.com/facebook/zstd"
+    GIT_TAG 63779c798237346c2b245c546c40b72a5a5913fe # v1.5.5 (Apr 5, 2023)
+    SOURCE_SUBDIR build/cmake)
+
 # Fetch
 message(STATUS "Fetching Catch2...")
 FetchContent_MakeAvailable(Catch2)
@@ -114,6 +121,9 @@ message(STATUS "Fetching stb...")
 FetchContent_MakeAvailable(stb)
 set(STB_SOURCE_DIR ${stb_SOURCE_DIR})
 
+message(STATUS "Fetching zstd...")
+FetchContent_MakeAvailable(zstd)
+
 # Configure
 
 # cgltf
@@ -135,3 +145,7 @@ target_link_libraries(imgui PRIVATE glfw webgpu_dawn)
 
 # stb
 set(STB_INCLUDE_DIR ${STB_SOURCE_DIR} CACHE INTERNAL "stb Include Directory")
+
+# zstd
+# NOTE: zstd_SOURCE_DIR points to zstd/build/cmake
+set(ZSTD_INCLUDE_DIR ${zstd_SOURCE_DIR}/lib CACHE INTERNAL "zstd Include Directory")

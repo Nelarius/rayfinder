@@ -111,7 +111,11 @@ set(TESTS_SOURCE_FILES
 list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
 
 add_executable(tests ${TESTS_SOURCE_FILES})
-target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common fmt glm::glm)
+target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common fmt glm::glm libzstd_static)
+
+# on windows and macos, it is necessary to explicitly include the zstd headers
+# https://github.com/facebook/zstd/tree/dev/build/cmake#how-to-use-it-with-cmake-fetchcontent
+target_include_directories(tests PRIVATE ${ZSTD_INCLUDE_DIR})
 add_custom_command(
     TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
