@@ -6,7 +6,6 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
-#include <zstd.h>
 
 #include <algorithm>
 #include <cstring>
@@ -93,106 +92,6 @@ public:
 
 private:
     std::ofstream mFileStream;
-};
-
-class CompressingStreamAdapter : public OutputStream
-{
-public:
-    CompressingStreamAdapter(OutputStream& ostream)
-        : mOutputStream(ostream),
-          mBuffer()
-    {
-        mBuffer.reserve(1 << 20);
-    }
-
-    CompressingStreamAdapter(const CompressingStreamAdapter&) = delete;
-    CompressingStreamAdapter& operator=(const CompressingStreamAdapter&) = delete;
-
-    CompressingStreamAdapter(CompressingStreamAdapter&&) = delete;
-    CompressingStreamAdapter& operator=(CompressingStreamAdapter&&) = delete;
-
-    ~CompressingStreamAdapter()
-    {
-        const std::size_t compressedSize = ZSTD_compressBound(mBuffer.size());
-        std::vector<char> compressedBuffer(compressedSize);
-        const std::size_t compressedBytes = ZSTD_compress(
-            compressedBuffer.data(),
-            compressedSize,
-            mBuffer.data(),
-            mBuffer.size(),
-            ZSTD_maxCLevel());
-        NLRS_ASSERT(ZSTD_isError(compressedBytes) == 0);
-        mOutputStream.write(compressedBuffer.data(), compressedBytes);
-    }
-
-    virtual void write(const char* data, std::size_t numBytes) override
-    {
-        const std::size_t offset = mBuffer.size();
-        mBuffer.resize(offset + numBytes);
-        std::memcpy(mBuffer.data() + offset, data, numBytes);
-    }
-
-private:
-    OutputStream&     mOutputStream;
-    std::vector<char> mBuffer;
-};
-
-class DecompressingStreamAdapter : public InputStream
-{
-public:
-    DecompressingStreamAdapter(InputStream& istream)
-        : mInputStream(istream),
-          mDecompressedBuffer(),
-          mOffset(0)
-    {
-        std::vector<char> compressedBuffer;
-        compressedBuffer.reserve(1 << 20);
-        constexpr std::size_t chunkBytes = 1 << 10;
-        std::size_t           bytesRead = 0;
-        // NOTE: the compressedSize should be used instead of compressedBuffer.size() since the
-        // buffer is expanded by chunk size.
-        std::size_t compressedSize = 0;
-        do
-        {
-            const std::size_t offset = compressedBuffer.size();
-            compressedBuffer.resize(offset + chunkBytes);
-            bytesRead = mInputStream.read(compressedBuffer.data() + offset, chunkBytes);
-            compressedSize += bytesRead;
-        } while (bytesRead == chunkBytes);
-
-        const std::size_t decompressedSize =
-            ZSTD_getFrameContentSize(compressedBuffer.data(), compressedSize);
-        NLRS_ASSERT(decompressedSize != ZSTD_CONTENTSIZE_ERROR);
-        NLRS_ASSERT(decompressedSize != ZSTD_CONTENTSIZE_UNKNOWN);
-        mDecompressedBuffer.resize(decompressedSize);
-        NLRS_ASSERT(
-            ZSTD_decompress(
-                mDecompressedBuffer.data(),
-                decompressedSize,
-                compressedBuffer.data(),
-                compressedSize) == decompressedSize);
-    }
-
-    DecompressingStreamAdapter(const DecompressingStreamAdapter&) = delete;
-    DecompressingStreamAdapter& operator=(const DecompressingStreamAdapter&) = delete;
-
-    DecompressingStreamAdapter(DecompressingStreamAdapter&&) = delete;
-    DecompressingStreamAdapter& operator=(DecompressingStreamAdapter&&) = delete;
-
-    ~DecompressingStreamAdapter() = default;
-
-    virtual std::size_t read(char* data, std::size_t numBytes) override
-    {
-        const std::size_t bytesToRead = std::min(numBytes, mDecompressedBuffer.size() - mOffset);
-        std::memcpy(data, mDecompressedBuffer.data() + mOffset, bytesToRead);
-        mOffset += bytesToRead;
-        return bytesToRead;
-    }
-
-private:
-    InputStream&      mInputStream;
-    std::vector<char> mDecompressedBuffer;
-    std::size_t       mOffset;
 };
 
 void serialize(OutputStream& ostream, const Bvh& bvh)
@@ -421,37 +320,6 @@ SCENARIO("Serialize and deserializing a bvh", "[archive]")
             }
             fs::remove(testFile);
         }
-
-        WHEN("serializing to a CompressingStreamAdapter")
-        {
-            nlrs::BufferStream bufferStream;
-            {
-                nlrs::CompressingStreamAdapter compressingStream(bufferStream);
-                nlrs::serialize(compressingStream, sourceBvh);
-            }
-
-            THEN("deserializing from DecompressingStreamAdapter equals original bvh")
-            {
-                nlrs::Bvh bvh;
-                {
-                    nlrs::DecompressingStreamAdapter decompressingStream(bufferStream);
-                    nlrs::deserialize(decompressingStream, bvh);
-                }
-
-                REQUIRE(bvh.nodes.size() == sourceBvh.nodes.size());
-                REQUIRE(bvh.triangleIndices.size() == sourceBvh.triangleIndices.size());
-
-                const std::size_t byteSizeNodes = sizeof(nlrs::BvhNode) * bvh.nodes.size();
-                const std::size_t byteSizeIndices =
-                    sizeof(std::size_t) * bvh.triangleIndices.size();
-                REQUIRE(std::memcmp(bvh.nodes.data(), sourceBvh.nodes.data(), byteSizeNodes) == 0);
-                REQUIRE(
-                    std::memcmp(
-                        bvh.triangleIndices.data(),
-                        sourceBvh.triangleIndices.data(),
-                        byteSizeIndices) == 0);
-            }
-        }
     }
 }
 
@@ -482,44 +350,6 @@ SCENARIO("Archiving a model without compression", "[archive]")
                 {
                     nlrs::InputFileStream file(testFile);
                     nlrs::deserialize(file, deserializedModel);
-                };
-            }
-        }
-
-        fs::remove(testFile);
-    }
-}
-
-SCENARIO("Archiving a model with compression", "[archive]")
-{
-    GIVEN("a model")
-    {
-        const nlrs::GltfModel model{"Duck.glb"};
-        const fs::path        testFile = fs::current_path() / fs::path("model.testbin");
-
-        WHEN("serializing to OutputFileStream")
-        {
-            {
-                nlrs::OutputFileStream         file(testFile);
-                nlrs::CompressingStreamAdapter compressingStream(file);
-                nlrs::serialize(compressingStream, model);
-            }
-
-            THEN("deserializing using InputFileStream should yield the same model")
-            {
-                nlrs::GltfModel deserializedModel;
-                {
-                    nlrs::InputFileStream            file(testFile);
-                    nlrs::DecompressingStreamAdapter decompressingStream(file);
-                    nlrs::deserialize(decompressingStream, deserializedModel);
-                }
-                REQUIRE(deserializedModel == model);
-
-                BENCHMARK("deserializing compressed data from a file")
-                {
-                    nlrs::InputFileStream            file(testFile);
-                    nlrs::DecompressingStreamAdapter decompressingStream(file);
-                    nlrs::deserialize(decompressingStream, deserializedModel);
                 };
             }
         }
