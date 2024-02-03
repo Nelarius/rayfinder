@@ -29,8 +29,9 @@ int main(int argc, char** argv)
 
     const GltfModel      model(argv[1]);
     const FlattenedModel flattenedModel(model);
-    const Bvh            bvh = buildBvh(flattenedModel.positions());
-    const auto triangles = reorderAttributes(flattenedModel.positions(), bvh.triangleIndices);
+    const Bvh            bvh = buildBvh(flattenedModel.positions);
+    const auto           triangles =
+        reorderAttributes(std::span(flattenedModel.positions), bvh.triangleIndices);
 
     const Camera camera = [&bvh]() -> Camera {
         const BvhNode&  rootNode = bvh.nodes[0];

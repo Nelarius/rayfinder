@@ -106,13 +106,16 @@ int main(int argc, char** argv)
         [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
         const nlrs::GltfModel      model(argv[1]);
         const nlrs::FlattenedModel flattenedModel(model);
-        auto [bvhNodes, triangleIndices] = nlrs::buildBvh(flattenedModel.positions());
+        auto [bvhNodes, triangleIndices] = nlrs::buildBvh(flattenedModel.positions);
 
-        const auto positions = nlrs::reorderAttributes(flattenedModel.positions(), triangleIndices);
-        const auto normals = nlrs::reorderAttributes(flattenedModel.normals(), triangleIndices);
-        const auto texCoords = nlrs::reorderAttributes(flattenedModel.texCoords(), triangleIndices);
-        const auto textureIndices =
-            nlrs::reorderAttributes(flattenedModel.baseColorTextureIndices(), triangleIndices);
+        const auto positions =
+            nlrs::reorderAttributes(std::span(flattenedModel.positions), triangleIndices);
+        const auto normals =
+            nlrs::reorderAttributes(std::span(flattenedModel.normals), triangleIndices);
+        const auto texCoords =
+            nlrs::reorderAttributes(std::span(flattenedModel.texCoords), triangleIndices);
+        const auto textureIndices = nlrs::reorderAttributes(
+            std::span(flattenedModel.baseColorTextureIndices), triangleIndices);
 
         NLRS_ASSERT(positions.size() == normals.size());
         NLRS_ASSERT(positions.size() == texCoords.size());
@@ -153,7 +156,7 @@ int main(int argc, char** argv)
             .bvhNodes = bvhNodes,
             .positionAttributes = positionAttributes,
             .vertexAttributes = vertexAttributes,
-            .baseColorTextures = model.baseColorTextures(),
+            .baseColorTextures = model.baseColorTextures,
         };
 
         AppState app{

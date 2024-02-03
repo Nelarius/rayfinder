@@ -19,10 +19,9 @@ int main(int argc, char** argv)
 
     nlrs::GltfModel model(argv[1]);
 
-    const auto baseColorTextures = model.baseColorTextures();
-    for (std::size_t textureIdx = 0; textureIdx < baseColorTextures.size(); ++textureIdx)
+    for (std::size_t textureIdx = 0; textureIdx < model.baseColorTextures.size(); ++textureIdx)
     {
-        const auto& texture = baseColorTextures[textureIdx];
+        const auto& texture = model.baseColorTextures[textureIdx];
         const auto  dimensions = texture.dimensions();
         const auto  pixels = texture.pixels();
 
