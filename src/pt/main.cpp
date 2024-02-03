@@ -10,6 +10,8 @@
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/triangle_attributes.hpp>
+#include <pt-format/vertex_attributes.hpp>
+#include <pt-format/pt_format.hpp>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -104,44 +106,7 @@ int main(int argc, char** argv)
 
     auto [appState, renderer] =
         [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
-        const nlrs::GltfModel      model(argv[1]);
-        const nlrs::FlattenedModel flattenedModel(model);
-        auto [bvhNodes, triangleIndices] = nlrs::buildBvh(flattenedModel.positions);
-
-        const auto positions =
-            nlrs::reorderAttributes(std::span(flattenedModel.positions), triangleIndices);
-        const auto normals =
-            nlrs::reorderAttributes(std::span(flattenedModel.normals), triangleIndices);
-        const auto texCoords =
-            nlrs::reorderAttributes(std::span(flattenedModel.texCoords), triangleIndices);
-        const auto textureIndices = nlrs::reorderAttributes(
-            std::span(flattenedModel.baseColorTextureIndices), triangleIndices);
-
-        NLRS_ASSERT(positions.size() == normals.size());
-        NLRS_ASSERT(positions.size() == texCoords.size());
-        NLRS_ASSERT(positions.size() == textureIndices.size());
-        std::vector<nlrs::PositionAttribute> positionAttributes;
-        std::vector<nlrs::VertexAttributes>  vertexAttributes;
-        positionAttributes.reserve(positions.size());
-        vertexAttributes.reserve(positions.size());
-        for (std::size_t i = 0; i < normals.size(); ++i)
-        {
-            const auto& ps = positions[i];
-            const auto& ns = normals[i];
-            const auto& uvs = texCoords[i];
-            const auto  textureIdx = textureIndices[i];
-
-            positionAttributes.push_back(
-                nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
-            vertexAttributes.push_back(nlrs::VertexAttributes{
-                .n0 = ns.n0,
-                .n1 = ns.n1,
-                .n2 = ns.n2,
-                .uv0 = uvs.uv0,
-                .uv1 = uvs.uv1,
-                .uv2 = uvs.uv2,
-                .textureIdx = textureIdx});
-        }
+        nlrs::PtFormat ptFormat{argv[1]};
 
         const nlrs::RendererDescriptor rendererDesc{
             nlrs::RenderParameters{
@@ -153,16 +118,16 @@ int main(int argc, char** argv)
         };
 
         nlrs::Scene scene{
-            .bvhNodes = bvhNodes,
-            .positionAttributes = positionAttributes,
-            .vertexAttributes = vertexAttributes,
-            .baseColorTextures = model.baseColorTextures,
+            .bvhNodes = ptFormat.bvhNodes,
+            .positionAttributes = ptFormat.gpuPositionAttributes,
+            .vertexAttributes = ptFormat.gpuVertexAttributes,
+            .baseColorTextures = ptFormat.baseColorTextures,
         };
 
         AppState app{
             .cameraController{},
-            .bvhNodes = std::move(bvhNodes),
-            .positions = std::move(positions),
+            .bvhNodes = std::move(ptFormat.bvhNodes),
+            .positions = std::move(ptFormat.bvhPositionAttributes),
             .ui = UiState{},
             .focusPressed = false,
         };

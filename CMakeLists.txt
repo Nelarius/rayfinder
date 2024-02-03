@@ -59,6 +59,11 @@ target_link_libraries(hw-skymodel-demo PRIVATE common hw-skymodel glm::glm)
 add_executable(hw-sunmodel-integrator src/hw-sunmodel-integrator/main.cpp)
 target_link_libraries(hw-sunmodel-integrator PRIVATE common hosekwilkie-skylightmodel fmt glm::glm)
 
+# pt-format
+add_library(pt-format src/pt-format/pt_format.cpp)
+target_include_directories(pt-format PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(pt-format PRIVATE common glm::glm)
+
 # pt
 set(PT_SOURCE_FILES
     fly_camera_controller.cpp
@@ -71,7 +76,7 @@ set(PT_SOURCE_FILES
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 
 add_executable(pt ${PT_SOURCE_FILES})
-target_link_libraries(pt PRIVATE common fmt glfw glfw3webgpu glm::glm hw-skymodel imgui webgpu_dawn)
+target_link_libraries(pt PRIVATE common fmt glfw glfw3webgpu glm::glm hw-skymodel imgui pt-format webgpu_dawn)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 add_custom_command(
     TARGET pt POST_BUILD
