@@ -18,10 +18,12 @@ endif()
 
 # common
 set(COMMON_SOURCE_FILES
+    buffer_stream.cpp
     bvh.cpp
     camera.cpp
     cgltf.c
     flattened_model.cpp
+    file_stream.cpp
     gltf_model.cpp
     ray_intersection.cpp
     stb_image.c
@@ -111,6 +113,7 @@ set(TESTS_SOURCE_FILES
     bvh.cpp
     gltf.cpp
     intersection.cpp
+    stream.cpp
     vector_set.cpp)
 list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
 
