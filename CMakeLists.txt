@@ -103,7 +103,6 @@ add_custom_command(
 set(TESTS_SOURCE_FILES
     aabb.cpp
     angle.cpp
-    archive.cpp
     bvh.cpp
     gltf.cpp
     intersection.cpp
