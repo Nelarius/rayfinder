@@ -3,6 +3,7 @@ build
 build-debug
 build-release
 clangd
+*.pt
 
 ### CMake ###
 CMakeLists.txt.user
