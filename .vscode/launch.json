@@ -19,7 +19,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/pt",
             "args": [
-                "../assets/Duck.glb"
+                "../assets/Duck.pt"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -45,7 +45,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/Debug/pt.exe",
             "args": [
-                "../../assets/Duck.glb"
+                "../../assets/Duck.pt"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build/Debug",
