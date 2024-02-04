@@ -18,10 +18,12 @@ endif()
 
 # common
 set(COMMON_SOURCE_FILES
+    buffer_stream.cpp
     bvh.cpp
     camera.cpp
     cgltf.c
     flattened_model.cpp
+    file_stream.cpp
     gltf_model.cpp
     ray_intersection.cpp
     stb_image.c
@@ -59,6 +61,15 @@ target_link_libraries(hw-skymodel-demo PRIVATE common hw-skymodel glm::glm)
 add_executable(hw-sunmodel-integrator src/hw-sunmodel-integrator/main.cpp)
 target_link_libraries(hw-sunmodel-integrator PRIVATE common hosekwilkie-skylightmodel fmt glm::glm)
 
+# pt-format
+add_library(pt-format src/pt-format/pt_format.cpp)
+target_include_directories(pt-format PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(pt-format PRIVATE common fmt glm::glm)
+
+# pt-format-tool
+add_executable(pt-format-tool src/pt-format-tool/main.cpp)
+target_link_libraries(pt-format-tool PRIVATE common fmt pt-format glm::glm)
+
 # pt
 set(PT_SOURCE_FILES
     fly_camera_controller.cpp
@@ -71,7 +82,7 @@ set(PT_SOURCE_FILES
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 
 add_executable(pt ${PT_SOURCE_FILES})
-target_link_libraries(pt PRIVATE common fmt glfw glfw3webgpu glm::glm hw-skymodel imgui webgpu_dawn)
+target_link_libraries(pt PRIVATE common fmt glfw glfw3webgpu glm::glm hw-skymodel imgui pt-format webgpu_dawn)
 set_target_properties(pt PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 add_custom_command(
     TARGET pt POST_BUILD
@@ -106,11 +117,13 @@ set(TESTS_SOURCE_FILES
     bvh.cpp
     gltf.cpp
     intersection.cpp
+    pt_format.cpp
+    stream.cpp
     vector_set.cpp)
 list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
 
 add_executable(tests ${TESTS_SOURCE_FILES})
-target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common glm::glm)
+target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common fmt pt-format glm::glm)
 add_custom_command(
     TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy

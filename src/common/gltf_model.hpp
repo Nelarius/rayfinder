@@ -11,47 +11,43 @@
 
 namespace nlrs
 {
-class GltfMesh
+struct GltfMesh
 {
-public:
     GltfMesh(
         std::vector<glm::vec3>     positions,
         std::vector<glm::vec3>     normals,
         std::vector<glm::vec2>     texCoords,
         std::vector<std::uint32_t> indices,
         size_t                     baseColorTextureIndex)
-        : mPositions(std::move(positions)),
-          mNormals(std::move(normals)),
-          mTexCoords(std::move(texCoords)),
-          mIndices(std::move(indices)),
-          mBaseColorTextureIndex(baseColorTextureIndex)
+        : positions(std::move(positions)),
+          normals(std::move(normals)),
+          texCoords(std::move(texCoords)),
+          indices(std::move(indices)),
+          baseColorTextureIndex(baseColorTextureIndex)
     {
     }
 
-    std::span<const glm::vec3>     positions() const { return mPositions; }
-    std::span<const glm::vec3>     normals() const { return mNormals; }
-    std::span<const glm::vec2>     texCoords() const { return mTexCoords; }
-    std::span<const std::uint32_t> indices() const { return mIndices; }
-    size_t                         baseColorTextureIndex() const { return mBaseColorTextureIndex; }
-
-private:
-    std::vector<glm::vec3>     mPositions;
-    std::vector<glm::vec3>     mNormals;
-    std::vector<glm::vec2>     mTexCoords;
-    std::vector<std::uint32_t> mIndices;
-    std::size_t                mBaseColorTextureIndex;
+    std::vector<glm::vec3>     positions;
+    std::vector<glm::vec3>     normals;
+    std::vector<glm::vec2>     texCoords;
+    std::vector<std::uint32_t> indices;
+    std::size_t                baseColorTextureIndex;
 };
 
-class GltfModel
+struct GltfModel
 {
 public:
+    GltfModel() = default;
     GltfModel(std::filesystem::path gltfPath);
+    GltfModel(std::vector<GltfMesh> meshes, std::vector<Texture> baseColorTextures);
 
-    std::span<const GltfMesh> meshes() const { return mMeshes; }
-    std::span<const Texture>  baseColorTextures() const { return mBaseColorTextures; }
+    GltfModel(const GltfModel&) = delete;
+    GltfModel& operator=(const GltfModel&) = delete;
 
-private:
-    std::vector<GltfMesh> mMeshes;
-    std::vector<Texture>  mBaseColorTextures;
+    GltfModel(GltfModel&&) = default;
+    GltfModel& operator=(GltfModel&&) = default;
+
+    std::vector<GltfMesh> meshes;
+    std::vector<Texture>  baseColorTextures;
 };
 } // namespace nlrs

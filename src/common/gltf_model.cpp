@@ -70,8 +70,8 @@ void traverseNodeHierarchy(
 } // namespace
 
 GltfModel::GltfModel(const fs::path gltfPath)
-    : mMeshes(),
-      mBaseColorTextures()
+    : meshes(),
+      baseColorTextures()
 {
     if (!fs::exists(gltfPath))
     {
@@ -296,11 +296,11 @@ GltfModel::GltfModel(const fs::path gltfPath)
         return std::span(bufferPtr + bufferOffset, byteLength);
     };
 
-    mBaseColorTextures.reserve(uniqueBaseColorImages.size());
+    baseColorTextures.reserve(uniqueBaseColorImages.size());
     std::transform(
         uniqueBaseColorImages.begin(),
         uniqueBaseColorImages.end(),
-        std::back_inserter(mBaseColorTextures),
+        std::back_inserter(baseColorTextures),
         [&](const cgltf_image* image) -> Texture {
             if (image->buffer_view)
             {
@@ -328,10 +328,10 @@ GltfModel::GltfModel(const fs::path gltfPath)
             }
         });
 
-    mMeshes.reserve(meshPositions.size());
+    meshes.reserve(meshPositions.size());
     for (std::size_t i = 0; i < meshPositions.size(); ++i)
     {
-        mMeshes.emplace_back(
+        meshes.emplace_back(
             std::move(meshPositions[i]),
             std::move(meshNormals[i]),
             std::move(meshTexCoords[i]),
@@ -340,5 +340,11 @@ GltfModel::GltfModel(const fs::path gltfPath)
     }
 
     cgltf_free(data);
+}
+
+GltfModel::GltfModel(std::vector<GltfMesh> meshes, std::vector<Texture> baseColorTextures)
+    : meshes(std::move(meshes)),
+      baseColorTextures(std::move(baseColorTextures))
+{
 }
 } // namespace nlrs

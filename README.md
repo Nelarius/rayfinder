@@ -51,6 +51,17 @@ $ cmake --build build-debug --target pt -- -j 32
 
 ## Run
 
+### `pt` and `pt-format-tool`
+
+The `pt` executable contains the path tracer. You run it by providing it with input file in the `pt` file format. `.pt` files are generated from a glTF file using the `pt-format-tool` executable.
+
+```sh
+# Running the path tracer requires input data generated from a gltf file.
+$ ./build-release/pt-format-tool assets/Sponza.glb
+# Run the path tracer with the resulting .pt file.
+$ ./build-release/pt assets/Sponza.pt
+```
+
 ### `bvh-visualizer`
 
 For validating that the bounding volume hierarchy (BVH) and it's intersection tests are computed correctly. This executable loads the specified glTF file, builds a BVH, and produces an image where each pixel is colored by the number of nodes visited for the pixel's primary ray. Running the executable produces the test image `bvh-visualizer.png`.

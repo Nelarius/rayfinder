@@ -6,24 +6,32 @@
 
 #include <common/assert.hpp>
 #include <common/bvh.hpp>
+#include <common/file_stream.hpp>
 #include <common/flattened_model.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/triangle_attributes.hpp>
+#include <pt-format/vertex_attributes.hpp>
+#include <pt-format/pt_format.hpp>
 
+#include <fmt/core.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <webgpu/webgpu.h>
 
 #include <cstdint>
 #include <cstdio>
+#include <exception>
+#include <filesystem>
 #include <tuple>
 #include <utility>
+
+namespace fs = std::filesystem;
 
 inline constexpr int defaultWindowWidth = 640;
 inline constexpr int defaultWindowHeight = 480;
 
-void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
+void printHelp() { std::printf("Usage:\n\tpt <input_pt_file>\n"); }
 
 struct UiState
 {
@@ -84,6 +92,7 @@ nlrs::Extent2i largestMonitorResolution()
 }
 
 int main(int argc, char** argv)
+try
 {
     if (argc != 2)
     {
@@ -104,40 +113,16 @@ int main(int argc, char** argv)
 
     auto [appState, renderer] =
         [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
-        const nlrs::GltfModel      model(argv[1]);
-        const nlrs::FlattenedModel flattenedModel(model);
-        auto [bvhNodes, triangleIndices] = nlrs::buildBvh(flattenedModel.positions());
-
-        const auto positions = nlrs::reorderAttributes(flattenedModel.positions(), triangleIndices);
-        const auto normals = nlrs::reorderAttributes(flattenedModel.normals(), triangleIndices);
-        const auto texCoords = nlrs::reorderAttributes(flattenedModel.texCoords(), triangleIndices);
-        const auto textureIndices =
-            nlrs::reorderAttributes(flattenedModel.baseColorTextureIndices(), triangleIndices);
-
-        NLRS_ASSERT(positions.size() == normals.size());
-        NLRS_ASSERT(positions.size() == texCoords.size());
-        NLRS_ASSERT(positions.size() == textureIndices.size());
-        std::vector<nlrs::PositionAttribute> positionAttributes;
-        std::vector<nlrs::VertexAttributes>  vertexAttributes;
-        positionAttributes.reserve(positions.size());
-        vertexAttributes.reserve(positions.size());
-        for (std::size_t i = 0; i < normals.size(); ++i)
+        nlrs::PtFormat ptFormat;
         {
-            const auto& ps = positions[i];
-            const auto& ns = normals[i];
-            const auto& uvs = texCoords[i];
-            const auto  textureIdx = textureIndices[i];
-
-            positionAttributes.push_back(
-                nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
-            vertexAttributes.push_back(nlrs::VertexAttributes{
-                .n0 = ns.n0,
-                .n1 = ns.n1,
-                .n2 = ns.n2,
-                .uv0 = uvs.uv0,
-                .uv1 = uvs.uv1,
-                .uv2 = uvs.uv2,
-                .textureIdx = textureIdx});
+            const fs::path path = argv[1];
+            if (!fs::exists(path))
+            {
+                fmt::print(stderr, "File {} does not exist\n", path.string());
+                std::exit(1);
+            }
+            nlrs::InputFileStream file(argv[1]);
+            nlrs::deserialize(file, ptFormat);
         }
 
         const nlrs::RendererDescriptor rendererDesc{
@@ -150,16 +135,16 @@ int main(int argc, char** argv)
         };
 
         nlrs::Scene scene{
-            .bvhNodes = bvhNodes,
-            .positionAttributes = positionAttributes,
-            .vertexAttributes = vertexAttributes,
-            .baseColorTextures = model.baseColorTextures(),
+            .bvhNodes = ptFormat.bvhNodes,
+            .positionAttributes = ptFormat.gpuPositionAttributes,
+            .vertexAttributes = ptFormat.gpuVertexAttributes,
+            .baseColorTextures = ptFormat.baseColorTextures,
         };
 
         AppState app{
             .cameraController{},
-            .bvhNodes = std::move(bvhNodes),
-            .positions = std::move(positions),
+            .bvhNodes = std::move(ptFormat.bvhNodes),
+            .positions = std::move(ptFormat.bvhPositionAttributes),
             .ui = UiState{},
             .focusPressed = false,
         };
@@ -327,4 +312,14 @@ int main(int argc, char** argv)
     window.run(gpuContext, std::move(onNewFrame), std::move(onUpdate), std::move(onRender));
 
     return 0;
+}
+catch (const std::exception& e)
+{
+    fmt::println(stderr, "Exception occurred. {}", e.what());
+    return 1;
+}
+catch (...)
+{
+    fmt::println(stderr, "Unknown exception occurred.");
+    return 1;
 }
