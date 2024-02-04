@@ -6,6 +6,7 @@
 
 #include <common/assert.hpp>
 #include <common/bvh.hpp>
+#include <common/file_stream.hpp>
 #include <common/flattened_model.hpp>
 #include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
@@ -13,19 +14,24 @@
 #include <pt-format/vertex_attributes.hpp>
 #include <pt-format/pt_format.hpp>
 
+#include <fmt/core.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <webgpu/webgpu.h>
 
 #include <cstdint>
 #include <cstdio>
+#include <exception>
+#include <filesystem>
 #include <tuple>
 #include <utility>
+
+namespace fs = std::filesystem;
 
 inline constexpr int defaultWindowWidth = 640;
 inline constexpr int defaultWindowHeight = 480;
 
-void printHelp() { std::printf("Usage: pt <input_gltf_file>\n"); }
+void printHelp() { std::printf("Usage:\n\tpt <input_pt_file>\n"); }
 
 struct UiState
 {
@@ -86,6 +92,7 @@ nlrs::Extent2i largestMonitorResolution()
 }
 
 int main(int argc, char** argv)
+try
 {
     if (argc != 2)
     {
@@ -106,7 +113,17 @@ int main(int argc, char** argv)
 
     auto [appState, renderer] =
         [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
-        nlrs::PtFormat ptFormat{argv[1]};
+        nlrs::PtFormat ptFormat;
+        {
+            const fs::path path = argv[1];
+            if (!fs::exists(path))
+            {
+                fmt::print(stderr, "File {} does not exist\n", path.string());
+                std::exit(1);
+            }
+            nlrs::InputFileStream file(argv[1]);
+            nlrs::deserialize(file, ptFormat);
+        }
 
         const nlrs::RendererDescriptor rendererDesc{
             nlrs::RenderParameters{
@@ -295,4 +312,14 @@ int main(int argc, char** argv)
     window.run(gpuContext, std::move(onNewFrame), std::move(onUpdate), std::move(onRender));
 
     return 0;
+}
+catch (const std::exception& e)
+{
+    fmt::println(stderr, "Exception occurred. {}", e.what());
+    return 1;
+}
+catch (...)
+{
+    fmt::println(stderr, "Unknown exception occurred.");
+    return 1;
 }

@@ -66,6 +66,10 @@ add_library(pt-format src/pt-format/pt_format.cpp)
 target_include_directories(pt-format PUBLIC ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(pt-format PRIVATE common fmt glm::glm)
 
+# pt-format-tool
+add_executable(pt-format-tool src/pt-format-tool/main.cpp)
+target_link_libraries(pt-format-tool PRIVATE common fmt pt-format glm::glm)
+
 # pt
 set(PT_SOURCE_FILES
     fly_camera_controller.cpp
