@@ -4,7 +4,6 @@
 
 #include <common/bvh.hpp>
 #include <common/triangle_attributes.hpp>
-#include <common/stream.hpp>
 #include <common/texture.hpp>
 
 #include <filesystem>
@@ -12,6 +11,9 @@
 
 namespace nlrs
 {
+class InputStream;
+class OutputStream;
+
 struct PtFormat
 {
     PtFormat() = default;
@@ -23,4 +25,7 @@ struct PtFormat
     std::vector<VertexAttributes>  gpuVertexAttributes;
     std::vector<Texture>           baseColorTextures;
 };
+
+void serialize(OutputStream&, const PtFormat&);
+void deserialize(InputStream&, PtFormat&);
 } // namespace nlrs

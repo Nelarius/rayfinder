@@ -19,6 +19,7 @@ public:
         bool operator==(const Dimensions&) const = default;
     };
 
+    Texture() = default;
     Texture(std::vector<RgbaPixel>&& pixels, Dimensions dimensions)
         : mPixels(std::move(pixels)),
           mDimensions(dimensions)

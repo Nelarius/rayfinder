@@ -64,7 +64,7 @@ target_link_libraries(hw-sunmodel-integrator PRIVATE common hosekwilkie-skylight
 # pt-format
 add_library(pt-format src/pt-format/pt_format.cpp)
 target_include_directories(pt-format PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(pt-format PRIVATE common glm::glm)
+target_link_libraries(pt-format PRIVATE common fmt glm::glm)
 
 # pt
 set(PT_SOURCE_FILES
@@ -113,12 +113,13 @@ set(TESTS_SOURCE_FILES
     bvh.cpp
     gltf.cpp
     intersection.cpp
+    pt_format.cpp
     stream.cpp
     vector_set.cpp)
 list(TRANSFORM TESTS_SOURCE_FILES PREPEND src/tests/)
 
 add_executable(tests ${TESTS_SOURCE_FILES})
-target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common fmt glm::glm)
+target_link_libraries(tests PRIVATE Catch2::Catch2WithMain common fmt pt-format glm::glm)
 add_custom_command(
     TARGET tests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
