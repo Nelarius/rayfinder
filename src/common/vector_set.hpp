@@ -36,14 +36,14 @@ public:
     }
 
     template<std::size_t N>
-    constexpr VectorSet(const Key (&data)[N], Compare comp = Compare()) noexcept
+    constexpr VectorSet(const Key (&data)[N], Compare comp = Compare())
         : m_data(data, data + N),
           m_compare(std::move(comp))
     {
     }
 
     template<typename InputIt>
-    constexpr VectorSet(InputIt first, InputIt last, Compare comp = Compare()) noexcept
+    constexpr VectorSet(InputIt first, InputIt last, Compare comp = Compare())
         : m_data(first, last),
           m_compare(std::move(comp))
     {
@@ -60,7 +60,7 @@ public:
 
     [[nodiscard]] constexpr const_pointer data() const noexcept { return m_data.data(); }
 
-    [[nodiscard]] constexpr const_reference operator[](const size_type pos) const
+    [[nodiscard]] constexpr const_reference operator[](const size_type pos) const noexcept
     {
         assert(pos < m_data.size());
         return m_data[pos];

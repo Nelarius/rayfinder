@@ -35,7 +35,7 @@ WGPUBufferBindingType bufferUsageToBufferBindingType(const WGPUBufferUsageFlags 
 }
 } // namespace
 
-GpuBuffer::GpuBuffer(GpuBuffer&& other)
+GpuBuffer::GpuBuffer(GpuBuffer&& other) noexcept
 {
     if (this != &other)
     {
@@ -49,7 +49,7 @@ GpuBuffer::GpuBuffer(GpuBuffer&& other)
     }
 }
 
-GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other)
+GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept
 {
     if (this != &other)
     {

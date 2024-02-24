@@ -21,8 +21,8 @@ public:
     GpuBuffer(const GpuBuffer&) = delete;
     GpuBuffer& operator=(const GpuBuffer&) = delete;
 
-    GpuBuffer(GpuBuffer&&);
-    GpuBuffer& operator=(GpuBuffer&&);
+    GpuBuffer(GpuBuffer&&) noexcept;
+    GpuBuffer& operator=(GpuBuffer&&) noexcept;
 
     GpuBuffer(
         WGPUDevice           device,
@@ -41,12 +41,12 @@ public:
 
     // Raw access
 
-    inline WGPUBuffer handle() const
+    inline WGPUBuffer handle() const noexcept
     {
         assert(mBuffer != nullptr);
         return mBuffer;
     }
-    inline std::size_t byteSize() const
+    inline std::size_t byteSize() const noexcept
     {
         assert(mByteSize > 0);
         return mByteSize;

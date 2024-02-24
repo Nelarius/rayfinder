@@ -34,8 +34,8 @@ public:
 
     bool operator==(const Texture&) const = default;
 
-    std::span<const RgbaPixel> pixels() const { return mPixels; }
-    Dimensions                 dimensions() const { return mDimensions; }
+    std::span<const RgbaPixel> pixels() const noexcept { return mPixels; }
+    Dimensions                 dimensions() const noexcept { return mDimensions; }
 
     // `data` is expected to be in RGBA or RGB format, with each component 8 bits.
     static Texture fromMemory(std::span<const std::uint8_t> data);
