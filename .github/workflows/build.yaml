@@ -1,0 +1,33 @@
+name: Validate
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest points to macos-12, which has AppleClang 14.0.
+        # Read more: https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners/about-github-hosted-runners
+        platform: [windows-latest, macos-13]
+        configuration: [Debug, Release]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Generate
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.configuration }} --target bvh-visualizer hw-skymodel-demo hw-sunmodel-integrator pt-format-tool pt textractor tests -j 16 --
+
+      - name: Test
+        if: matrix.platform == 'windows-latest'
+        working-directory: build/${{ matrix.configuration }}
+        run: ./tests.exe
+
+      - name: Test
+        if: matrix.platform == 'macos-13'
+        working-directory: build/
+        run: ./tests
