@@ -40,7 +40,7 @@ FlattenedModel::FlattenedModel(const GltfModel& gltfModel)
             const glm::vec2& uv2 = meshTexCoords[idx2];
             texCoords.push_back(TexCoords{.uv0 = uv0, .uv1 = uv1, .uv2 = uv2});
 
-            baseColorTextureIndices.push_back(baseColorTextureIndex);
+            baseColorTextureIndices.push_back(static_cast<std::uint32_t>(baseColorTextureIndex));
         }
     }
 }
