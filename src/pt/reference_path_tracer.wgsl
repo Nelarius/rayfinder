@@ -6,7 +6,6 @@ struct Uniforms {
 
 struct VertexInput {
     @location(0) position: vec2f,
-    @location(1) texCoord: vec2f,
 }
 
 struct VertexOutput {
@@ -18,7 +17,7 @@ struct VertexOutput {
 fn vsMain(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
     out.position = uniforms.viewProjectionMatrix * vec4f(in.position, 0.0, 1.0);
-    out.texCoord = in.texCoord;
+    out.texCoord = in.position + vec2f(0.5);
 
     return out;
 }

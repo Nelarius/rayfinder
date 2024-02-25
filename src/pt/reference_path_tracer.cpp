@@ -1,6 +1,7 @@
 #include "gpu_context.hpp"
 #include "gui.hpp"
 #include "reference_path_tracer.hpp"
+#include "webgpu_utils.hpp"
 #include "window.hpp"
 
 #include <common/bvh.hpp>
@@ -18,13 +19,10 @@
 #include <cstring>
 #include <cstdio>
 #include <deque>
-#include <fstream>
 #include <numbers>
 #include <numeric>
 #include <span>
-#include <sstream>
 #include <stdexcept>
-#include <string>
 #include <utility>
 
 namespace nlrs
@@ -34,12 +32,6 @@ inline constexpr float DEGREES_TO_RADIANS = PI / 180.0f;
 
 namespace
 {
-struct Vertex
-{
-    float position[2];
-    float uv[2];
-};
-
 struct FrameDataLayout
 {
     Extent2u      dimensions;
@@ -170,38 +162,17 @@ struct TimestampsLayout
 
     static constexpr std::uint32_t QUERY_COUNT = 2;
 };
-
-void querySetSafeRelease(const WGPUQuerySet querySet)
-{
-    if (querySet)
-    {
-        wgpuQuerySetDestroy(querySet);
-        wgpuQuerySetRelease(querySet);
-    }
-}
-
-void bindGroupSafeRelease(const WGPUBindGroup bindGroup)
-{
-    if (bindGroup)
-    {
-        wgpuBindGroupRelease(bindGroup);
-    }
-}
-
-void renderPipelineSafeRelease(const WGPURenderPipeline pipeline)
-{
-    if (pipeline)
-    {
-        wgpuRenderPipelineRelease(pipeline);
-    }
-}
 } // namespace
 
 ReferencePathTracer::ReferencePathTracer(
     const RendererDescriptor& rendererDesc,
     const GpuContext&         gpuContext,
     const Scene               scene)
-    : mVertexBuffer(),
+    : mVertexBuffer(
+          gpuContext.device,
+          "Vertex buffer",
+          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
+          std::span<const float[2]>(quadVertexData)),
       mUniformsBuffer(),
       mUniformsBindGroup(nullptr),
       mRenderParamsBuffer(
@@ -262,23 +233,6 @@ ReferencePathTracer::ReferencePathTracer(
       mAccumulatedSampleCount(0),
       mRenderPassDurationsNs()
 {
-    {
-        const std::array<Vertex, 6> vertexData{
-            Vertex{{-0.5f, -0.5f}, {0.0f, 0.0f}},
-            Vertex{{0.5f, -0.5f}, {1.0f, 0.0f}},
-            Vertex{{0.5f, 0.5f}, {1.0f, 1.0f}},
-            Vertex{{0.5f, 0.5f}, {1.0f, 1.0f}},
-            Vertex{{-0.5f, 0.5f}, {0.0f, 1.0f}},
-            Vertex{{-0.5f, -0.5f}, {0.0f, 0.0f}},
-        };
-
-        mVertexBuffer = GpuBuffer(
-            gpuContext.device,
-            "Vertex buffer",
-            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
-            std::span<const Vertex>(vertexData));
-    }
-
     {
         // DirectX, Metal, wgpu share the same left-handed coordinate system
         // for their normalized device coordinates:
@@ -387,17 +341,6 @@ ReferencePathTracer::ReferencePathTracer(
 
         // Shader modules
 
-        auto loadShaderSource = [](std::string_view path) -> std::string {
-            std::ifstream file(path.data());
-            if (!file)
-            {
-                throw std::runtime_error(fmt::format("Error opening file: {}.", path));
-            }
-            std::stringstream buffer;
-            buffer << file.rdbuf();
-            return buffer.str();
-        };
-
         const std::string shaderSource = loadShaderSource("reference_path_tracer.wgsl");
 
         const WGPUShaderModuleWGSLDescriptor shaderCodeDesc = {
@@ -429,25 +372,17 @@ ReferencePathTracer::ReferencePathTracer(
 
         // Vertex layout
 
-        std::array<WGPUVertexAttribute, 2> vertexAttributes{
-            WGPUVertexAttribute{
-                // position
-                .format = WGPUVertexFormat_Float32x2,
-                .offset = 0,
-                .shaderLocation = 0,
-            },
-            WGPUVertexAttribute{
-                // texCoord
-                .format = WGPUVertexFormat_Float32x2,
-                .offset = 2 * sizeof(float),
-                .shaderLocation = 1,
-            },
-        };
+        const std::array<WGPUVertexAttribute, 1> vertexAttributes{WGPUVertexAttribute{
+            // position
+            .format = WGPUVertexFormat_Float32x2,
+            .offset = 0,
+            .shaderLocation = 0,
+        }};
 
         WGPUVertexBufferLayout vertexBufferLayout{
-            .arrayStride = 1 * sizeof(Vertex),
+            .arrayStride = sizeof(float[2]),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = 2,
+            .attributeCount = vertexAttributes.size(),
             .attributes = vertexAttributes.data(),
         };
 
@@ -519,7 +454,7 @@ ReferencePathTracer::ReferencePathTracer(
 
         // pipeline layout
 
-        std::array<WGPUBindGroupLayout, 4> bindGroupLayouts{
+        const std::array<WGPUBindGroupLayout, 4> bindGroupLayouts{
             uniformsBindGroupLayout,
             renderParamsBindGroupLayout,
             sceneBindGroupLayout,
