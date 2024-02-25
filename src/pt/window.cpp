@@ -142,16 +142,16 @@ Window::~Window()
     }
 }
 
-Extent2i Window::size() const
+ScreenSize Window::size() const
 {
-    Extent2i result;
+    ScreenSize result;
     glfwGetWindowSize(mWindow, &result.x, &result.y);
     return result;
 }
 
-Extent2i Window::resolution() const
+FramebufferSize Window::resolution() const
 {
-    Extent2i result;
+    FramebufferSize result;
     glfwGetFramebufferSize(mWindow, &result.x, &result.y);
     return result;
 }
@@ -160,10 +160,11 @@ void Window::run(
     const GpuContext&  gpuContext,
     NewFrameCallback&& newFrameCallback,
     UpdateCallback&&   updateCallback,
-    RenderCallback&&   renderCallback)
+    RenderCallback&&   renderCallback,
+    ResizeCallback&&   resizeCallback)
 {
-    Extent2i currentFramebufferSize = resolution();
-    auto     lastTime = std::chrono::steady_clock::now();
+    FramebufferSize currentFramebufferSize = resolution();
+    auto            lastTime = std::chrono::steady_clock::now();
     while (!glfwWindowShouldClose(mWindow))
     {
         const auto  currentTime = std::chrono::steady_clock::now();
@@ -176,7 +177,7 @@ void Window::run(
 
         // Resize
         {
-            const Extent2i newFramebufferSize = resolution();
+            const FramebufferSize newFramebufferSize = resolution();
             if (newFramebufferSize != currentFramebufferSize)
             {
                 currentFramebufferSize = newFramebufferSize;
@@ -189,6 +190,8 @@ void Window::run(
                 swapChainSafeRelease(mSwapChain);
                 mSwapChain = createSwapChain(
                     gpuContext.device, mSurface, SWAP_CHAIN_FORMAT, newFramebufferSize);
+
+                resizeCallback(newFramebufferSize);
             }
         }
 

@@ -2,6 +2,7 @@
 #include "gpu_context.hpp"
 #include "gui.hpp"
 #include "reference_path_tracer.hpp"
+#include "texture_blit_renderer.hpp"
 #include "window.hpp"
 
 #include <common/assert.hpp>
@@ -110,6 +111,11 @@ try
     }();
 
     nlrs::Gui gui(window.ptr(), gpuContext);
+
+    nlrs::TextureBlitRenderer textureBlitter{
+        gpuContext,
+        nlrs::TextureBlitRendererDescriptor{
+            .framebufferSize = nlrs::Extent2u(window.resolution())}};
 
     auto [appState, renderer] =
         [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
@@ -280,7 +286,7 @@ try
         }
     };
 
-    auto onRender = [&appState, &gpuContext, &gui, &renderer](
+    auto onRender = [&appState, &gpuContext, &gui, &renderer, &textureBlitter](
                         GLFWwindow* windowPtr, WGPUSwapChain swapChain) -> void {
         nlrs::Extent2i windowResolution;
         glfwGetFramebufferSize(windowPtr, &windowResolution.x, &windowResolution.y);
@@ -306,10 +312,20 @@ try
         };
         renderer.setPostProcessingParameters(postProcessingParams);
 
-        renderer.render(gpuContext, gui, swapChain);
+        renderer.render(gpuContext, textureBlitter.textureView());
+        textureBlitter.render(gpuContext, gui, swapChain);
     };
 
-    window.run(gpuContext, std::move(onNewFrame), std::move(onUpdate), std::move(onRender));
+    auto onResize = [&gpuContext, &textureBlitter](const nlrs::FramebufferSize newSize) -> void {
+        textureBlitter.resize(gpuContext, nlrs::Extent2u(newSize));
+    };
+
+    window.run(
+        gpuContext,
+        std::move(onNewFrame),
+        std::move(onUpdate),
+        std::move(onRender),
+        std::move(onResize));
 
     return 0;
 }

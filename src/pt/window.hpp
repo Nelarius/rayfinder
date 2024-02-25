@@ -19,9 +19,13 @@ struct WindowDescriptor
     std::string_view title;
 };
 
+using ScreenSize = Extent2i;
+using FramebufferSize = Extent2i;
+
 using NewFrameCallback = std::function<void()>;
 using UpdateCallback = std::function<void(GLFWwindow*, float)>;
 using RenderCallback = std::function<void(GLFWwindow*, WGPUSwapChain)>;
+using ResizeCallback = std::function<void(FramebufferSize)>;
 
 class Window
 {
@@ -38,14 +42,19 @@ public:
     // Size accessors
 
     // Returns the size of the window in screen coordinates.
-    Extent2i size() const;
+    ScreenSize size() const;
     // Returns the size of the window in pixels.
-    Extent2i resolution() const;
+    FramebufferSize resolution() const;
     // Returns the largest monitor, in pixels, by pixel count.
 
     // Run loop
 
-    void run(const GpuContext&, NewFrameCallback&&, UpdateCallback&&, RenderCallback&&);
+    void run(
+        const GpuContext&,
+        NewFrameCallback&&,
+        UpdateCallback&&,
+        RenderCallback&&,
+        ResizeCallback&&);
 
     // Raw access
 

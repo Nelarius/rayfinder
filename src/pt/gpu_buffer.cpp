@@ -99,56 +99,17 @@ GpuBuffer::~GpuBuffer()
 }
 
 WGPUBindGroupLayoutEntry GpuBuffer::bindGroupLayoutEntry(
-    const std::uint32_t        binding,
+    const std::uint32_t        bindingIdx,
     const WGPUShaderStageFlags visibility) const
 {
     assert(mBuffer != nullptr);
-
     const WGPUBufferBindingType bindingType = bufferUsageToBufferBindingType(mUsage);
-
-    return WGPUBindGroupLayoutEntry{
-        .nextInChain = nullptr,
-        .binding = binding,
-        .visibility = visibility,
-        .buffer =
-            WGPUBufferBindingLayout{
-                .nextInChain = nullptr,
-                .type = bindingType,
-                .hasDynamicOffset = false,
-                .minBindingSize = mByteSize},
-        .sampler =
-            WGPUSamplerBindingLayout{
-                .nextInChain = nullptr,
-                .type = WGPUSamplerBindingType_Undefined,
-            },
-        .texture =
-            WGPUTextureBindingLayout{
-                .nextInChain = nullptr,
-                .sampleType = WGPUTextureSampleType_Undefined,
-                .viewDimension = WGPUTextureViewDimension_Undefined,
-                .multisampled = false,
-            },
-        .storageTexture =
-            WGPUStorageTextureBindingLayout{
-                .nextInChain = nullptr,
-                .access = WGPUStorageTextureAccess_Undefined,
-                .format = WGPUTextureFormat_Undefined,
-                .viewDimension = WGPUTextureViewDimension_Undefined,
-            },
-    };
+    return bufferBindGroupLayoutEntry(bindingIdx, visibility, bindingType, mByteSize);
 }
 
 WGPUBindGroupEntry GpuBuffer::bindGroupEntry(const std::uint32_t binding) const
 {
     assert(mBuffer != nullptr);
-    return WGPUBindGroupEntry{
-        .nextInChain = nullptr,
-        .binding = binding,
-        .buffer = mBuffer,
-        .offset = 0,
-        .size = mByteSize,
-        .sampler = nullptr,
-        .textureView = nullptr,
-    };
+    return bufferBindGroupEntry(binding, mBuffer, mByteSize);
 }
 } // namespace nlrs

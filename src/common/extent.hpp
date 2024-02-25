@@ -25,10 +25,7 @@ struct Extent2
     {
     }
 
-    constexpr bool operator==(const Extent2& rhs) const noexcept
-    {
-        return x == rhs.x && y == rhs.y;
-    }
+    constexpr bool operator==(const Extent2& rhs) const noexcept = default;
 };
 
 using Extent2i = Extent2<std::int32_t>;

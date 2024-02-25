@@ -1,5 +1,4 @@
 #include "gpu_context.hpp"
-#include "gui.hpp"
 #include "reference_path_tracer.hpp"
 #include "webgpu_utils.hpp"
 #include "window.hpp"
@@ -558,8 +557,7 @@ ReferencePathTracer::ReferencePathTracer(
                     .topology = WGPUPrimitiveTopology_TriangleList,
                     .stripIndexFormat = WGPUIndexFormat_Undefined,
                     .frontFace = WGPUFrontFace_CCW,
-                    .cullMode = WGPUCullMode_None, // TODO: this could be Front, once a triangle is
-                                                   // confirmed onscreen
+                    .cullMode = WGPUCullMode_Back,
                 },
             .depthStencil = nullptr,
             .multisample =
@@ -697,21 +695,13 @@ void ReferencePathTracer::setPostProcessingParameters(
     mCurrentPostProcessingParams = postProcessingParameters;
 }
 
-void ReferencePathTracer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
+void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView textureView)
 {
     // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
     do
     {
         wgpuDeviceTick(gpuContext.device);
     } while (wgpuBufferGetMapState(mTimestampBuffer.handle()) != WGPUBufferMapState_Unmapped);
-
-    const WGPUTextureView nextTexture = wgpuSwapChainGetCurrentTextureView(swapChain);
-    if (!nextTexture)
-    {
-        // Getting the next texture can fail, if e.g. the window has been resized.
-        std::fprintf(stderr, "Failed to get texture view from swap chain\n");
-        return;
-    }
 
     {
         assert(mAccumulatedSampleCount <= mCurrentRenderParams.samplingParams.numSamplesPerPixel);
@@ -750,10 +740,10 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwa
     wgpuCommandEncoderWriteTimestamp(encoder, mQuerySet, 0);
     {
         const WGPURenderPassEncoder renderPassEncoder = [encoder,
-                                                         nextTexture]() -> WGPURenderPassEncoder {
+                                                         textureView]() -> WGPURenderPassEncoder {
             const WGPURenderPassColorAttachment renderPassColorAttachment{
                 .nextInChain = nullptr,
-                .view = nextTexture,
+                .view = textureView,
                 .depthSlice =
                     WGPU_DEPTH_SLICE_UNDEFINED, // depthSlice must be initialized with 'undefined'
                                                 // value for 2d color attachments.
@@ -788,8 +778,6 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwa
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
         }
 
-        gui.render(renderPassEncoder);
-
         wgpuRenderPassEncoderEnd(renderPassEncoder);
     }
     wgpuCommandEncoderWriteTimestamp(encoder, mQuerySet, 1);
@@ -807,8 +795,6 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwa
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
-
-    wgpuTextureViewRelease(nextTexture);
 
     // Map query timers
     wgpuBufferMapAsync(

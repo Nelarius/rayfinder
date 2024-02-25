@@ -1,5 +1,7 @@
 #pragma once
 
+#include "webgpu_utils.hpp"
+
 #include <fmt/core.h>
 #include <webgpu/webgpu.h>
 

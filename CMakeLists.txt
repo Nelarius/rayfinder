@@ -78,6 +78,7 @@ set(PT_SOURCE_FILES
     gpu_context.cpp
     gui.cpp
     reference_path_tracer.cpp
+    texture_blit_renderer.cpp
     window.cpp)
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 
@@ -90,6 +91,13 @@ add_custom_command(
     ${CMAKE_SOURCE_DIR}/src/pt/reference_path_tracer.wgsl
     $<TARGET_FILE_DIR:pt>/reference_path_tracer.wgsl
     COMMENT "Copying $<TARGET_FILE_DIR:pt>/reference_path_tracer.wgsl"
+)
+add_custom_command(
+    TARGET pt POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/src/pt/texture_blit.wgsl
+    $<TARGET_FILE_DIR:pt>/texture_blit.wgsl
+    COMMENT "Copying $<TARGET_FILE_DIR:pt>/texture_blit.wgsl"
 )
 add_custom_command(
     TARGET pt POST_BUILD
