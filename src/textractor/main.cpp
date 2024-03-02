@@ -1,10 +1,10 @@
+#include <common/assert.hpp>
 #include <common/gltf_model.hpp>
 #include <common/texture.hpp>
 
 #include <fmt/core.h>
 #include <stb_image_write.h>
 
-#include <cassert>
 #include <cstdio>
 
 void printHelp() { std::printf("Usage: textractor <input_gltf_file>\n"); }
@@ -29,14 +29,14 @@ int main(int argc, char** argv)
         const int         numChannels = 4;
         const int         strideBytes = dimensions.width * numChannels;
 
-        [[maybe_unused]] const int result = stbi_write_png(
-            filename.c_str(),
-            dimensions.width,
-            dimensions.height,
-            numChannels,
-            pixels.data(),
-            strideBytes);
-        assert(result != 0);
+        NLRS_ASSERT(
+            stbi_write_png(
+                filename.c_str(),
+                dimensions.width,
+                dimensions.height,
+                numChannels,
+                pixels.data(),
+                strideBytes) != 0);
     }
 
     return 0;
