@@ -436,6 +436,10 @@ void TextureBlitRenderer::resize(const GpuContext& gpuContext, const Extent2u& n
     textureViewSafeRelease(mTextureView);
     bindGroupSafeRelease(mTextureBindGroup);
 
+    mTexture = nullptr;
+    mTextureView = nullptr;
+    mTextureBindGroup = nullptr;
+
     {
         const WGPUTextureDescriptor textureDesc{
             .nextInChain = nullptr,
