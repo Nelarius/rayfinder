@@ -572,6 +572,12 @@ ReferencePathTracer::ReferencePathTracer(
         };
 
         mRenderPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
+
+        wgpuBindGroupLayoutRelease(uniformsBindGroupLayout);
+        wgpuBindGroupLayoutRelease(renderParamsBindGroupLayout);
+        wgpuBindGroupLayoutRelease(sceneBindGroupLayout);
+        wgpuBindGroupLayoutRelease(imageBindGroupLayout);
+        wgpuPipelineLayoutRelease(pipelineLayout);
     }
 
     // Timestamp query sets

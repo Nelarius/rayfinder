@@ -297,6 +297,7 @@ TextureBlitRenderer::TextureBlitRenderer(
         mPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
 
         wgpuBindGroupLayoutRelease(uniformsBindGroupLayout);
+        wgpuPipelineLayoutRelease(pipelineLayout);
     }
 }
 
