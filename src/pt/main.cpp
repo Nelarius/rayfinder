@@ -1,6 +1,7 @@
 #include "fly_camera_controller.hpp"
 #include "gpu_context.hpp"
 #include "gui.hpp"
+#include "hybrid_renderer.hpp"
 #include "reference_path_tracer.hpp"
 #include "texture_blit_renderer.hpp"
 #include "window.hpp"
@@ -20,6 +21,8 @@
 #include <imgui.h>
 #include <webgpu/webgpu.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <exception>
@@ -34,8 +37,15 @@ inline constexpr int defaultWindowHeight = 480;
 
 void printHelp() { std::printf("Usage:\n\tpt <input_pt_file>\n"); }
 
+enum RendererType
+{
+    RendererType_PathTracer,
+    RendererType_Hybrid,
+};
+
 struct UiState
 {
+    int   rendererType = RendererType_PathTracer;
     float vfovDegrees = 70.0f;
     // sampling
     int numSamplesPerPixel = 128;
@@ -116,6 +126,62 @@ try
         gpuContext,
         nlrs::TextureBlitRendererDescriptor{
             .framebufferSize = nlrs::Extent2u(window.resolution())}};
+
+    nlrs::HybridRenderer hybridRenderer = [&gpuContext, argv]() -> nlrs::HybridRenderer {
+        fs::path path = argv[1];
+        path.replace_extension(".glb");
+        if (!fs::exists(path))
+        {
+            fmt::print(stderr, "File {} does not exist\n", path.string());
+            std::exit(1);
+        }
+        nlrs::GltfModel gltf{path};
+
+        const auto [numTotalVertices, numTotalIndices] =
+            [&gltf]() -> std::tuple<std::size_t, std::size_t> {
+            std::size_t numTotalVertices = 0;
+            std::size_t numTotalIndices = 0;
+            for (const auto& mesh : gltf.meshes)
+            {
+                numTotalVertices += mesh.positions.size();
+                numTotalIndices += mesh.indices.size();
+            }
+            return std::make_tuple(numTotalVertices, numTotalIndices);
+        }();
+
+        std::vector<glm::vec4> flattenedVertices;
+        flattenedVertices.reserve(numTotalVertices);
+        std::vector<std::span<const glm::vec4>> meshVertices;
+
+        std::vector<std::uint32_t> flattenedIndices;
+        flattenedIndices.reserve(numTotalIndices);
+        std::vector<std::span<const std::uint32_t>> meshIndices;
+
+        for (const auto& mesh : gltf.meshes)
+        {
+            const std::size_t vertexOffsetIdx = flattenedVertices.size();
+            const std::size_t numVertices = mesh.positions.size();
+            std::transform(
+                mesh.positions.begin(),
+                mesh.positions.end(),
+                std::back_inserter(flattenedVertices),
+                [](const glm::vec3& v) -> glm::vec4 { return glm::vec4(v, 1.0f); });
+            meshVertices.emplace_back(flattenedVertices.data() + vertexOffsetIdx, numVertices);
+
+            const std::size_t indexOffsetIdx = flattenedIndices.size();
+            const std::size_t numIndices = mesh.indices.size();
+            flattenedIndices.insert(
+                flattenedIndices.end(), mesh.indices.begin(), mesh.indices.end());
+            meshIndices.emplace_back(flattenedIndices.data() + indexOffsetIdx, numIndices);
+        }
+
+        return nlrs::HybridRenderer{
+            gpuContext,
+            nlrs::HybridRendererSceneDescriptor{
+                .meshVertices = meshVertices,
+                .meshIndices = meshIndices,
+            }};
+    }();
 
     auto [appState, renderer] =
         [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
@@ -210,6 +276,12 @@ try
         {
             ImGui::Begin("pt");
 
+            ImGui::Text("Renderer");
+            ImGui::RadioButton("path tracer", &appState.ui.rendererType, RendererType_PathTracer);
+            ImGui::SameLine();
+            ImGui::RadioButton("hybrid", &appState.ui.rendererType, RendererType_Hybrid);
+            ImGui::Separator();
+
             ImGui::Text("Renderer stats");
             {
                 const float renderAverageMs = renderer.averageRenderpassDurationMs();
@@ -286,7 +358,7 @@ try
         }
     };
 
-    auto onRender = [&appState, &gpuContext, &gui, &renderer, &textureBlitter](
+    auto onRender = [&appState, &gpuContext, &gui, &renderer, &hybridRenderer, &textureBlitter](
                         GLFWwindow* windowPtr, WGPUSwapChain swapChain) -> void {
         nlrs::Extent2i windowResolution;
         glfwGetFramebufferSize(windowPtr, &windowResolution.x, &windowResolution.y);
@@ -312,7 +384,16 @@ try
         };
         renderer.setPostProcessingParameters(postProcessingParams);
 
-        renderer.render(gpuContext, textureBlitter.textureView());
+        switch (appState.ui.rendererType)
+        {
+        case RendererType_PathTracer:
+            renderer.render(gpuContext, textureBlitter.textureView());
+            break;
+        case RendererType_Hybrid:
+            const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
+            hybridRenderer.render(gpuContext, textureBlitter.textureView(), viewProjectionMat);
+            break;
+        }
         textureBlitter.render(gpuContext, gui, swapChain);
     };
 

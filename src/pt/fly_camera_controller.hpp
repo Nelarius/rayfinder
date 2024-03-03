@@ -24,7 +24,8 @@ public:
 
     FlyCameraController() = default;
 
-    Camera getCamera() const;
+    Camera    getCamera() const;
+    glm::mat4 viewProjectionMatrix() const;
 
     void lookAt(const glm::vec3& p);
     void update(GLFWwindow* window, float dt);

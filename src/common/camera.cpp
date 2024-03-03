@@ -1,5 +1,7 @@
 #include "camera.hpp"
 
+#include <glm/gtc/matrix_transform.hpp>
+
 namespace nlrs
 {
 Camera createCamera(
@@ -46,5 +48,20 @@ Ray generateCameraRay(const Camera& camera, const float u, const float v)
         camera.lowerLeftCorner + camera.horizontal * u + camera.vertical * v - origin;
 
     return Ray{.origin = origin, .direction = glm::normalize(direction)};
+}
+
+glm::mat4 generateViewProjectionMatrix(
+    glm::vec3 origin,
+    glm::vec3 lookAt,
+    Angle     vfov,
+    float     aspectRatio)
+{
+    const glm::vec3 forward = glm::normalize(lookAt - origin);
+    const glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+    const glm::vec3 up = glm::cross(right, forward);
+
+    return glm::perspective(vfov.asRadians(), aspectRatio, 0.1f, 100.0f) *
+           glm::lookAt(origin, lookAt, up);
 }
 } // namespace nlrs

@@ -363,7 +363,10 @@ TextureBlitRenderer& TextureBlitRenderer::operator=(TextureBlitRenderer&& other)
     return *this;
 }
 
-void TextureBlitRenderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwapChain swapChain)
+void TextureBlitRenderer::render(
+    const GpuContext&   gpuContext,
+    Gui&                gui,
+    const WGPUSwapChain swapChain)
 {
     // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
     wgpuDeviceTick(gpuContext.device);

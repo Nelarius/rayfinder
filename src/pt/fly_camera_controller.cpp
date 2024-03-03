@@ -20,6 +20,16 @@ Camera FlyCameraController::getCamera() const
         aspectRatio(mWindowSize));
 }
 
+glm::mat4 FlyCameraController::viewProjectionMatrix() const
+{
+    const auto orientation = cameraOrientation();
+    return generateViewProjectionMatrix(
+        mPosition,
+        mPosition + mFocusDistance * orientation.forward,
+        mVfov,
+        aspectRatio(mWindowSize));
+}
+
 void FlyCameraController::lookAt(const glm::vec3& p)
 {
     const glm::vec3 d = p - mPosition;
