@@ -48,6 +48,127 @@ TextureBlitRenderer::TextureBlitRenderer(
                 sizeof(glm::mat4)));
     }
 
+    // uniforms bind group layout
+    const WGPUBindGroupLayout uniformsBindGroupLayout = [this,
+                                                         &gpuContext]() -> WGPUBindGroupLayout {
+        const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
+            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
+
+        const WGPUBindGroupLayoutDescriptor uniformsBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "uniforms group layout",
+            .entryCount = 1,
+            .entries = &uniformsBindGroupLayoutEntry,
+        };
+        return wgpuDeviceCreateBindGroupLayout(gpuContext.device, &uniformsBindGroupLayoutDesc);
+    }();
+
+    // uniforms bind group
+    {
+        const WGPUBindGroupEntry uniformsBindGroupEntry = mUniformsBuffer.bindGroupEntry(0);
+
+        const WGPUBindGroupDescriptor uniformsBindGroupDesc{
+            .nextInChain = nullptr,
+            .label = "Bind group",
+            .layout = uniformsBindGroupLayout,
+            .entryCount = 1,
+            .entries = &uniformsBindGroupEntry,
+        };
+        mUniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
+    }
+
+    // color attachment texture
+
+    constexpr WGPUTextureFormat TEXTURE_FORMAT = Window::SWAP_CHAIN_FORMAT;
+
+    mTexture = [&gpuContext, &desc]() -> WGPUTexture {
+        const std::array<const WGPUTextureFormat, 1> viewFormats{TEXTURE_FORMAT};
+
+        const WGPUTextureDescriptor textureDesc{
+            .nextInChain = nullptr,
+            .label = "Offscreen texture",
+            .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+            .dimension = WGPUTextureDimension_2D,
+            .size = {desc.framebufferSize.x, desc.framebufferSize.y, 1},
+            .format = TEXTURE_FORMAT,
+            .mipLevelCount = 1,
+            .sampleCount = 1,
+            .viewFormatCount = viewFormats.size(),
+            .viewFormats = viewFormats.data(),
+        };
+        return wgpuDeviceCreateTexture(gpuContext.device, &textureDesc);
+    }();
+    if (!mTexture)
+    {
+        throw std::runtime_error("Failed to create TextureBlitRenderer color texture");
+    }
+
+    mTextureView = [this]() -> WGPUTextureView {
+        const WGPUTextureViewDescriptor textureViewDesc{
+            .nextInChain = nullptr,
+            .label = "Offscreen texture view",
+            .format = TEXTURE_FORMAT,
+            .dimension = WGPUTextureViewDimension_2D,
+            .baseMipLevel = 0,
+            .mipLevelCount = 1,
+            .baseArrayLayer = 0,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_All,
+        };
+        return wgpuTextureCreateView(mTexture, &textureViewDesc);
+    }();
+    NLRS_ASSERT(mTextureView != nullptr);
+
+    mSampler = [&gpuContext]() -> WGPUSampler {
+        const WGPUSamplerDescriptor samplerDesc{
+            .nextInChain = nullptr,
+            .label = "Offscreen sampler",
+            .addressModeU = WGPUAddressMode_ClampToEdge,
+            .addressModeV = WGPUAddressMode_ClampToEdge,
+            .addressModeW = WGPUAddressMode_ClampToEdge,
+            .magFilter = WGPUFilterMode_Nearest,
+            .minFilter = WGPUFilterMode_Nearest,
+            .mipmapFilter = WGPUMipmapFilterMode_Nearest,
+            .lodMinClamp = 0.f,
+            .lodMaxClamp = 32.f,
+            .compare = WGPUCompareFunction_Undefined,
+            .maxAnisotropy = 1,
+        };
+        return wgpuDeviceCreateSampler(gpuContext.device, &samplerDesc);
+    }();
+    NLRS_ASSERT(mSampler != nullptr);
+
+    // texture bind group
+    {
+        const std::array<WGPUBindGroupLayoutEntry, 2> textureBindGroupLayoutEntries{
+            textureBindGroupLayoutEntry(0), samplerBindGroupLayoutEntry(1)};
+
+        const WGPUBindGroupLayoutDescriptor textureBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "Texture bind group layout",
+            .entryCount = textureBindGroupLayoutEntries.size(),
+            .entries = textureBindGroupLayoutEntries.data(),
+        };
+
+        mTextureBindGroupLayout =
+            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &textureBindGroupLayoutDesc);
+
+        const std::array<WGPUBindGroupEntry, 2> textureBindGroupEntries{
+            textureBindGroupEntry(0, mTextureView),
+            samplerBindGroupEntry(1, mSampler),
+        };
+
+        const WGPUBindGroupDescriptor textureBindGroupDesc{
+            .nextInChain = nullptr,
+            .label = "Texture bind group",
+            .layout = mTextureBindGroupLayout,
+            .entryCount = textureBindGroupEntries.size(),
+            .entries = textureBindGroupEntries.data(),
+        };
+        mTextureBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &textureBindGroupDesc);
+        NLRS_ASSERT(mTextureBindGroup != nullptr);
+    }
+
     {
         // Blend state for color target
 
@@ -91,7 +212,7 @@ TextureBlitRenderer::TextureBlitRenderer(
 
         const WGPUShaderModuleDescriptor shaderDesc{
             .nextInChain = &shaderCodeDesc.chain,
-            .label = "Shader module",
+            .label = "Texture blitter shader",
         };
 
         const WGPUShaderModule shaderModule =
@@ -122,124 +243,6 @@ TextureBlitRenderer::TextureBlitRenderer(
             .attributeCount = vertexAttributes.size(),
             .attributes = vertexAttributes.data(),
         };
-
-        // uniforms bind group layout
-
-        const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
-            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
-
-        const WGPUBindGroupLayoutDescriptor uniformsBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "uniforms group layout",
-            .entryCount = 1,
-            .entries = &uniformsBindGroupLayoutEntry,
-        };
-        const WGPUBindGroupLayout uniformsBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &uniformsBindGroupLayoutDesc);
-
-        // uniforms bind group
-
-        const WGPUBindGroupEntry uniformsBindGroupEntry = mUniformsBuffer.bindGroupEntry(0);
-
-        const WGPUBindGroupDescriptor uniformsBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "Bind group",
-            .layout = uniformsBindGroupLayout,
-            .entryCount = 1,
-            .entries = &uniformsBindGroupEntry,
-        };
-        mUniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
-
-        // color attachment texture
-
-        constexpr WGPUTextureFormat TEXTURE_FORMAT = Window::SWAP_CHAIN_FORMAT;
-
-        mTexture = [&gpuContext, &desc]() -> WGPUTexture {
-            const std::array<const WGPUTextureFormat, 1> viewFormats{TEXTURE_FORMAT};
-
-            const WGPUTextureDescriptor textureDesc{
-                .nextInChain = nullptr,
-                .label = "Offscreen texture",
-                .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
-                .dimension = WGPUTextureDimension_2D,
-                .size = {desc.framebufferSize.x, desc.framebufferSize.y, 1},
-                .format = TEXTURE_FORMAT,
-                .mipLevelCount = 1,
-                .sampleCount = 1,
-                .viewFormatCount = viewFormats.size(),
-                .viewFormats = viewFormats.data(),
-            };
-            return wgpuDeviceCreateTexture(gpuContext.device, &textureDesc);
-        }();
-        if (!mTexture)
-        {
-            throw std::runtime_error("Failed to create TextureBlitRenderer color texture");
-        }
-
-        mTextureView = [this]() -> WGPUTextureView {
-            const WGPUTextureViewDescriptor textureViewDesc{
-                .nextInChain = nullptr,
-                .label = "Offscreen texture view",
-                .format = TEXTURE_FORMAT,
-                .dimension = WGPUTextureViewDimension_2D,
-                .baseMipLevel = 0,
-                .mipLevelCount = 1,
-                .baseArrayLayer = 0,
-                .arrayLayerCount = 1,
-                .aspect = WGPUTextureAspect_All,
-            };
-            return wgpuTextureCreateView(mTexture, &textureViewDesc);
-        }();
-        NLRS_ASSERT(mTextureView != nullptr);
-
-        mSampler = [&gpuContext]() -> WGPUSampler {
-            const WGPUSamplerDescriptor samplerDesc{
-                .nextInChain = nullptr,
-                .label = "Offscreen sampler",
-                .addressModeU = WGPUAddressMode_ClampToEdge,
-                .addressModeV = WGPUAddressMode_ClampToEdge,
-                .addressModeW = WGPUAddressMode_ClampToEdge,
-                .magFilter = WGPUFilterMode_Nearest,
-                .minFilter = WGPUFilterMode_Nearest,
-                .mipmapFilter = WGPUMipmapFilterMode_Nearest,
-                .lodMinClamp = 0.f,
-                .lodMaxClamp = 32.f,
-                .compare = WGPUCompareFunction_Undefined,
-                .maxAnisotropy = 1,
-            };
-            return wgpuDeviceCreateSampler(gpuContext.device, &samplerDesc);
-        }();
-        NLRS_ASSERT(mSampler != nullptr);
-
-        // texture bind group
-
-        const std::array<WGPUBindGroupLayoutEntry, 2> textureBindGroupLayoutEntries{
-            textureBindGroupLayoutEntry(0), samplerBindGroupLayoutEntry(1)};
-
-        const WGPUBindGroupLayoutDescriptor textureBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "Texture bind group layout",
-            .entryCount = textureBindGroupLayoutEntries.size(),
-            .entries = textureBindGroupLayoutEntries.data(),
-        };
-
-        mTextureBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &textureBindGroupLayoutDesc);
-
-        const std::array<WGPUBindGroupEntry, 2> textureBindGroupEntries{
-            textureBindGroupEntry(0, mTextureView),
-            samplerBindGroupEntry(1, mSampler),
-        };
-
-        const WGPUBindGroupDescriptor textureBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "Texture bind group",
-            .layout = mTextureBindGroupLayout,
-            .entryCount = textureBindGroupEntries.size(),
-            .entries = textureBindGroupEntries.data(),
-        };
-        mTextureBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &textureBindGroupDesc);
-        NLRS_ASSERT(mTextureBindGroup != nullptr);
 
         // pipeline layout
 
@@ -296,9 +299,10 @@ TextureBlitRenderer::TextureBlitRenderer(
 
         mPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
 
-        wgpuBindGroupLayoutRelease(uniformsBindGroupLayout);
         wgpuPipelineLayoutRelease(pipelineLayout);
     }
+
+    wgpuBindGroupLayoutRelease(uniformsBindGroupLayout);
 }
 
 TextureBlitRenderer::~TextureBlitRenderer()
