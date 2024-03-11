@@ -378,7 +378,7 @@ ReferencePathTracer::ReferencePathTracer(
             .shaderLocation = 0,
         }};
 
-        WGPUVertexBufferLayout vertexBufferLayout{
+        const WGPUVertexBufferLayout vertexBufferLayout{
             .arrayStride = sizeof(float[2]),
             .stepMode = WGPUVertexStepMode_Vertex,
             .attributeCount = vertexAttributes.size(),
@@ -796,7 +796,7 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
             .nextInChain = nullptr,
-            .label = "Renderer command buffer",
+            .label = "ReferencePathTracer command buffer",
         };
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();

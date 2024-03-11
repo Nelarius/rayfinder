@@ -1,5 +1,5 @@
 struct Uniforms {
-    viewProjectionMatrix: mat4x4<f32>,
+    viewProjectionMatrix: mat4x4f,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -27,6 +27,6 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(1) @binding(1) var textureSampler: sampler;
 
 @fragment
-fn fsMain(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     return textureSample(texture, textureSampler, in.texCoord);
 }

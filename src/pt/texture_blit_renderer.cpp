@@ -237,7 +237,7 @@ TextureBlitRenderer::TextureBlitRenderer(
             .shaderLocation = 0,
         }};
 
-        WGPUVertexBufferLayout vertexBufferLayout{
+        const WGPUVertexBufferLayout vertexBufferLayout{
             .arrayStride = sizeof(float[2]),
             .stepMode = WGPUVertexStepMode_Vertex,
             .attributeCount = vertexAttributes.size(),
@@ -426,7 +426,7 @@ void TextureBlitRenderer::render(const GpuContext& gpuContext, Gui& gui, WGPUSwa
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
             .nextInChain = nullptr,
-            .label = "Renderer command buffer",
+            .label = "TextureBlitRenderer command buffer",
         };
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();

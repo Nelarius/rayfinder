@@ -57,9 +57,9 @@ public:
     // Bind group and layout
 
     WGPUBindGroupLayoutEntry bindGroupLayoutEntry(
-        std::uint32_t        binding,
+        std::uint32_t        bindingIndex,
         WGPUShaderStageFlags visibility) const;
-    WGPUBindGroupEntry bindGroupEntry(std::uint32_t binding) const;
+    WGPUBindGroupEntry bindGroupEntry(std::uint32_t bindingIndex) const;
 
 private:
     WGPUBuffer           mBuffer = nullptr;

@@ -107,9 +107,9 @@ WGPUBindGroupLayoutEntry GpuBuffer::bindGroupLayoutEntry(
     return bufferBindGroupLayoutEntry(bindingIdx, visibility, bindingType, mByteSize);
 }
 
-WGPUBindGroupEntry GpuBuffer::bindGroupEntry(const std::uint32_t binding) const
+WGPUBindGroupEntry GpuBuffer::bindGroupEntry(const std::uint32_t bindingIdx) const
 {
     assert(mBuffer != nullptr);
-    return bufferBindGroupEntry(binding, mBuffer, mByteSize);
+    return bufferBindGroupEntry(bindingIdx, mBuffer, mByteSize);
 }
 } // namespace nlrs
