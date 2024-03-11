@@ -94,7 +94,7 @@ add_custom_command(
 )
 add_custom_command(
     TARGET pt POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
     ${CMAKE_SOURCE_DIR}/src/pt/texture_blit.wgsl
     $<TARGET_FILE_DIR:pt>/texture_blit.wgsl
     COMMENT "Copying $<TARGET_FILE_DIR:pt>/texture_blit.wgsl"
