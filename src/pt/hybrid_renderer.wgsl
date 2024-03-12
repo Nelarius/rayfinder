@@ -1,7 +1,7 @@
 @group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
 
 struct VertexOutput {
-	@builtin(position) position: vec4f
+    @builtin(position) position: vec4f
 }
 
 @vertex
