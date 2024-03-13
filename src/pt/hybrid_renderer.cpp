@@ -250,6 +250,8 @@ HybridRenderer::HybridRenderer(HybridRenderer&& other)
     if (this != &other)
     {
         mPositionBuffers = std::move(other.mPositionBuffers);
+        mTexCoordBuffers = std::move(other.mTexCoordBuffers);
+        mIndexBuffers = std::move(other.mIndexBuffers);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
@@ -263,6 +265,8 @@ HybridRenderer& HybridRenderer::operator=(HybridRenderer&& other)
     if (this != &other)
     {
         mPositionBuffers = std::move(other.mPositionBuffers);
+        mTexCoordBuffers = std::move(other.mTexCoordBuffers);
+        mIndexBuffers = std::move(other.mIndexBuffers);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
