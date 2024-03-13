@@ -24,7 +24,20 @@ TextureBlitRenderer::TextureBlitRenderer(
           "Vertex buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
           std::span<const float[2]>(quadVertexData)),
-      mUniformsBuffer(),
+      mUniformsBuffer([&gpuContext]() -> GpuBuffer {
+          // DirectX, Metal, wgpu share the same left-handed coordinate system
+          // for their normalized device coordinates:
+          // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
+          const glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
+
+          return GpuBuffer(
+              gpuContext.device,
+              "uniforms buffer",
+              WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+              std::span<const std::uint8_t>(
+                  reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
+                  sizeof(glm::mat4)));
+      }()),
       mUniformsBindGroup(nullptr),
       mTexture(nullptr),
       mTextureView(nullptr),
@@ -33,21 +46,6 @@ TextureBlitRenderer::TextureBlitRenderer(
       mTextureBindGroup(nullptr),
       mPipeline(nullptr)
 {
-    {
-        // DirectX, Metal, wgpu share the same left-handed coordinate system
-        // for their normalized device coordinates:
-        // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
-        const glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
-
-        mUniformsBuffer = GpuBuffer(
-            gpuContext.device,
-            "uniforms buffer",
-            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-            std::span<const std::uint8_t>(
-                reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
-                sizeof(glm::mat4)));
-    }
-
     // uniforms bind group layout
     const WGPUBindGroupLayout uniformsBindGroupLayout = [this,
                                                          &gpuContext]() -> WGPUBindGroupLayout {
