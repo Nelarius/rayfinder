@@ -15,8 +15,9 @@ struct GpuContext;
 
 struct HybridRendererSceneDescriptor
 {
-    std::span<std::span<const glm::vec4>>     meshVertices;
-    std::span<std::span<const std::uint32_t>> meshIndices;
+    std::span<std::span<const glm::vec4>>     modelPositions;
+    std::span<std::span<const glm::vec2>>     modelTexCoords;
+    std::span<std::span<const std::uint32_t>> modelIndices;
 };
 
 class HybridRenderer
@@ -41,7 +42,8 @@ private:
         WGPUIndexFormat format;
     };
 
-    std::vector<GpuBuffer>   mVertexBuffers;
+    std::vector<GpuBuffer>   mPositionBuffers;
+    std::vector<GpuBuffer>   mTexCoordBuffers;
     std::vector<IndexBuffer> mIndexBuffers;
     GpuBuffer                mUniformBuffer;
     WGPUBindGroup            mUniformBindGroup;

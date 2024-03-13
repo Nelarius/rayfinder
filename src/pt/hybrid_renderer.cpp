@@ -10,11 +10,11 @@
 namespace nlrs
 {
 HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererSceneDescriptor desc)
-    : mVertexBuffers([&gpuContext, &desc]() -> std::vector<GpuBuffer> {
+    : mPositionBuffers([&gpuContext, &desc]() -> std::vector<GpuBuffer> {
           std::vector<GpuBuffer> buffers;
           std::transform(
-              desc.meshVertices.begin(),
-              desc.meshVertices.end(),
+              desc.modelPositions.begin(),
+              desc.modelPositions.end(),
               std::back_inserter(buffers),
               [&gpuContext](const std::span<const glm::vec4> vertices) {
                   return GpuBuffer(
@@ -22,11 +22,23 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
               });
           return buffers;
       }()),
+      mTexCoordBuffers([&gpuContext, &desc]() -> std::vector<GpuBuffer> {
+          std::vector<GpuBuffer> buffers;
+          std::transform(
+              desc.modelTexCoords.begin(),
+              desc.modelTexCoords.end(),
+              std::back_inserter(buffers),
+              [&gpuContext](const std::span<const glm::vec2> texCoords) {
+                  return GpuBuffer(
+                      gpuContext.device, "Mesh TexCoord Buffer", WGPUBufferUsage_Vertex, texCoords);
+              });
+          return buffers;
+      }()),
       mIndexBuffers([&gpuContext, &desc]() -> std::vector<IndexBuffer> {
           std::vector<IndexBuffer> buffers;
           std::transform(
-              desc.meshIndices.begin(),
-              desc.meshIndices.end(),
+              desc.modelIndices.begin(),
+              desc.modelIndices.end(),
               std::back_inserter(buffers),
               [&gpuContext](const std::span<const std::uint32_t> indices) {
                   return IndexBuffer{
@@ -46,7 +58,7 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
       mUniformBindGroup(nullptr),
       mPipeline(nullptr)
 {
-    NLRS_ASSERT(mVertexBuffers.size() == mIndexBuffers.size());
+    NLRS_ASSERT(mPositionBuffers.size() == mIndexBuffers.size());
 
     const WGPUBindGroupLayout uniformBindGroupLayout = [this,
                                                         &gpuContext]() -> WGPUBindGroupLayout {
@@ -81,19 +93,35 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
     {
         // Vertex layout
 
-        const std::array<WGPUVertexAttribute, 1> vertexAttributes{
-            WGPUVertexAttribute{
-                .format = WGPUVertexFormat_Float32x4,
-                .offset = 0,
-                .shaderLocation = 0,
-            },
+        const WGPUVertexAttribute positionAttribute{
+            .format = WGPUVertexFormat_Float32x4,
+            .offset = 0,
+            .shaderLocation = 0,
         };
 
-        const WGPUVertexBufferLayout vertexBufferLayout{
+        const WGPUVertexBufferLayout positionBufferLayout{
             .arrayStride = sizeof(glm::vec4),
             .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = vertexAttributes.size(),
-            .attributes = vertexAttributes.data(),
+            .attributeCount = 1,
+            .attributes = &positionAttribute,
+        };
+
+        const WGPUVertexAttribute texCoordAttribute{
+            .format = WGPUVertexFormat_Float32x2,
+            .offset = 0,
+            .shaderLocation = 1,
+        };
+
+        const WGPUVertexBufferLayout texCoordBufferLayout{
+            .arrayStride = sizeof(glm::vec2),
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .attributeCount = 1,
+            .attributes = &texCoordAttribute,
+        };
+
+        const std::array<WGPUVertexBufferLayout, 2> vertexBufferLayouts{
+            positionBufferLayout,
+            texCoordBufferLayout,
         };
 
         // Blend state for color target
@@ -152,7 +180,7 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
             .targets = &colorTarget,
         };
 
-        // pipeline layout
+        // Pipeline layout
 
         const std::array<WGPUBindGroupLayout, 1> bindGroupLayouts{
             uniformBindGroupLayout,
@@ -179,8 +207,8 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
                     .entryPoint = "vsMain",
                     .constantCount = 0,
                     .constants = nullptr,
-                    .bufferCount = 1,
-                    .buffers = &vertexBufferLayout,
+                    .bufferCount = vertexBufferLayouts.size(),
+                    .buffers = vertexBufferLayouts.data(),
                 },
             // NOTE: the primitive assembly config, defines how the primitive assembly and
             // rasterization stages are configured.
@@ -217,11 +245,11 @@ HybridRenderer::~HybridRenderer()
 }
 
 HybridRenderer::HybridRenderer(HybridRenderer&& other)
-    : mVertexBuffers()
+    : mPositionBuffers()
 {
     if (this != &other)
     {
-        mVertexBuffers = std::move(other.mVertexBuffers);
+        mPositionBuffers = std::move(other.mPositionBuffers);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
@@ -234,7 +262,7 @@ HybridRenderer& HybridRenderer::operator=(HybridRenderer&& other)
 {
     if (this != &other)
     {
-        mVertexBuffers = std::move(other.mVertexBuffers);
+        mPositionBuffers = std::move(other.mPositionBuffers);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
@@ -293,11 +321,15 @@ void HybridRenderer::render(
     wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mPipeline);
     wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, mUniformBindGroup, 0, nullptr);
 
-    for (std::size_t idx = 0; idx < mVertexBuffers.size(); ++idx)
+    for (std::size_t idx = 0; idx < mPositionBuffers.size(); ++idx)
     {
-        const GpuBuffer& vertexBuffer = mVertexBuffers[idx];
+        const GpuBuffer& positionBuffer = mPositionBuffers[idx];
+        const GpuBuffer& texCoordBuffer = mTexCoordBuffers[idx];
         wgpuRenderPassEncoderSetVertexBuffer(
-            renderPassEncoder, 0, vertexBuffer.handle(), 0, vertexBuffer.byteSize());
+            renderPassEncoder, 0, positionBuffer.handle(), 0, positionBuffer.byteSize());
+        wgpuRenderPassEncoderSetVertexBuffer(
+            renderPassEncoder, 1, texCoordBuffer.handle(), 0, texCoordBuffer.byteSize());
+
         const IndexBuffer& indexBuffer = mIndexBuffers[idx];
         wgpuRenderPassEncoderSetIndexBuffer(
             renderPassEncoder,
@@ -305,6 +337,7 @@ void HybridRenderer::render(
             indexBuffer.format,
             0,
             indexBuffer.buffer.byteSize());
+
         wgpuRenderPassEncoderDrawIndexed(renderPassEncoder, indexBuffer.count, 1, 0, 0, 0);
     }
 

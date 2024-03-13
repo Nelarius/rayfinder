@@ -137,49 +137,60 @@ try
         }
         nlrs::GltfModel gltf{path};
 
-        const auto [numTotalVertices, numTotalIndices] =
+        const auto [numModelVertices, numModelIndices] =
             [&gltf]() -> std::tuple<std::size_t, std::size_t> {
-            std::size_t numTotalVertices = 0;
-            std::size_t numTotalIndices = 0;
+            std::size_t numModelVertices = 0;
+            std::size_t numModelIndices = 0;
             for (const auto& mesh : gltf.meshes)
             {
-                numTotalVertices += mesh.positions.size();
-                numTotalIndices += mesh.indices.size();
+                numModelVertices += mesh.positions.size();
+                numModelIndices += mesh.indices.size();
+                NLRS_ASSERT(mesh.positions.size() == mesh.texCoords.size());
             }
-            return std::make_tuple(numTotalVertices, numTotalIndices);
+            return std::make_tuple(numModelVertices, numModelIndices);
         }();
 
         std::vector<glm::vec4> flattenedVertices;
-        flattenedVertices.reserve(numTotalVertices);
-        std::vector<std::span<const glm::vec4>> meshVertices;
+        flattenedVertices.reserve(numModelVertices);
+        std::vector<std::span<const glm::vec4>> modelVertices;
+
+        std::vector<glm::vec2> flattenedTexCoords;
+        flattenedTexCoords.reserve(numModelVertices);
+        std::vector<std::span<const glm::vec2>> modelTexCoords;
 
         std::vector<std::uint32_t> flattenedIndices;
-        flattenedIndices.reserve(numTotalIndices);
-        std::vector<std::span<const std::uint32_t>> meshIndices;
+        flattenedIndices.reserve(numModelIndices);
+        std::vector<std::span<const std::uint32_t>> modelIndices;
 
         for (const auto& mesh : gltf.meshes)
         {
             const std::size_t vertexOffsetIdx = flattenedVertices.size();
             const std::size_t numVertices = mesh.positions.size();
+
             std::transform(
                 mesh.positions.begin(),
                 mesh.positions.end(),
                 std::back_inserter(flattenedVertices),
                 [](const glm::vec3& v) -> glm::vec4 { return glm::vec4(v, 1.0f); });
-            meshVertices.emplace_back(flattenedVertices.data() + vertexOffsetIdx, numVertices);
+            modelVertices.emplace_back(flattenedVertices.data() + vertexOffsetIdx, numVertices);
+
+            flattenedTexCoords.insert(
+                flattenedTexCoords.end(), mesh.texCoords.begin(), mesh.texCoords.end());
+            modelTexCoords.emplace_back(flattenedTexCoords.data() + vertexOffsetIdx, numVertices);
 
             const std::size_t indexOffsetIdx = flattenedIndices.size();
             const std::size_t numIndices = mesh.indices.size();
             flattenedIndices.insert(
                 flattenedIndices.end(), mesh.indices.begin(), mesh.indices.end());
-            meshIndices.emplace_back(flattenedIndices.data() + indexOffsetIdx, numIndices);
+            modelIndices.emplace_back(flattenedIndices.data() + indexOffsetIdx, numIndices);
         }
 
         return nlrs::HybridRenderer{
             gpuContext,
             nlrs::HybridRendererSceneDescriptor{
-                .meshVertices = meshVertices,
-                .meshIndices = meshIndices,
+                .modelPositions = modelVertices,
+                .modelTexCoords = modelTexCoords,
+                .modelIndices = modelIndices,
             }};
     }();
 
