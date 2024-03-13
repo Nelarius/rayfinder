@@ -58,7 +58,8 @@ public:
 
     WGPUBindGroupLayoutEntry bindGroupLayoutEntry(
         std::uint32_t        bindingIndex,
-        WGPUShaderStageFlags visibility) const;
+        WGPUShaderStageFlags visibility,
+        std::size_t          minBindingSize = 0) const;
     WGPUBindGroupEntry bindGroupEntry(std::uint32_t bindingIndex) const;
 
 private:

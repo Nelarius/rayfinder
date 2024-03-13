@@ -51,7 +51,7 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
     const WGPUBindGroupLayout uniformBindGroupLayout = [this,
                                                         &gpuContext]() -> WGPUBindGroupLayout {
         const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
-            mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
+            mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4));
 
         const WGPUBindGroupLayoutDescriptor bindGroupLayoutDesc{
             .nextInChain = nullptr,

@@ -101,7 +101,7 @@ inline WGPUBindGroupLayoutEntry bufferBindGroupLayoutEntry(
     const std::uint32_t         bindingIdx,
     const WGPUShaderStageFlags  visibility,
     const WGPUBufferBindingType bindingType,
-    const std::size_t           bindingSize)
+    const std::size_t           minBindingSize)
 {
     return WGPUBindGroupLayoutEntry{
         .nextInChain = nullptr,
@@ -112,7 +112,7 @@ inline WGPUBindGroupLayoutEntry bufferBindGroupLayoutEntry(
                 .nextInChain = nullptr,
                 .type = bindingType,
                 .hasDynamicOffset = false,
-                .minBindingSize = static_cast<std::uint64_t>(bindingSize)},
+                .minBindingSize = static_cast<std::uint64_t>(minBindingSize)},
         .sampler = DEFAULT_SAMPLER_BINDING_LAYOUT,
         .texture = DEFAULT_TEXTURE_BINDING_LAYOUT,
         .storageTexture = DEFAULT_STORAGE_TEXTURE_BINDING_LAYOUT,

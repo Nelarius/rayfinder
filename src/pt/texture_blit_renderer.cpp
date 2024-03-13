@@ -52,7 +52,7 @@ TextureBlitRenderer::TextureBlitRenderer(
     const WGPUBindGroupLayout uniformsBindGroupLayout = [this,
                                                          &gpuContext]() -> WGPUBindGroupLayout {
         const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
-            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
+            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4));
 
         const WGPUBindGroupLayoutDescriptor uniformsBindGroupLayoutDesc{
             .nextInChain = nullptr,

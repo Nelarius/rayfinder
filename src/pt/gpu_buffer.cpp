@@ -100,11 +100,12 @@ GpuBuffer::~GpuBuffer()
 
 WGPUBindGroupLayoutEntry GpuBuffer::bindGroupLayoutEntry(
     const std::uint32_t        bindingIdx,
-    const WGPUShaderStageFlags visibility) const
+    const WGPUShaderStageFlags visibility,
+    const std::size_t          minBindingSize) const
 {
     assert(mBuffer != nullptr);
     const WGPUBufferBindingType bindingType = bufferUsageToBufferBindingType(mUsage);
-    return bufferBindGroupLayoutEntry(bindingIdx, visibility, bindingType, mByteSize);
+    return bufferBindGroupLayoutEntry(bindingIdx, visibility, bindingType, minBindingSize);
 }
 
 WGPUBindGroupEntry GpuBuffer::bindGroupEntry(const std::uint32_t bindingIdx) const
