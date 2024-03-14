@@ -71,6 +71,13 @@ inline void textureViewSafeRelease(const WGPUTextureView textureView) noexcept
     }
 }
 
+constexpr WGPUStencilFaceState DEFAULT_STENCIL_FACE_STATE{
+    .compare = WGPUCompareFunction_Always,
+    .failOp = WGPUStencilOperation_Keep,
+    .depthFailOp = WGPUStencilOperation_Keep,
+    .passOp = WGPUStencilOperation_Keep,
+};
+
 constexpr WGPUBufferBindingLayout DEFAULT_BUFFER_BINDING_LAYOUT{
     .nextInChain = nullptr,
     .type = WGPUBufferBindingType_Undefined,

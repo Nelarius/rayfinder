@@ -2,6 +2,8 @@
 
 #include "gpu_buffer.hpp"
 
+#include <common/extent.hpp>
+
 #include <glm/glm.hpp>
 #include <webgpu/webgpu.h>
 
@@ -13,8 +15,9 @@ namespace nlrs
 {
 struct GpuContext;
 
-struct HybridRendererSceneDescriptor
+struct HybridRendererDescriptor
 {
+    Extent2u                                  framebufferSize;
     std::span<std::span<const glm::vec4>>     modelPositions;
     std::span<std::span<const glm::vec2>>     modelTexCoords;
     std::span<std::span<const std::uint32_t>> modelIndices;
@@ -23,7 +26,7 @@ struct HybridRendererSceneDescriptor
 class HybridRenderer
 {
 public:
-    HybridRenderer(const GpuContext&, HybridRendererSceneDescriptor);
+    HybridRenderer(const GpuContext&, HybridRendererDescriptor);
     ~HybridRenderer();
 
     HybridRenderer(const HybridRenderer&) = delete;
@@ -33,6 +36,7 @@ public:
     HybridRenderer& operator=(HybridRenderer&&);
 
     void render(const GpuContext&, WGPUTextureView, const glm::mat4& viewProjectionMatrix);
+    void resize(const GpuContext&, const Extent2u&);
 
 private:
     struct IndexBuffer
@@ -47,6 +51,8 @@ private:
     std::vector<IndexBuffer> mIndexBuffers;
     GpuBuffer                mUniformBuffer;
     WGPUBindGroup            mUniformBindGroup;
+    WGPUTexture              mDepthTexture;
+    WGPUTextureView          mDepthTextureView;
     WGPURenderPipeline       mPipeline;
 };
 } // namespace nlrs

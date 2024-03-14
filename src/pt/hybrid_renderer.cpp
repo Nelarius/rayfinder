@@ -1,5 +1,6 @@
 #include "gpu_context.hpp"
 #include "hybrid_renderer.hpp"
+#include "webgpu_utils.hpp"
 #include "window.hpp"
 
 #include <common/assert.hpp>
@@ -9,7 +10,7 @@
 
 namespace nlrs
 {
-HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererSceneDescriptor desc)
+HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescriptor desc)
     : mPositionBuffers([&gpuContext, &desc]() -> std::vector<GpuBuffer> {
           std::vector<GpuBuffer> buffers;
           std::transform(
@@ -56,6 +57,8 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(glm::mat4)),
       mUniformBindGroup(nullptr),
+      mDepthTexture(nullptr),
+      mDepthTextureView(nullptr),
       mPipeline(nullptr)
 {
     NLRS_ASSERT(mPositionBuffers.size() == mIndexBuffers.size());
@@ -87,6 +90,41 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
         };
 
         mUniformBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &bindGroupDesc);
+    }
+
+    constexpr WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth24Plus;
+    {
+        const std::array<WGPUTextureFormat, 1> depthFormats{
+            DEPTH_TEXTURE_FORMAT,
+        };
+        const WGPUTextureDescriptor depthTextureDesc{
+            .nextInChain = nullptr,
+            .label = "Depth texture",
+            .usage = WGPUTextureUsage_RenderAttachment,
+            .dimension = WGPUTextureDimension_2D,
+            .size = {desc.framebufferSize.x, desc.framebufferSize.y, 1},
+            .format = DEPTH_TEXTURE_FORMAT,
+            .mipLevelCount = 1,
+            .sampleCount = 1,
+            .viewFormatCount = depthFormats.size(),
+            .viewFormats = depthFormats.data(),
+        };
+        mDepthTexture = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
+        NLRS_ASSERT(mDepthTexture != nullptr);
+
+        const WGPUTextureViewDescriptor depthTextureViewDesc{
+            .nextInChain = nullptr,
+            .label = "Depth texture view",
+            .format = DEPTH_TEXTURE_FORMAT,
+            .dimension = WGPUTextureViewDimension_2D,
+            .baseMipLevel = 0,
+            .mipLevelCount = 1,
+            .baseArrayLayer = 0,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_DepthOnly,
+        };
+        mDepthTextureView = wgpuTextureCreateView(mDepthTexture, &depthTextureViewDesc);
+        NLRS_ASSERT(mDepthTextureView != nullptr);
     }
 
     // Render pipeline
@@ -180,6 +218,22 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
             .targets = &colorTarget,
         };
 
+        // Depth Stencil
+
+        const WGPUDepthStencilState depthStencilState{
+            .nextInChain = nullptr,
+            .format = DEPTH_TEXTURE_FORMAT,
+            .depthWriteEnabled = true,
+            .depthCompare = WGPUCompareFunction_Less,
+            .stencilFront = DEFAULT_STENCIL_FACE_STATE,
+            .stencilBack = DEFAULT_STENCIL_FACE_STATE,
+            .stencilReadMask = 0, // stencil masks deactivated by setting to zero
+            .stencilWriteMask = 0,
+            .depthBias = 0,
+            .depthBiasSlopeScale = 0,
+            .depthBiasClamp = 0,
+        };
+
         // Pipeline layout
 
         const std::array<WGPUBindGroupLayout, 1> bindGroupLayouts{
@@ -220,7 +274,7 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
                     .frontFace = WGPUFrontFace_CCW,
                     .cullMode = WGPUCullMode_Back,
                 },
-            .depthStencil = nullptr,
+            .depthStencil = &depthStencilState,
             .multisample =
                 WGPUMultisampleState{
                     .nextInChain = nullptr,
@@ -241,6 +295,8 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererScene
 HybridRenderer::~HybridRenderer()
 {
     renderPipelineSafeRelease(mPipeline);
+    textureViewSafeRelease(mDepthTextureView);
+    textureSafeRelease(mDepthTexture);
     bindGroupSafeRelease(mUniformBindGroup);
 }
 
@@ -255,6 +311,10 @@ HybridRenderer::HybridRenderer(HybridRenderer&& other)
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
+        mDepthTexture = other.mDepthTexture;
+        other.mDepthTexture = nullptr;
+        mDepthTextureView = other.mDepthTextureView;
+        other.mDepthTextureView = nullptr;
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
@@ -270,6 +330,10 @@ HybridRenderer& HybridRenderer::operator=(HybridRenderer&& other)
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
+        mDepthTexture = other.mDepthTexture;
+        other.mDepthTexture = nullptr;
+        mDepthTextureView = other.mDepthTextureView;
+        other.mDepthTextureView = nullptr;
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
@@ -296,9 +360,9 @@ void HybridRenderer::render(
         return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
     }();
 
-    const WGPURenderPassEncoder renderPassEncoder = [encoder,
-                                                     textureView]() -> WGPURenderPassEncoder {
-        const WGPURenderPassColorAttachment renderPassColorAttachment{
+    const WGPURenderPassEncoder renderPassEncoder =
+        [encoder, textureView, this]() -> WGPURenderPassEncoder {
+        const WGPURenderPassColorAttachment colorAttachment{
             .nextInChain = nullptr,
             .view = textureView,
             .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED, // depthSlice must be initialized with
@@ -309,12 +373,24 @@ void HybridRenderer::render(
             .clearValue = WGPUColor{0.0, 0.0, 0.0, 1.0},
         };
 
+        const WGPURenderPassDepthStencilAttachment depthStencilAttachment{
+            .view = mDepthTextureView,
+            .depthLoadOp = WGPULoadOp_Clear,
+            .depthStoreOp = WGPUStoreOp_Store,
+            .depthClearValue = 1.0f,
+            .depthReadOnly = false,
+            .stencilLoadOp = WGPULoadOp_Undefined, // ops must not be set if no stencil aspect
+            .stencilStoreOp = WGPUStoreOp_Undefined,
+            .stencilClearValue = 0,
+            .stencilReadOnly = true,
+        };
+
         const WGPURenderPassDescriptor renderPassDesc = {
             .nextInChain = nullptr,
             .label = "Render pass encoder",
             .colorAttachmentCount = 1,
-            .colorAttachments = &renderPassColorAttachment,
-            .depthStencilAttachment = nullptr,
+            .colorAttachments = &colorAttachment,
+            .depthStencilAttachment = &depthStencilAttachment,
             .occlusionQuerySet = nullptr,
             .timestampWrites = nullptr,
         };
@@ -355,5 +431,53 @@ void HybridRenderer::render(
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
+}
+
+void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSize)
+{
+    NLRS_ASSERT(newSize.x > 0 && newSize.y > 0);
+
+    textureViewSafeRelease(mDepthTextureView);
+    textureSafeRelease(mDepthTexture);
+
+    mDepthTextureView = nullptr;
+    mDepthTexture = nullptr;
+
+    constexpr WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth24Plus;
+    {
+        const std::array<WGPUTextureFormat, 1> depthFormats{
+            DEPTH_TEXTURE_FORMAT,
+        };
+        const WGPUTextureDescriptor depthTextureDesc{
+            .nextInChain = nullptr,
+            .label = "Depth texture",
+            .usage = WGPUTextureUsage_RenderAttachment,
+            .dimension = WGPUTextureDimension_2D,
+            .size = {newSize.x, newSize.y, 1},
+            .format = DEPTH_TEXTURE_FORMAT,
+            .mipLevelCount = 1,
+            .sampleCount = 1,
+            .viewFormatCount = depthFormats.size(),
+            .viewFormats = depthFormats.data(),
+        };
+        mDepthTexture = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
+        NLRS_ASSERT(mDepthTexture != nullptr);
+    }
+
+    {
+        const WGPUTextureViewDescriptor depthTextureViewDesc{
+            .nextInChain = nullptr,
+            .label = "Depth texture view",
+            .format = DEPTH_TEXTURE_FORMAT,
+            .dimension = WGPUTextureViewDimension_2D,
+            .baseMipLevel = 0,
+            .mipLevelCount = 1,
+            .baseArrayLayer = 0,
+            .arrayLayerCount = 1,
+            .aspect = WGPUTextureAspect_DepthOnly,
+        };
+        mDepthTextureView = wgpuTextureCreateView(mDepthTexture, &depthTextureViewDesc);
+        NLRS_ASSERT(mDepthTextureView != nullptr);
+    }
 }
 } // namespace nlrs

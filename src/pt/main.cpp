@@ -127,7 +127,7 @@ try
         nlrs::TextureBlitRendererDescriptor{
             .framebufferSize = nlrs::Extent2u(window.resolution())}};
 
-    nlrs::HybridRenderer hybridRenderer = [&gpuContext, argv]() -> nlrs::HybridRenderer {
+    nlrs::HybridRenderer hybridRenderer = [&gpuContext, &window, argv]() -> nlrs::HybridRenderer {
         fs::path path = argv[1];
         path.replace_extension(".glb");
         if (!fs::exists(path))
@@ -187,7 +187,8 @@ try
 
         return nlrs::HybridRenderer{
             gpuContext,
-            nlrs::HybridRendererSceneDescriptor{
+            nlrs::HybridRendererDescriptor{
+                .framebufferSize = nlrs::Extent2u(window.resolution()),
                 .modelPositions = modelVertices,
                 .modelTexCoords = modelTexCoords,
                 .modelIndices = modelIndices,
@@ -408,8 +409,11 @@ try
         textureBlitter.render(gpuContext, gui, swapChain);
     };
 
-    auto onResize = [&gpuContext, &textureBlitter](const nlrs::FramebufferSize newSize) -> void {
-        textureBlitter.resize(gpuContext, nlrs::Extent2u(newSize));
+    auto onResize = [&gpuContext, &hybridRenderer, &textureBlitter](
+                        const nlrs::FramebufferSize newSize) -> void {
+        const auto sz = nlrs::Extent2u(newSize);
+        hybridRenderer.resize(gpuContext, sz);
+        textureBlitter.resize(gpuContext, sz);
     };
 
     window.run(
