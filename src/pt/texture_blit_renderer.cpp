@@ -306,12 +306,19 @@ TextureBlitRenderer::TextureBlitRenderer(
 TextureBlitRenderer::~TextureBlitRenderer()
 {
     renderPipelineSafeRelease(mPipeline);
+    mPipeline = nullptr;
     bindGroupSafeRelease(mTextureBindGroup);
+    mTextureBindGroup = nullptr;
     bindGroupLayoutSafeRelease(mTextureBindGroupLayout);
+    mTextureBindGroupLayout = nullptr;
     samplerSafeRelease(mSampler);
+    mSampler = nullptr;
     textureViewSafeRelease(mTextureView);
+    mTextureView = nullptr;
     textureSafeRelease(mTexture);
+    mTexture = nullptr;
     bindGroupSafeRelease(mUniformsBindGroup);
+    mUniformsBindGroup = nullptr;
 }
 
 TextureBlitRenderer::TextureBlitRenderer(TextureBlitRenderer&& other)

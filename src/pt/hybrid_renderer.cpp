@@ -295,9 +295,13 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
 HybridRenderer::~HybridRenderer()
 {
     renderPipelineSafeRelease(mPipeline);
+    mPipeline = nullptr;
     textureViewSafeRelease(mDepthTextureView);
+    mDepthTexture = nullptr;
     textureSafeRelease(mDepthTexture);
+    mDepthTexture = nullptr;
     bindGroupSafeRelease(mUniformBindGroup);
+    mUniformBindGroup = nullptr;
 }
 
 HybridRenderer::HybridRenderer(HybridRenderer&& other)
