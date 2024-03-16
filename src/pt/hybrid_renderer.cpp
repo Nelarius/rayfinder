@@ -51,17 +51,177 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
               });
           return buffers;
       }()),
+      mBaseColorTextureIndices(
+          desc.baseColorTextureIndices.begin(),
+          desc.baseColorTextureIndices.end()),
+      mBaseColorTextures([&gpuContext, &desc]() -> std::vector<GpuTexture> {
+          std::vector<GpuTexture> textures;
+          std::transform(
+              desc.baseColorTextures.begin(),
+              desc.baseColorTextures.end(),
+              std::back_inserter(textures),
+              [&gpuContext](const Texture& texture) -> GpuTexture {
+                  const auto                  dimensions = texture.dimensions();
+                  const WGPUTextureFormat     TEXTURE_FORMAT = WGPUTextureFormat_BGRA8Unorm;
+                  const WGPUTextureDescriptor textureDesc{
+                      .nextInChain = nullptr,
+                      .label = "Mesh texture",
+                      .usage = WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding,
+                      .dimension = WGPUTextureDimension_2D,
+                      .size = {dimensions.width, dimensions.height, 1},
+                      .format = TEXTURE_FORMAT,
+                      .mipLevelCount = 1,
+                      .sampleCount = 1,
+                      .viewFormatCount = 1,
+                      .viewFormats = &TEXTURE_FORMAT,
+                  };
+                  const WGPUTexture gpuTexture =
+                      wgpuDeviceCreateTexture(gpuContext.device, &textureDesc);
+
+                  const WGPUTextureViewDescriptor viewDesc{
+                      .nextInChain = nullptr,
+                      .label = "Mesh texture view",
+                      .format = TEXTURE_FORMAT,
+                      .dimension = WGPUTextureViewDimension_2D,
+                      .baseMipLevel = 0,
+                      .mipLevelCount = 1,
+                      .baseArrayLayer = 0,
+                      .arrayLayerCount = 1,
+                      .aspect = WGPUTextureAspect_All,
+                  };
+                  const WGPUTextureView view = wgpuTextureCreateView(gpuTexture, &viewDesc);
+
+                  const WGPUImageCopyTexture imageDestination{
+                      .nextInChain = nullptr,
+                      .texture = gpuTexture,
+                      .mipLevel = 0,
+                      .origin = {0, 0, 0},
+                      .aspect = WGPUTextureAspect_All,
+                  };
+                  const WGPUTextureDataLayout sourceDataLayout{
+                      .nextInChain = nullptr,
+                      .offset = 0,
+                      .bytesPerRow =
+                          static_cast<std::uint32_t>(dimensions.width * sizeof(Texture::RgbaPixel)),
+                      .rowsPerImage = dimensions.height,
+                  };
+                  const WGPUExtent3D writeSize{
+                      .width = dimensions.width,
+                      .height = dimensions.height,
+                      .depthOrArrayLayers = 1};
+                  const std::size_t numPixelBytes = sizeof(Texture::RgbaPixel);
+                  const std::size_t numTextureBytes = texture.pixels().size() * numPixelBytes;
+                  wgpuQueueWriteTexture(
+                      gpuContext.queue,
+                      &imageDestination,
+                      texture.pixels().data(),
+                      numTextureBytes,
+                      &sourceDataLayout,
+                      &writeSize);
+
+                  return GpuTexture{
+                      .texture = gpuTexture,
+                      .view = view,
+                  };
+              });
+          return textures;
+      }()),
+      mBaseColorTextureBindGroups(),
+      mSampler(nullptr),
       mUniformBuffer(
           gpuContext.device,
           "Uniform buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
           sizeof(glm::mat4)),
       mUniformBindGroup(nullptr),
+      mSamplerBindGroup(nullptr),
       mDepthTexture(nullptr),
       mDepthTextureView(nullptr),
       mPipeline(nullptr)
 {
     NLRS_ASSERT(mPositionBuffers.size() == mIndexBuffers.size());
+
+    {
+        const WGPUSamplerDescriptor samplerDesc{
+            .nextInChain = nullptr,
+            .label = "Model texture sampler",
+            .addressModeU = WGPUAddressMode_Repeat,
+            .addressModeV = WGPUAddressMode_Repeat,
+            .addressModeW = WGPUAddressMode_Repeat,
+            .magFilter = WGPUFilterMode_Linear,
+            .minFilter = WGPUFilterMode_Linear,
+            .mipmapFilter = WGPUMipmapFilterMode_Linear,
+            .lodMinClamp = 0.f,
+            .lodMaxClamp = 32.f,
+            .compare = WGPUCompareFunction_Undefined,
+            .maxAnisotropy = 1,
+        };
+        mSampler = wgpuDeviceCreateSampler(gpuContext.device, &samplerDesc);
+        NLRS_ASSERT(mSampler != nullptr);
+    }
+
+    const WGPUBindGroupLayout samplerBindGroupLayout = [&gpuContext]() -> WGPUBindGroupLayout {
+        const std::array<WGPUBindGroupLayoutEntry, 1> samplerBindGroupLayoutEntries{
+            samplerBindGroupLayoutEntry(0),
+        };
+        const WGPUBindGroupLayoutDescriptor samplerBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "Sampler bind group layout",
+            .entryCount = samplerBindGroupLayoutEntries.size(),
+            .entries = samplerBindGroupLayoutEntries.data(),
+        };
+        return wgpuDeviceCreateBindGroupLayout(gpuContext.device, &samplerBindGroupLayoutDesc);
+    }();
+    NLRS_ASSERT(samplerBindGroupLayout != nullptr);
+
+    {
+        const std::array<WGPUBindGroupEntry, 1> samplerBindGroupEntries{
+            samplerBindGroupEntry(0, mSampler),
+        };
+        const WGPUBindGroupDescriptor samplerBindGroupDesc{
+            .nextInChain = nullptr,
+            .label = "Sampler bind group",
+            .layout = samplerBindGroupLayout,
+            .entryCount = samplerBindGroupEntries.size(),
+            .entries = samplerBindGroupEntries.data(),
+        };
+        mSamplerBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &samplerBindGroupDesc);
+    }
+
+    const WGPUBindGroupLayout textureBindGroupLayout = [&gpuContext]() -> WGPUBindGroupLayout {
+        const std::array<WGPUBindGroupLayoutEntry, 1> textureBindGroupLayoutEntries{
+            textureBindGroupLayoutEntry(0),
+        };
+        const WGPUBindGroupLayoutDescriptor textureBindGroupLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "Texture bind group layout",
+            .entryCount = textureBindGroupLayoutEntries.size(),
+            .entries = textureBindGroupLayoutEntries.data(),
+        };
+        return wgpuDeviceCreateBindGroupLayout(gpuContext.device, &textureBindGroupLayoutDesc);
+    }();
+    NLRS_ASSERT(textureBindGroupLayout != nullptr);
+
+    std::transform(
+        mBaseColorTextures.begin(),
+        mBaseColorTextures.end(),
+        std::back_inserter(mBaseColorTextureBindGroups),
+        [&gpuContext, &textureBindGroupLayout](const GpuTexture& texture) -> WGPUBindGroup {
+            const std::array<WGPUBindGroupEntry, 1> bindGroupEntries{
+                textureBindGroupEntry(0, texture.view),
+            };
+            const WGPUBindGroupDescriptor bindGroupDesc{
+                .nextInChain = nullptr,
+                .label = "Texture bind group",
+                .layout = textureBindGroupLayout,
+                .entryCount = bindGroupEntries.size(),
+                .entries = bindGroupEntries.data(),
+            };
+            const WGPUBindGroup bindGroup =
+                wgpuDeviceCreateBindGroup(gpuContext.device, &bindGroupDesc);
+            NLRS_ASSERT(bindGroup != nullptr);
+            return bindGroup;
+        });
 
     const WGPUBindGroupLayout uniformBindGroupLayout = [this,
                                                         &gpuContext]() -> WGPUBindGroupLayout {
@@ -236,8 +396,10 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
 
         // Pipeline layout
 
-        const std::array<WGPUBindGroupLayout, 1> bindGroupLayouts{
+        const std::array<WGPUBindGroupLayout, 3> bindGroupLayouts{
             uniformBindGroupLayout,
+            samplerBindGroupLayout,
+            textureBindGroupLayout,
         };
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
@@ -289,7 +451,13 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
         mPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
 
         wgpuPipelineLayoutRelease(pipelineLayout);
+        wgpuBindGroupLayoutRelease(textureBindGroupLayout);
+        wgpuBindGroupLayoutRelease(samplerBindGroupLayout);
     }
+
+    NLRS_ASSERT(mPositionBuffers.size() == mIndexBuffers.size());
+    NLRS_ASSERT(mPositionBuffers.size() == mTexCoordBuffers.size());
+    NLRS_ASSERT(mPositionBuffers.size() == mBaseColorTextureIndices.size());
 }
 
 HybridRenderer::~HybridRenderer()
@@ -300,8 +468,23 @@ HybridRenderer::~HybridRenderer()
     mDepthTexture = nullptr;
     textureSafeRelease(mDepthTexture);
     mDepthTexture = nullptr;
+    bindGroupSafeRelease(mSamplerBindGroup);
+    mSamplerBindGroup = nullptr;
     bindGroupSafeRelease(mUniformBindGroup);
     mUniformBindGroup = nullptr;
+    samplerSafeRelease(mSampler);
+    mSampler = nullptr;
+    for (const auto b : mBaseColorTextureBindGroups)
+    {
+        bindGroupSafeRelease(b);
+    }
+    mBaseColorTextureBindGroups.clear();
+    for (const auto& texture : mBaseColorTextures)
+    {
+        textureSafeRelease(texture.texture);
+        textureViewSafeRelease(texture.view);
+    }
+    mBaseColorTextures.clear();
 }
 
 HybridRenderer::HybridRenderer(HybridRenderer&& other)
@@ -312,9 +495,16 @@ HybridRenderer::HybridRenderer(HybridRenderer&& other)
         mPositionBuffers = std::move(other.mPositionBuffers);
         mTexCoordBuffers = std::move(other.mTexCoordBuffers);
         mIndexBuffers = std::move(other.mIndexBuffers);
+        mBaseColorTextureIndices = std::move(other.mBaseColorTextureIndices);
+        mBaseColorTextures = std::move(other.mBaseColorTextures);
+        mBaseColorTextureBindGroups = std::move(other.mBaseColorTextureBindGroups);
+        mSampler = other.mSampler;
+        other.mSampler = nullptr;
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
+        mSamplerBindGroup = other.mSamplerBindGroup;
+        other.mSamplerBindGroup = nullptr;
         mDepthTexture = other.mDepthTexture;
         other.mDepthTexture = nullptr;
         mDepthTextureView = other.mDepthTextureView;
@@ -331,9 +521,16 @@ HybridRenderer& HybridRenderer::operator=(HybridRenderer&& other)
         mPositionBuffers = std::move(other.mPositionBuffers);
         mTexCoordBuffers = std::move(other.mTexCoordBuffers);
         mIndexBuffers = std::move(other.mIndexBuffers);
+        mBaseColorTextureIndices = std::move(other.mBaseColorTextureIndices);
+        mBaseColorTextures = std::move(other.mBaseColorTextures);
+        mBaseColorTextureBindGroups = std::move(other.mBaseColorTextureBindGroups);
+        mSampler = other.mSampler;
+        other.mSampler = nullptr;
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = other.mUniformBindGroup;
         other.mUniformBindGroup = nullptr;
+        mSamplerBindGroup = other.mSamplerBindGroup;
+        other.mSamplerBindGroup = nullptr;
         mDepthTexture = other.mDepthTexture;
         other.mDepthTexture = nullptr;
         mDepthTextureView = other.mDepthTextureView;
@@ -404,6 +601,7 @@ void HybridRenderer::render(
 
     wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mPipeline);
     wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, mUniformBindGroup, 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 1, mSamplerBindGroup, 0, nullptr);
 
     for (std::size_t idx = 0; idx < mPositionBuffers.size(); ++idx)
     {
@@ -421,6 +619,10 @@ void HybridRenderer::render(
             indexBuffer.format,
             0,
             indexBuffer.buffer.byteSize());
+
+        const std::size_t textureIdx = mBaseColorTextureIndices[idx];
+        wgpuRenderPassEncoderSetBindGroup(
+            renderPassEncoder, 2, mBaseColorTextureBindGroups[textureIdx], 0, nullptr);
 
         wgpuRenderPassEncoderDrawIndexed(renderPassEncoder, indexBuffer.count, 1, 0, 0, 0);
     }

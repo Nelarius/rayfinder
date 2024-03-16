@@ -3,10 +3,12 @@
 #include "gpu_buffer.hpp"
 
 #include <common/extent.hpp>
+#include <common/texture.hpp>
 
 #include <glm/glm.hpp>
 #include <webgpu/webgpu.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -21,6 +23,8 @@ struct HybridRendererDescriptor
     std::span<std::span<const glm::vec4>>     modelPositions;
     std::span<std::span<const glm::vec2>>     modelTexCoords;
     std::span<std::span<const std::uint32_t>> modelIndices;
+    std::span<std::size_t>                    baseColorTextureIndices;
+    std::span<Texture>                        baseColorTextures;
 };
 
 class HybridRenderer
@@ -46,13 +50,24 @@ private:
         WGPUIndexFormat format;
     };
 
-    std::vector<GpuBuffer>   mPositionBuffers;
-    std::vector<GpuBuffer>   mTexCoordBuffers;
-    std::vector<IndexBuffer> mIndexBuffers;
-    GpuBuffer                mUniformBuffer;
-    WGPUBindGroup            mUniformBindGroup;
-    WGPUTexture              mDepthTexture;
-    WGPUTextureView          mDepthTextureView;
-    WGPURenderPipeline       mPipeline;
+    struct GpuTexture
+    {
+        WGPUTexture     texture;
+        WGPUTextureView view;
+    };
+
+    std::vector<GpuBuffer>     mPositionBuffers;
+    std::vector<GpuBuffer>     mTexCoordBuffers;
+    std::vector<IndexBuffer>   mIndexBuffers;
+    std::vector<std::size_t>   mBaseColorTextureIndices;
+    std::vector<GpuTexture>    mBaseColorTextures;
+    std::vector<WGPUBindGroup> mBaseColorTextureBindGroups;
+    WGPUSampler                mSampler;
+    GpuBuffer                  mUniformBuffer;
+    WGPUBindGroup              mUniformBindGroup;
+    WGPUBindGroup              mSamplerBindGroup;
+    WGPUTexture                mDepthTexture;
+    WGPUTextureView            mDepthTextureView;
+    WGPURenderPipeline         mPipeline;
 };
 } // namespace nlrs

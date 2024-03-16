@@ -13,7 +13,10 @@ fn vsMain(@location(0) position: vec4f, @location(1) texCoord: vec2f) -> VertexO
     return out;
 }
 
+@group(1) @binding(0) var textureSampler: sampler;
+@group(2) @binding(0) var texture: texture_2d<f32>;
+
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
-    return vec4(in.texCoord, 0.0, 1.0);
+    return textureSample(texture, textureSampler, in.texCoord);
 }

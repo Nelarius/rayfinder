@@ -162,6 +162,8 @@ try
         flattenedIndices.reserve(numModelIndices);
         std::vector<std::span<const std::uint32_t>> modelIndices;
 
+        std::vector<std::size_t> baseColorTextureIndices;
+
         for (const auto& mesh : gltf.meshes)
         {
             const std::size_t vertexOffsetIdx = flattenedVertices.size();
@@ -183,6 +185,8 @@ try
             flattenedIndices.insert(
                 flattenedIndices.end(), mesh.indices.begin(), mesh.indices.end());
             modelIndices.emplace_back(flattenedIndices.data() + indexOffsetIdx, numIndices);
+
+            baseColorTextureIndices.push_back(mesh.baseColorTextureIndex);
         }
 
         return nlrs::HybridRenderer{
@@ -192,6 +196,8 @@ try
                 .modelPositions = modelVertices,
                 .modelTexCoords = modelTexCoords,
                 .modelIndices = modelIndices,
+                .baseColorTextureIndices = baseColorTextureIndices,
+                .baseColorTextures = gltf.baseColorTextures,
             }};
     }();
 
