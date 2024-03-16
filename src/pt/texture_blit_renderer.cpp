@@ -117,7 +117,7 @@ TextureBlitRenderer::TextureBlitRenderer(
     }();
     NLRS_ASSERT(mTextureView != nullptr);
 
-    mSampler = [&gpuContext]() -> WGPUSampler {
+    {
         const WGPUSamplerDescriptor samplerDesc{
             .nextInChain = nullptr,
             .label = "Offscreen sampler",
@@ -132,9 +132,9 @@ TextureBlitRenderer::TextureBlitRenderer(
             .compare = WGPUCompareFunction_Undefined,
             .maxAnisotropy = 1,
         };
-        return wgpuDeviceCreateSampler(gpuContext.device, &samplerDesc);
-    }();
-    NLRS_ASSERT(mSampler != nullptr);
+        mSampler = wgpuDeviceCreateSampler(gpuContext.device, &samplerDesc);
+        NLRS_ASSERT(mSampler != nullptr);
+    }
 
     // texture bind group
     {
