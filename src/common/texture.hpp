@@ -9,7 +9,7 @@ namespace nlrs
 class Texture
 {
 public:
-    using RgbaPixel = std::uint32_t;
+    using BgraPixel = std::uint32_t;
 
     struct Dimensions
     {
@@ -20,7 +20,7 @@ public:
     };
 
     Texture() = default;
-    Texture(std::vector<RgbaPixel>&& pixels, Dimensions dimensions)
+    Texture(std::vector<BgraPixel>&& pixels, Dimensions dimensions)
         : mPixels(std::move(pixels)),
           mDimensions(dimensions)
     {
@@ -34,14 +34,14 @@ public:
 
     bool operator==(const Texture&) const = default;
 
-    std::span<const RgbaPixel> pixels() const noexcept { return mPixels; }
+    std::span<const BgraPixel> pixels() const noexcept { return mPixels; }
     Dimensions                 dimensions() const noexcept { return mDimensions; }
 
     // `data` is expected to be in RGBA or RGB format, with each component 8 bits.
     static Texture fromMemory(std::span<const std::uint8_t> data);
 
 private:
-    std::vector<RgbaPixel> mPixels;
+    std::vector<BgraPixel> mPixels;
     Dimensions             mDimensions;
 };
 } // namespace nlrs

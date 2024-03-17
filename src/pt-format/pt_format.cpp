@@ -101,7 +101,7 @@ void deserialize(InputStream& stream, Texture& texture)
     NLRS_ASSERT(
         stream.read(reinterpret_cast<char*>(&dimensions), sizeof(Texture::Dimensions)) ==
         sizeof(Texture::Dimensions));
-    std::vector<Texture::RgbaPixel> pixels;
+    std::vector<Texture::BgraPixel> pixels;
     deserialize(stream, pixels);
     texture = Texture{std::move(pixels), dimensions};
 }

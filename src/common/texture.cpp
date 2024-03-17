@@ -2,8 +2,10 @@
 
 #include <stb_image.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <iterator>
 
 namespace nlrs
 {
@@ -17,7 +19,7 @@ Texture Texture::fromMemory(std::span<const std::uint8_t> data)
     // NOTE: desired channels results in RGBA output, regardless of number of source channels.
     // Missing values are filled in -- e.g. when sourceChannels is 3, then the texture is opaque. If
     // desiredChannels is 0, then sourceChannels is used as the number of channels.
-    unsigned char* const pixelData = stbi_load_from_memory(
+    unsigned char* const pixelPtr = stbi_load_from_memory(
         data.data(),
         static_cast<int>(data.size()),
         &width,
@@ -26,14 +28,25 @@ Texture Texture::fromMemory(std::span<const std::uint8_t> data)
         desiredChannels);
 
     assert(sourceChannels == 3 || sourceChannels == 4);
-    assert(pixelData != nullptr);
+    assert(pixelPtr != nullptr);
 
-    const std::size_t numPixels = static_cast<std::size_t>(width * height);
+    const auto numPixels = static_cast<std::size_t>(width * height);
+    const auto pixelData =
+        std::span<const std::uint32_t>(reinterpret_cast<const std::uint32_t*>(pixelPtr), numPixels);
+    std::vector<BgraPixel> pixels;
+    pixels.reserve(numPixels);
+    std::transform(
+        pixelData.begin(),
+        pixelData.end(),
+        std::back_inserter(pixels),
+        [](const std::uint32_t& px) -> BgraPixel {
+            const std::uint32_t r = px & 0xffu;
+            const std::uint32_t g = (px >> 8) & 0xffu;
+            const std::uint32_t b = (px >> 16) & 0xffu;
+            return b | (g << 8) | (r << 16) | (255 << 24);
+        });
 
-    std::vector<RgbaPixel> pixels(numPixels, 0);
-    std::memcpy(pixels.data(), pixelData, numPixels * sizeof(RgbaPixel));
-
-    stbi_image_free(pixelData);
+    stbi_image_free(pixelPtr);
 
     return Texture(
         std::move(pixels),

@@ -584,8 +584,8 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
     let i = u32(v * f32(desc.height));
     let idx = i * desc.width + j;
 
-    let pixel = textures[desc.offset + idx];
-    let srgb = vec3(f32(pixel & 0xffu), f32((pixel >> 8u) & 0xffu), f32((pixel >> 16u) & 0xffu)) / 255f;
+    let bgra = textures[desc.offset + idx];
+    let srgb = vec3(f32((bgra >> 16u) & 0xffu), f32((bgra >> 8u) & 0xffu), f32(bgra & 0xffu)) / 255f;
     let linearRgb = pow(srgb, vec3(2.2f));
     return linearRgb;
 }

@@ -102,14 +102,14 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
                       .nextInChain = nullptr,
                       .offset = 0,
                       .bytesPerRow =
-                          static_cast<std::uint32_t>(dimensions.width * sizeof(Texture::RgbaPixel)),
+                          static_cast<std::uint32_t>(dimensions.width * sizeof(Texture::BgraPixel)),
                       .rowsPerImage = dimensions.height,
                   };
                   const WGPUExtent3D writeSize{
                       .width = dimensions.width,
                       .height = dimensions.height,
                       .depthOrArrayLayers = 1};
-                  const std::size_t numPixelBytes = sizeof(Texture::RgbaPixel);
+                  const std::size_t numPixelBytes = sizeof(Texture::BgraPixel);
                   const std::size_t numTextureBytes = texture.pixels().size() * numPixelBytes;
                   wgpuQueueWriteTexture(
                       gpuContext.queue,

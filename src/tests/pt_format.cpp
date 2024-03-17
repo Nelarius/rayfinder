@@ -67,7 +67,7 @@ SCENARIO("Serialize and deserialize PtFormat", "[pt-format]")
                     REQUIRE(sourceTexture.dimensions().width == destTexture.dimensions().width);
                     REQUIRE(sourceTexture.dimensions().height == destTexture.dimensions().height);
                     const std::size_t pixelBytes =
-                        sourceTexture.pixels().size() * sizeof(Texture::RgbaPixel);
+                        sourceTexture.pixels().size() * sizeof(Texture::BgraPixel);
                     REQUIRE(
                         std::memcmp(
                             sourceTexture.pixels().data(),
@@ -134,7 +134,7 @@ SCENARIO("Serialize and deserialize PtFormat", "[pt-format]")
                     REQUIRE(sourceTexture.dimensions().width == destTexture.dimensions().width);
                     REQUIRE(sourceTexture.dimensions().height == destTexture.dimensions().height);
                     const std::size_t pixelBytes =
-                        sourceTexture.pixels().size() * sizeof(Texture::RgbaPixel);
+                        sourceTexture.pixels().size() * sizeof(Texture::BgraPixel);
                     REQUIRE(
                         std::memcmp(
                             sourceTexture.pixels().data(),

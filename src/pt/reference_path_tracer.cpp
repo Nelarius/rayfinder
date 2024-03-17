@@ -256,7 +256,7 @@ ReferencePathTracer::ReferencePathTracer(
         std::vector<TextureDescriptor> textureDescriptors;
         textureDescriptors.reserve(scene.baseColorTextures.size());
 
-        std::vector<Texture::RgbaPixel> textureData;
+        std::vector<Texture::BgraPixel> textureData;
         textureData.reserve(67108864);
 
         // Texture descriptors and texture data need to appended in the order of the model's
@@ -280,7 +280,7 @@ ReferencePathTracer::ReferencePathTracer(
             std::memcpy(
                 textureData.data() + offset,
                 pixels.data(),
-                pixels.size() * sizeof(Texture::RgbaPixel));
+                pixels.size() * sizeof(Texture::BgraPixel));
 
             textureDescriptors.push_back({width, height, offset});
         }
@@ -291,7 +291,7 @@ ReferencePathTracer::ReferencePathTracer(
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
             std::span<const TextureDescriptor>(textureDescriptors));
 
-        const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::RgbaPixel);
+        const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::BgraPixel);
         const std::size_t maxStorageBufferBindingSize =
             static_cast<std::size_t>(wgpuRequiredLimits.limits.maxStorageBufferBindingSize);
         if (textureDataNumBytes > maxStorageBufferBindingSize)
@@ -307,7 +307,7 @@ ReferencePathTracer::ReferencePathTracer(
             gpuContext.device,
             "texture buffer",
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-            std::span<const Texture::RgbaPixel>(textureData));
+            std::span<const Texture::BgraPixel>(textureData));
     }
 
     {
