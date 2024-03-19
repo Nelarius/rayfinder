@@ -106,7 +106,7 @@ void deserialize(InputStream& stream, Texture& texture)
     texture = Texture{std::move(pixels), dimensions};
 }
 
-constexpr std::string_view MAGIC_BYTES = "PTFORMAT1";
+constexpr std::string_view MAGIC_BYTES = "PTFORMAT2";
 
 void serialize(OutputStream& stream, const PtFormat& format)
 {

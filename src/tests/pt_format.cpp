@@ -170,7 +170,7 @@ SCENARIO("invalid magic bytes", "[pt-format]")
             REQUIRE_THROWS_WITH(
                 deserialize(stream, format),
                 "Mismatching PtFormat file version. Invalid version in magic bytes: expected "
-                "'PTFORMAT1', got 'PTFORMAT0'.");
+                "'PTFORMAT2', got 'PTFORMAT0'.");
         }
     }
 
