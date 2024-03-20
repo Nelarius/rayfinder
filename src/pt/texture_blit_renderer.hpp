@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_bind_group_layout.hpp"
 #include "gpu_buffer.hpp"
 
 #include <common/extent.hpp>
@@ -38,14 +39,14 @@ public:
     inline WGPUTextureView textureView() const noexcept { return mTextureView; }
 
 private:
-    GpuBuffer           mVertexBuffer;
-    GpuBuffer           mUniformsBuffer;
-    WGPUBindGroup       mUniformsBindGroup;
-    WGPUTexture         mTexture;
-    WGPUTextureView     mTextureView;
-    WGPUSampler         mSampler;
-    WGPUBindGroupLayout mTextureBindGroupLayout;
-    WGPUBindGroup       mTextureBindGroup;
-    WGPURenderPipeline  mPipeline;
+    GpuBuffer          mVertexBuffer;
+    GpuBuffer          mUniformsBuffer;
+    WGPUBindGroup      mUniformsBindGroup;
+    WGPUTexture        mTexture;
+    WGPUTextureView    mTextureView;
+    WGPUSampler        mSampler;
+    GpuBindGroupLayout mTextureBindGroupLayout;
+    WGPUBindGroup      mTextureBindGroup;
+    WGPURenderPipeline mPipeline;
 };
 } // namespace nlrs

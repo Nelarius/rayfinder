@@ -42,24 +42,15 @@ TextureBlitRenderer::TextureBlitRenderer(
       mTexture(nullptr),
       mTextureView(nullptr),
       mSampler(nullptr),
-      mTextureBindGroupLayout(nullptr),
+      mTextureBindGroupLayout(),
       mTextureBindGroup(nullptr),
       mPipeline(nullptr)
 {
-    // uniforms bind group layout
-    const WGPUBindGroupLayout uniformsBindGroupLayout = [this,
-                                                         &gpuContext]() -> WGPUBindGroupLayout {
-        const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
-            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4));
-
-        const WGPUBindGroupLayoutDescriptor uniformsBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "uniforms group layout",
-            .entryCount = 1,
-            .entries = &uniformsBindGroupLayoutEntry,
-        };
-        return wgpuDeviceCreateBindGroupLayout(gpuContext.device, &uniformsBindGroupLayoutDesc);
-    }();
+    const GpuBindGroupLayout uniformsBindGroupLayout{
+        gpuContext.device,
+        "Uniforms bind group layout",
+        std::array<WGPUBindGroupLayoutEntry, 1>{
+            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4))}};
 
     // uniforms bind group
     {
@@ -68,7 +59,7 @@ TextureBlitRenderer::TextureBlitRenderer(
         const WGPUBindGroupDescriptor uniformsBindGroupDesc{
             .nextInChain = nullptr,
             .label = "Bind group",
-            .layout = uniformsBindGroupLayout,
+            .layout = uniformsBindGroupLayout.ptr(),
             .entryCount = 1,
             .entries = &uniformsBindGroupEntry,
         };
@@ -138,18 +129,10 @@ TextureBlitRenderer::TextureBlitRenderer(
 
     // texture bind group
     {
-        const std::array<WGPUBindGroupLayoutEntry, 2> textureBindGroupLayoutEntries{
+        std::array<const WGPUBindGroupLayoutEntry, 2> textureBindGroupLayoutEntries{
             textureBindGroupLayoutEntry(0), samplerBindGroupLayoutEntry(1)};
-
-        const WGPUBindGroupLayoutDescriptor textureBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "Texture bind group layout",
-            .entryCount = textureBindGroupLayoutEntries.size(),
-            .entries = textureBindGroupLayoutEntries.data(),
-        };
-
-        mTextureBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &textureBindGroupLayoutDesc);
+        mTextureBindGroupLayout = GpuBindGroupLayout(
+            gpuContext.device, "Texture bind group layout", textureBindGroupLayoutEntries);
 
         const std::array<WGPUBindGroupEntry, 2> textureBindGroupEntries{
             textureBindGroupEntry(0, mTextureView),
@@ -159,7 +142,7 @@ TextureBlitRenderer::TextureBlitRenderer(
         const WGPUBindGroupDescriptor textureBindGroupDesc{
             .nextInChain = nullptr,
             .label = "Texture bind group",
-            .layout = mTextureBindGroupLayout,
+            .layout = mTextureBindGroupLayout.ptr(),
             .entryCount = textureBindGroupEntries.size(),
             .entries = textureBindGroupEntries.data(),
         };
@@ -245,7 +228,7 @@ TextureBlitRenderer::TextureBlitRenderer(
         // pipeline layout
 
         const std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
-            uniformsBindGroupLayout, mTextureBindGroupLayout};
+            uniformsBindGroupLayout.ptr(), mTextureBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -299,8 +282,6 @@ TextureBlitRenderer::TextureBlitRenderer(
 
         wgpuPipelineLayoutRelease(pipelineLayout);
     }
-
-    wgpuBindGroupLayoutRelease(uniformsBindGroupLayout);
 }
 
 TextureBlitRenderer::~TextureBlitRenderer()
@@ -309,8 +290,6 @@ TextureBlitRenderer::~TextureBlitRenderer()
     mPipeline = nullptr;
     bindGroupSafeRelease(mTextureBindGroup);
     mTextureBindGroup = nullptr;
-    bindGroupLayoutSafeRelease(mTextureBindGroupLayout);
-    mTextureBindGroupLayout = nullptr;
     samplerSafeRelease(mSampler);
     mSampler = nullptr;
     textureViewSafeRelease(mTextureView);
@@ -335,8 +314,7 @@ TextureBlitRenderer::TextureBlitRenderer(TextureBlitRenderer&& other)
         other.mTextureView = nullptr;
         mSampler = other.mSampler;
         other.mSampler = nullptr;
-        mTextureBindGroupLayout = other.mTextureBindGroupLayout;
-        other.mTextureBindGroupLayout = nullptr;
+        mTextureBindGroupLayout = std::move(other.mTextureBindGroupLayout);
         mTextureBindGroup = other.mTextureBindGroup;
         other.mTextureBindGroup = nullptr;
         mPipeline = other.mPipeline;
@@ -348,6 +326,7 @@ TextureBlitRenderer& TextureBlitRenderer::operator=(TextureBlitRenderer&& other)
 {
     if (this != &other)
     {
+        // TODO: this leaks memory since existing resources are not released.
         mVertexBuffer = std::move(other.mVertexBuffer);
         mUniformsBuffer = std::move(other.mUniformsBuffer);
         mUniformsBindGroup = other.mUniformsBindGroup;
@@ -358,8 +337,7 @@ TextureBlitRenderer& TextureBlitRenderer::operator=(TextureBlitRenderer&& other)
         other.mTextureView = nullptr;
         mSampler = other.mSampler;
         other.mSampler = nullptr;
-        mTextureBindGroupLayout = other.mTextureBindGroupLayout;
-        mTextureBindGroup = other.mTextureBindGroup;
+        mTextureBindGroupLayout = std::move(other.mTextureBindGroupLayout);
         other.mTextureBindGroup = nullptr;
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
@@ -495,7 +473,7 @@ void TextureBlitRenderer::resize(const GpuContext& gpuContext, const Extent2u& n
         const WGPUBindGroupDescriptor textureBindGroupDesc{
             .nextInChain = nullptr,
             .label = "Texture bind group",
-            .layout = mTextureBindGroupLayout,
+            .layout = mTextureBindGroupLayout.ptr(),
             .entryCount = textureBindGroupEntries.size(),
             .entries = textureBindGroupEntries.data(),
         };
