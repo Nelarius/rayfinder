@@ -68,6 +68,6 @@ private:
     WGPUBindGroup              mSamplerBindGroup;
     WGPUTexture                mDepthTexture;
     WGPUTextureView            mDepthTextureView;
-    WGPURenderPipeline         mPipeline;
+    WGPURenderPipeline         mGbufferPipeline;
 };
 } // namespace nlrs

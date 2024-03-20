@@ -137,7 +137,7 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
       mSamplerBindGroup(nullptr),
       mDepthTexture(nullptr),
       mDepthTextureView(nullptr),
-      mPipeline(nullptr)
+      mGbufferPipeline(nullptr)
 {
     NLRS_ASSERT(mPositionBuffers.size() == mIndexBuffers.size());
 
@@ -448,7 +448,7 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
             .fragment = &fragmentState,
         };
 
-        mPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
+        mGbufferPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
 
         wgpuPipelineLayoutRelease(pipelineLayout);
         wgpuBindGroupLayoutRelease(textureBindGroupLayout);
@@ -462,8 +462,8 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
 
 HybridRenderer::~HybridRenderer()
 {
-    renderPipelineSafeRelease(mPipeline);
-    mPipeline = nullptr;
+    renderPipelineSafeRelease(mGbufferPipeline);
+    mGbufferPipeline = nullptr;
     textureViewSafeRelease(mDepthTextureView);
     mDepthTexture = nullptr;
     textureSafeRelease(mDepthTexture);
@@ -509,8 +509,8 @@ HybridRenderer::HybridRenderer(HybridRenderer&& other)
         other.mDepthTexture = nullptr;
         mDepthTextureView = other.mDepthTextureView;
         other.mDepthTextureView = nullptr;
-        mPipeline = other.mPipeline;
-        other.mPipeline = nullptr;
+        mGbufferPipeline = other.mGbufferPipeline;
+        other.mGbufferPipeline = nullptr;
     }
 }
 
@@ -535,8 +535,8 @@ HybridRenderer& HybridRenderer::operator=(HybridRenderer&& other)
         other.mDepthTexture = nullptr;
         mDepthTextureView = other.mDepthTextureView;
         other.mDepthTextureView = nullptr;
-        mPipeline = other.mPipeline;
-        other.mPipeline = nullptr;
+        mGbufferPipeline = other.mGbufferPipeline;
+        other.mGbufferPipeline = nullptr;
     }
     return *this;
 }
@@ -599,7 +599,7 @@ void HybridRenderer::render(
         return wgpuCommandEncoderBeginRenderPass(encoder, &renderPassDesc);
     }();
 
-    wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mPipeline);
+    wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mGbufferPipeline);
     wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, mUniformBindGroup, 0, nullptr);
     wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 1, mSamplerBindGroup, 0, nullptr);
 
