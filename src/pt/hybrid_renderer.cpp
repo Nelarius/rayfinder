@@ -487,60 +487,6 @@ HybridRenderer::~HybridRenderer()
     mBaseColorTextures.clear();
 }
 
-HybridRenderer::HybridRenderer(HybridRenderer&& other)
-    : mPositionBuffers()
-{
-    if (this != &other)
-    {
-        mPositionBuffers = std::move(other.mPositionBuffers);
-        mTexCoordBuffers = std::move(other.mTexCoordBuffers);
-        mIndexBuffers = std::move(other.mIndexBuffers);
-        mBaseColorTextureIndices = std::move(other.mBaseColorTextureIndices);
-        mBaseColorTextures = std::move(other.mBaseColorTextures);
-        mBaseColorTextureBindGroups = std::move(other.mBaseColorTextureBindGroups);
-        mSampler = other.mSampler;
-        other.mSampler = nullptr;
-        mUniformBuffer = std::move(other.mUniformBuffer);
-        mUniformBindGroup = other.mUniformBindGroup;
-        other.mUniformBindGroup = nullptr;
-        mSamplerBindGroup = other.mSamplerBindGroup;
-        other.mSamplerBindGroup = nullptr;
-        mDepthTexture = other.mDepthTexture;
-        other.mDepthTexture = nullptr;
-        mDepthTextureView = other.mDepthTextureView;
-        other.mDepthTextureView = nullptr;
-        mGbufferPipeline = other.mGbufferPipeline;
-        other.mGbufferPipeline = nullptr;
-    }
-}
-
-HybridRenderer& HybridRenderer::operator=(HybridRenderer&& other)
-{
-    if (this != &other)
-    {
-        mPositionBuffers = std::move(other.mPositionBuffers);
-        mTexCoordBuffers = std::move(other.mTexCoordBuffers);
-        mIndexBuffers = std::move(other.mIndexBuffers);
-        mBaseColorTextureIndices = std::move(other.mBaseColorTextureIndices);
-        mBaseColorTextures = std::move(other.mBaseColorTextures);
-        mBaseColorTextureBindGroups = std::move(other.mBaseColorTextureBindGroups);
-        mSampler = other.mSampler;
-        other.mSampler = nullptr;
-        mUniformBuffer = std::move(other.mUniformBuffer);
-        mUniformBindGroup = other.mUniformBindGroup;
-        other.mUniformBindGroup = nullptr;
-        mSamplerBindGroup = other.mSamplerBindGroup;
-        other.mSamplerBindGroup = nullptr;
-        mDepthTexture = other.mDepthTexture;
-        other.mDepthTexture = nullptr;
-        mDepthTextureView = other.mDepthTextureView;
-        other.mDepthTextureView = nullptr;
-        mGbufferPipeline = other.mGbufferPipeline;
-        other.mGbufferPipeline = nullptr;
-    }
-    return *this;
-}
-
 void HybridRenderer::render(
     const GpuContext&     gpuContext,
     const WGPUTextureView textureView,

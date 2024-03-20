@@ -36,8 +36,8 @@ public:
     HybridRenderer(const HybridRenderer&) = delete;
     HybridRenderer& operator=(const HybridRenderer&) = delete;
 
-    HybridRenderer(HybridRenderer&&);
-    HybridRenderer& operator=(HybridRenderer&&);
+    HybridRenderer(HybridRenderer&&) = delete;
+    HybridRenderer& operator=(HybridRenderer&&) = delete;
 
     void render(const GpuContext&, WGPUTextureView, const glm::mat4& viewProjectionMatrix);
     void resize(const GpuContext&, const Extent2u&);
