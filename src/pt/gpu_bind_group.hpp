@@ -26,6 +26,12 @@ public:
         WGPUBindGroupLayout                 layout,
         std::span<const WGPUBindGroupEntry> entries);
 
+    GpuBindGroup(
+        WGPUDevice                device,
+        const char*               label,
+        WGPUBindGroupLayout       layout,
+        const WGPUBindGroupEntry& entry);
+
     // Raw access
 
     inline WGPUBindGroup ptr() const noexcept

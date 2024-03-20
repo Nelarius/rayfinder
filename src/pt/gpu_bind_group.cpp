@@ -21,6 +21,24 @@ GpuBindGroup::GpuBindGroup(
     NLRS_ASSERT(mBindGroup != nullptr);
 }
 
+GpuBindGroup::GpuBindGroup(
+    const WGPUDevice          device,
+    const char* const         label,
+    const WGPUBindGroupLayout layout,
+    const WGPUBindGroupEntry& entry)
+    : mBindGroup(nullptr)
+{
+    const WGPUBindGroupDescriptor desc{
+        .nextInChain = nullptr,
+        .label = label,
+        .layout = layout,
+        .entryCount = 1,
+        .entries = &entry,
+    };
+    mBindGroup = wgpuDeviceCreateBindGroup(device, &desc);
+    NLRS_ASSERT(mBindGroup != nullptr);
+}
+
 GpuBindGroup::GpuBindGroup(GpuBindGroup&& other) noexcept
     : mBindGroup(nullptr)
 {

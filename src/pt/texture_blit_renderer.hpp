@@ -42,7 +42,7 @@ public:
 private:
     GpuBuffer          mVertexBuffer;
     GpuBuffer          mUniformsBuffer;
-    GpuBindGroup       mUniformsBindGroup;
+    GpuBindGroup       mUniformsBindGroup; // TODO: could this be replaced by WGPUConstantEntry?
     WGPUTexture        mTexture;
     WGPUTextureView    mTextureView;
     WGPUSampler        mSampler;

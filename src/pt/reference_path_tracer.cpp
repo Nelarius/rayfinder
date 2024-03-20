@@ -1,3 +1,4 @@
+#include "gpu_bind_group_layout.hpp"
 #include "gpu_context.hpp"
 #include "reference_path_tracer.hpp"
 #include "webgpu_utils.hpp"
@@ -173,7 +174,7 @@ ReferencePathTracer::ReferencePathTracer(
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
           std::span<const float[2]>(quadVertexData)),
       mUniformsBuffer(),
-      mUniformsBindGroup(nullptr),
+      mUniformsBindGroup(),
       mRenderParamsBuffer(
           gpuContext.device,
           "render params buffer",
@@ -189,7 +190,7 @@ ReferencePathTracer::ReferencePathTracer(
           "sky state buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
           sizeof(SkyStateLayout)),
-      mRenderParamsBindGroup(nullptr),
+      mRenderParamsBindGroup(),
       mBvhNodeBuffer(
           gpuContext.device,
           "bvh nodes buffer",
@@ -207,13 +208,13 @@ ReferencePathTracer::ReferencePathTracer(
           std::span<const VertexAttributes>(scene.vertexAttributes)),
       mTextureDescriptorBuffer(),
       mTextureBuffer(),
-      mSceneBindGroup(nullptr),
+      mSceneBindGroup(),
       mImageBuffer(
           gpuContext.device,
           "image buffer",
           WGPUBufferUsage_Storage,
           sizeof(float[4]) * rendererDesc.maxFramebufferSize.x * rendererDesc.maxFramebufferSize.y),
-      mImageBindGroup(nullptr),
+      mImageBindGroup(),
       mQuerySet(nullptr),
       mQueryBuffer(
           gpuContext.device,
@@ -387,17 +388,10 @@ ReferencePathTracer::ReferencePathTracer(
 
         // uniforms bind group layout
 
-        const WGPUBindGroupLayoutEntry uniformsBindGroupLayoutEntry =
-            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex);
-
-        const WGPUBindGroupLayoutDescriptor uniformsBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "uniforms group layout",
-            .entryCount = 1,
-            .entries = &uniformsBindGroupLayoutEntry,
-        };
-        const WGPUBindGroupLayout uniformsBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &uniformsBindGroupLayoutDesc);
+        const GpuBindGroupLayout uniformsBindGroupLayout{
+            gpuContext.device,
+            "Uniforms group layout",
+            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex)};
 
         // renderParams group layout
 
@@ -406,15 +400,10 @@ ReferencePathTracer::ReferencePathTracer(
             mPostProcessingParamsBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
             mSkyStateBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
         };
-
-        const WGPUBindGroupLayoutDescriptor renderParamsBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "renderParams bind group layout",
-            .entryCount = renderParamsBindGroupLayoutEntries.size(),
-            .entries = renderParamsBindGroupLayoutEntries.data(),
-        };
-        const WGPUBindGroupLayout renderParamsBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &renderParamsBindGroupLayoutDesc);
+        const GpuBindGroupLayout renderParamsBindGroupLayout{
+            gpuContext.device,
+            "RenderParams bind group layout",
+            renderParamsBindGroupLayoutEntries};
 
         // scene bind group layout
 
@@ -425,39 +414,23 @@ ReferencePathTracer::ReferencePathTracer(
             mTextureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
             mTextureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
         };
-
-        const WGPUBindGroupLayoutDescriptor sceneBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "scene bind group layout",
-            .entryCount = sceneBindGroupLayoutEntries.size(),
-            .entries = sceneBindGroupLayoutEntries.data(),
-        };
-
-        const WGPUBindGroupLayout sceneBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &sceneBindGroupLayoutDesc);
+        const GpuBindGroupLayout sceneBindGroupLayout{
+            gpuContext.device, "Scene bind group layout", sceneBindGroupLayoutEntries};
 
         // image bind group layout
 
-        const WGPUBindGroupLayoutEntry imageBindGroupLayoutEntry =
-            mImageBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment);
-
-        const WGPUBindGroupLayoutDescriptor imageBindGroupLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "image bind group layout",
-            .entryCount = 1,
-            .entries = &imageBindGroupLayoutEntry,
-        };
-
-        const WGPUBindGroupLayout imageBindGroupLayout =
-            wgpuDeviceCreateBindGroupLayout(gpuContext.device, &imageBindGroupLayoutDesc);
+        const GpuBindGroupLayout imageBindGroupLayout{
+            gpuContext.device,
+            "Image bind group layout",
+            mImageBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment)};
 
         // pipeline layout
 
         const std::array<WGPUBindGroupLayout, 4> bindGroupLayouts{
-            uniformsBindGroupLayout,
-            renderParamsBindGroupLayout,
-            sceneBindGroupLayout,
-            imageBindGroupLayout,
+            uniformsBindGroupLayout.ptr(),
+            renderParamsBindGroupLayout.ptr(),
+            sceneBindGroupLayout.ptr(),
+            imageBindGroupLayout.ptr(),
         };
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
@@ -471,16 +444,11 @@ ReferencePathTracer::ReferencePathTracer(
 
         // uniforms bind group
 
-        const WGPUBindGroupEntry uniformsBindGroupEntry = mUniformsBuffer.bindGroupEntry(0);
-
-        const WGPUBindGroupDescriptor uniformsBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "Bind group",
-            .layout = uniformsBindGroupLayout,
-            .entryCount = 1,
-            .entries = &uniformsBindGroupEntry,
-        };
-        mUniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
+        mUniformsBindGroup = GpuBindGroup{
+            gpuContext.device,
+            "Uniforms bind group",
+            uniformsBindGroupLayout.ptr(),
+            mUniformsBuffer.bindGroupEntry(0)};
 
         // renderParams bind group
 
@@ -489,16 +457,11 @@ ReferencePathTracer::ReferencePathTracer(
             mPostProcessingParamsBuffer.bindGroupEntry(1),
             mSkyStateBuffer.bindGroupEntry(2),
         };
-
-        const WGPUBindGroupDescriptor renderParamsBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "image bind group",
-            .layout = renderParamsBindGroupLayout,
-            .entryCount = renderParamsBindGroupEntries.size(),
-            .entries = renderParamsBindGroupEntries.data(),
-        };
-        mRenderParamsBindGroup =
-            wgpuDeviceCreateBindGroup(gpuContext.device, &renderParamsBindGroupDesc);
+        mRenderParamsBindGroup = GpuBindGroup{
+            gpuContext.device,
+            "RenderParams bind group",
+            renderParamsBindGroupLayout.ptr(),
+            renderParamsBindGroupEntries};
 
         // scene bind group
 
@@ -509,29 +472,19 @@ ReferencePathTracer::ReferencePathTracer(
             mTextureDescriptorBuffer.bindGroupEntry(3),
             mTextureBuffer.bindGroupEntry(4),
         };
-
-        const WGPUBindGroupDescriptor sceneBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "scene bind group",
-            .layout = sceneBindGroupLayout,
-            .entryCount = sceneBindGroupEntries.size(),
-            .entries = sceneBindGroupEntries.data(),
-        };
-        mSceneBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &sceneBindGroupDesc);
+        mSceneBindGroup = GpuBindGroup{
+            gpuContext.device,
+            "Scene bind group",
+            sceneBindGroupLayout.ptr(),
+            sceneBindGroupEntries};
 
         // image bind group
 
-        const WGPUBindGroupEntry imageBindGroupEntry = mImageBuffer.bindGroupEntry(0);
-
-        const WGPUBindGroupDescriptor imageBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "image bind group",
-            .layout = imageBindGroupLayout,
-            .entryCount = 1,
-            .entries = &imageBindGroupEntry,
-        };
-
-        mImageBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &imageBindGroupDesc);
+        mImageBindGroup = GpuBindGroup{
+            gpuContext.device,
+            "Image bind group",
+            imageBindGroupLayout.ptr(),
+            mImageBuffer.bindGroupEntry(0)};
 
         // pipeline
 
@@ -573,10 +526,6 @@ ReferencePathTracer::ReferencePathTracer(
 
         mRenderPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
 
-        wgpuBindGroupLayoutRelease(uniformsBindGroupLayout);
-        wgpuBindGroupLayoutRelease(renderParamsBindGroupLayout);
-        wgpuBindGroupLayoutRelease(sceneBindGroupLayout);
-        wgpuBindGroupLayoutRelease(imageBindGroupLayout);
         wgpuPipelineLayoutRelease(pipelineLayout);
     }
 
@@ -597,23 +546,19 @@ ReferencePathTracer::ReferencePathTracer(ReferencePathTracer&& other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
         mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = other.mUniformsBindGroup;
-        other.mUniformsBindGroup = nullptr;
+        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
         mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
         mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
         mSkyStateBuffer = std::move(other.mSkyStateBuffer);
-        mRenderParamsBindGroup = other.mRenderParamsBindGroup;
-        other.mRenderParamsBindGroup = nullptr;
+        mRenderParamsBindGroup = std::move(other.mRenderParamsBindGroup);
         mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
         mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
         mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
         mTextureBuffer = std::move(other.mTextureBuffer);
-        mSceneBindGroup = other.mSceneBindGroup;
-        other.mSceneBindGroup = nullptr;
+        mSceneBindGroup = std::move(other.mSceneBindGroup);
         mImageBuffer = std::move(other.mImageBuffer);
-        mImageBindGroup = other.mImageBindGroup;
-        other.mImageBindGroup = nullptr;
+        mImageBindGroup = std::move(other.mImageBindGroup);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
         mQueryBuffer = std::move(other.mQueryBuffer);
@@ -636,23 +581,19 @@ ReferencePathTracer& ReferencePathTracer::operator=(ReferencePathTracer&& other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
         mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = other.mUniformsBindGroup;
-        other.mUniformsBindGroup = nullptr;
+        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
         mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
         mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
         mSkyStateBuffer = std::move(other.mSkyStateBuffer);
-        mRenderParamsBindGroup = other.mRenderParamsBindGroup;
-        other.mRenderParamsBindGroup = nullptr;
+        mRenderParamsBindGroup = std::move(other.mRenderParamsBindGroup);
         mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
         mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
         mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
         mTextureBuffer = std::move(other.mTextureBuffer);
-        mSceneBindGroup = other.mSceneBindGroup;
-        other.mSceneBindGroup = nullptr;
+        mSceneBindGroup = std::move(other.mSceneBindGroup);
         mImageBuffer = std::move(other.mImageBuffer);
-        mImageBindGroup = other.mImageBindGroup;
-        other.mImageBindGroup = nullptr;
+        mImageBindGroup = std::move(other.mImageBindGroup);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
         mQueryBuffer = std::move(other.mQueryBuffer);
@@ -676,14 +617,6 @@ ReferencePathTracer::~ReferencePathTracer()
     mRenderPipeline = nullptr;
     querySetSafeRelease(mQuerySet);
     mQuerySet = nullptr;
-    bindGroupSafeRelease(mImageBindGroup);
-    mImageBindGroup = nullptr;
-    bindGroupSafeRelease(mSceneBindGroup);
-    mSceneBindGroup = nullptr;
-    bindGroupSafeRelease(mRenderParamsBindGroup);
-    mRenderParamsBindGroup = nullptr;
-    bindGroupSafeRelease(mUniformsBindGroup);
-    mUniformsBindGroup = nullptr;
 }
 
 void ReferencePathTracer::setRenderParameters(const RenderParameters& renderParams)
@@ -774,11 +707,14 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
 
         {
             wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mRenderPipeline);
-            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, mUniformsBindGroup, 0, nullptr);
             wgpuRenderPassEncoderSetBindGroup(
-                renderPassEncoder, 1, mRenderParamsBindGroup, 0, nullptr);
-            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 2, mSceneBindGroup, 0, nullptr);
-            wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 3, mImageBindGroup, 0, nullptr);
+                renderPassEncoder, 0, mUniformsBindGroup.ptr(), 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(
+                renderPassEncoder, 1, mRenderParamsBindGroup.ptr(), 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(
+                renderPassEncoder, 2, mSceneBindGroup.ptr(), 0, nullptr);
+            wgpuRenderPassEncoderSetBindGroup(
+                renderPassEncoder, 3, mImageBindGroup.ptr(), 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, mVertexBuffer.handle(), 0, mVertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);

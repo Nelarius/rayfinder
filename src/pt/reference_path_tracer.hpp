@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_bind_group.hpp"
 #include "gpu_buffer.hpp"
 
 #include <common/bvh.hpp>
@@ -138,19 +139,19 @@ public:
 private:
     GpuBuffer          mVertexBuffer;
     GpuBuffer          mUniformsBuffer;
-    WGPUBindGroup      mUniformsBindGroup;
+    GpuBindGroup       mUniformsBindGroup;
     GpuBuffer          mRenderParamsBuffer;
     GpuBuffer          mPostProcessingParamsBuffer;
     GpuBuffer          mSkyStateBuffer;
-    WGPUBindGroup      mRenderParamsBindGroup;
+    GpuBindGroup       mRenderParamsBindGroup;
     GpuBuffer          mBvhNodeBuffer;
     GpuBuffer          mPositionAttributesBuffer;
     GpuBuffer          mVertexAttributesBuffer;
     GpuBuffer          mTextureDescriptorBuffer;
     GpuBuffer          mTextureBuffer;
-    WGPUBindGroup      mSceneBindGroup;
+    GpuBindGroup       mSceneBindGroup;
     GpuBuffer          mImageBuffer;
-    WGPUBindGroup      mImageBindGroup;
+    GpuBindGroup       mImageBindGroup;
     WGPUQuerySet       mQuerySet;
     GpuBuffer          mQueryBuffer;
     GpuBuffer          mTimestampBuffer;

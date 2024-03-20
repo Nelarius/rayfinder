@@ -49,14 +49,13 @@ TextureBlitRenderer::TextureBlitRenderer(
     const GpuBindGroupLayout uniformsBindGroupLayout{
         gpuContext.device,
         "Uniforms bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 1>{
-            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4))}};
+        mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4))};
 
     mUniformsBindGroup = GpuBindGroup{
         gpuContext.device,
         "Uniforms bind group",
         uniformsBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 1>{mUniformsBuffer.bindGroupEntry(0)}};
+        mUniformsBuffer.bindGroupEntry(0)};
 
     // color attachment texture
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_bind_group.hpp"
 #include "gpu_buffer.hpp"
 
 #include <common/extent.hpp>
@@ -56,18 +57,18 @@ private:
         WGPUTextureView view;
     };
 
-    std::vector<GpuBuffer>     mPositionBuffers;
-    std::vector<GpuBuffer>     mTexCoordBuffers;
-    std::vector<IndexBuffer>   mIndexBuffers;
-    std::vector<std::size_t>   mBaseColorTextureIndices;
-    std::vector<GpuTexture>    mBaseColorTextures;
-    std::vector<WGPUBindGroup> mBaseColorTextureBindGroups;
-    WGPUSampler                mSampler;
-    GpuBuffer                  mUniformBuffer;
-    WGPUBindGroup              mUniformBindGroup;
-    WGPUBindGroup              mSamplerBindGroup;
-    WGPUTexture                mDepthTexture;
-    WGPUTextureView            mDepthTextureView;
-    WGPURenderPipeline         mGbufferPipeline;
+    std::vector<GpuBuffer>    mPositionBuffers;
+    std::vector<GpuBuffer>    mTexCoordBuffers;
+    std::vector<IndexBuffer>  mIndexBuffers;
+    std::vector<std::size_t>  mBaseColorTextureIndices;
+    std::vector<GpuTexture>   mBaseColorTextures;
+    std::vector<GpuBindGroup> mBaseColorTextureBindGroups;
+    WGPUSampler               mSampler;
+    GpuBuffer                 mUniformBuffer;
+    GpuBindGroup              mUniformBindGroup;
+    GpuBindGroup              mSamplerBindGroup;
+    WGPUTexture               mDepthTexture;
+    WGPUTextureView           mDepthTextureView;
+    WGPURenderPipeline        mGbufferPipeline;
 };
 } // namespace nlrs
