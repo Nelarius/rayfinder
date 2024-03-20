@@ -38,12 +38,12 @@ TextureBlitRenderer::TextureBlitRenderer(
                   reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
                   sizeof(glm::mat4)));
       }()),
-      mUniformsBindGroup(nullptr),
+      mUniformsBindGroup(),
       mTexture(nullptr),
       mTextureView(nullptr),
       mSampler(nullptr),
       mTextureBindGroupLayout(),
-      mTextureBindGroup(nullptr),
+      mTextureBindGroup(),
       mPipeline(nullptr)
 {
     const GpuBindGroupLayout uniformsBindGroupLayout{
@@ -52,19 +52,11 @@ TextureBlitRenderer::TextureBlitRenderer(
         std::array<WGPUBindGroupLayoutEntry, 1>{
             mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4))}};
 
-    // uniforms bind group
-    {
-        const WGPUBindGroupEntry uniformsBindGroupEntry = mUniformsBuffer.bindGroupEntry(0);
-
-        const WGPUBindGroupDescriptor uniformsBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "Bind group",
-            .layout = uniformsBindGroupLayout.ptr(),
-            .entryCount = 1,
-            .entries = &uniformsBindGroupEntry,
-        };
-        mUniformsBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &uniformsBindGroupDesc);
-    }
+    mUniformsBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Uniforms bind group",
+        uniformsBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 1>{mUniformsBuffer.bindGroupEntry(0)}};
 
     // color attachment texture
 
@@ -131,23 +123,18 @@ TextureBlitRenderer::TextureBlitRenderer(
     {
         std::array<const WGPUBindGroupLayoutEntry, 2> textureBindGroupLayoutEntries{
             textureBindGroupLayoutEntry(0), samplerBindGroupLayoutEntry(1)};
-        mTextureBindGroupLayout = GpuBindGroupLayout(
-            gpuContext.device, "Texture bind group layout", textureBindGroupLayoutEntries);
+        mTextureBindGroupLayout = GpuBindGroupLayout{
+            gpuContext.device, "Texture bind group layout", textureBindGroupLayoutEntries};
 
         const std::array<WGPUBindGroupEntry, 2> textureBindGroupEntries{
             textureBindGroupEntry(0, mTextureView),
             samplerBindGroupEntry(1, mSampler),
         };
-
-        const WGPUBindGroupDescriptor textureBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "Texture bind group",
-            .layout = mTextureBindGroupLayout.ptr(),
-            .entryCount = textureBindGroupEntries.size(),
-            .entries = textureBindGroupEntries.data(),
-        };
-        mTextureBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &textureBindGroupDesc);
-        NLRS_ASSERT(mTextureBindGroup != nullptr);
+        mTextureBindGroup = GpuBindGroup(
+            gpuContext.device,
+            "Texture bind group",
+            mTextureBindGroupLayout.ptr(),
+            std::span<const WGPUBindGroupEntry>(textureBindGroupEntries));
     }
 
     {
@@ -288,16 +275,12 @@ TextureBlitRenderer::~TextureBlitRenderer()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
-    bindGroupSafeRelease(mTextureBindGroup);
-    mTextureBindGroup = nullptr;
     samplerSafeRelease(mSampler);
     mSampler = nullptr;
     textureViewSafeRelease(mTextureView);
     mTextureView = nullptr;
     textureSafeRelease(mTexture);
     mTexture = nullptr;
-    bindGroupSafeRelease(mUniformsBindGroup);
-    mUniformsBindGroup = nullptr;
 }
 
 TextureBlitRenderer::TextureBlitRenderer(TextureBlitRenderer&& other)
@@ -306,8 +289,7 @@ TextureBlitRenderer::TextureBlitRenderer(TextureBlitRenderer&& other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
         mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = other.mUniformsBindGroup;
-        other.mUniformsBindGroup = nullptr;
+        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
         mTexture = other.mTexture;
         other.mTexture = nullptr;
         mTextureView = other.mTextureView;
@@ -315,8 +297,7 @@ TextureBlitRenderer::TextureBlitRenderer(TextureBlitRenderer&& other)
         mSampler = other.mSampler;
         other.mSampler = nullptr;
         mTextureBindGroupLayout = std::move(other.mTextureBindGroupLayout);
-        mTextureBindGroup = other.mTextureBindGroup;
-        other.mTextureBindGroup = nullptr;
+        mTextureBindGroup = std::move(other.mTextureBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
@@ -329,8 +310,7 @@ TextureBlitRenderer& TextureBlitRenderer::operator=(TextureBlitRenderer&& other)
         // TODO: this leaks memory since existing resources are not released.
         mVertexBuffer = std::move(other.mVertexBuffer);
         mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = other.mUniformsBindGroup;
-        other.mUniformsBindGroup = nullptr;
+        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
         mTexture = other.mTexture;
         other.mTexture = nullptr;
         mTextureView = other.mTextureView;
@@ -338,7 +318,7 @@ TextureBlitRenderer& TextureBlitRenderer::operator=(TextureBlitRenderer&& other)
         mSampler = other.mSampler;
         other.mSampler = nullptr;
         mTextureBindGroupLayout = std::move(other.mTextureBindGroupLayout);
-        other.mTextureBindGroup = nullptr;
+        mTextureBindGroup = std::move(other.mTextureBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
@@ -398,8 +378,10 @@ void TextureBlitRenderer::render(
 
     {
         wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mPipeline);
-        wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, mUniformsBindGroup, 0, nullptr);
-        wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 1, mTextureBindGroup, 0, nullptr);
+        wgpuRenderPassEncoderSetBindGroup(
+            renderPassEncoder, 0, mUniformsBindGroup.ptr(), 0, nullptr);
+        wgpuRenderPassEncoderSetBindGroup(
+            renderPassEncoder, 1, mTextureBindGroup.ptr(), 0, nullptr);
         wgpuRenderPassEncoderSetVertexBuffer(
             renderPassEncoder, 0, mVertexBuffer.handle(), 0, mVertexBuffer.byteSize());
         wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
@@ -425,11 +407,9 @@ void TextureBlitRenderer::resize(const GpuContext& gpuContext, const Extent2u& n
 {
     textureSafeRelease(mTexture);
     textureViewSafeRelease(mTextureView);
-    bindGroupSafeRelease(mTextureBindGroup);
 
     mTexture = nullptr;
     mTextureView = nullptr;
-    mTextureBindGroup = nullptr;
 
     {
         const WGPUTextureDescriptor textureDesc{
@@ -469,16 +449,11 @@ void TextureBlitRenderer::resize(const GpuContext& gpuContext, const Extent2u& n
             textureBindGroupEntry(0, mTextureView),
             samplerBindGroupEntry(1, mSampler),
         };
-
-        const WGPUBindGroupDescriptor textureBindGroupDesc{
-            .nextInChain = nullptr,
-            .label = "Texture bind group",
-            .layout = mTextureBindGroupLayout.ptr(),
-            .entryCount = textureBindGroupEntries.size(),
-            .entries = textureBindGroupEntries.data(),
-        };
-        mTextureBindGroup = wgpuDeviceCreateBindGroup(gpuContext.device, &textureBindGroupDesc);
-        NLRS_ASSERT(mTextureBindGroup != nullptr);
+        mTextureBindGroup = GpuBindGroup{
+            gpuContext.device,
+            "Texture bind group",
+            mTextureBindGroupLayout.ptr(),
+            textureBindGroupEntries};
     }
 }
 } // namespace nlrs

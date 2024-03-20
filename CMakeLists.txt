@@ -74,6 +74,7 @@ target_link_libraries(pt-format-tool PRIVATE common fmt pt-format glm::glm)
 set(PT_SOURCE_FILES
     fly_camera_controller.cpp
     main.cpp
+    gpu_bind_group.cpp
     gpu_bind_group_layout.cpp
     gpu_buffer.cpp
     gpu_context.cpp

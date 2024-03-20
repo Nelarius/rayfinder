@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu_bind_group.hpp"
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_buffer.hpp"
 
@@ -41,12 +42,12 @@ public:
 private:
     GpuBuffer          mVertexBuffer;
     GpuBuffer          mUniformsBuffer;
-    WGPUBindGroup      mUniformsBindGroup;
+    GpuBindGroup       mUniformsBindGroup;
     WGPUTexture        mTexture;
     WGPUTextureView    mTextureView;
     WGPUSampler        mSampler;
     GpuBindGroupLayout mTextureBindGroupLayout;
-    WGPUBindGroup      mTextureBindGroup;
+    GpuBindGroup       mTextureBindGroup;
     WGPURenderPipeline mPipeline;
 };
 } // namespace nlrs
