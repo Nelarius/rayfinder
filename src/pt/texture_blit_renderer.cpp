@@ -282,49 +282,6 @@ TextureBlitRenderer::~TextureBlitRenderer()
     mTexture = nullptr;
 }
 
-TextureBlitRenderer::TextureBlitRenderer(TextureBlitRenderer&& other)
-{
-    if (this != &other)
-    {
-        mVertexBuffer = std::move(other.mVertexBuffer);
-        mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
-        mTexture = other.mTexture;
-        other.mTexture = nullptr;
-        mTextureView = other.mTextureView;
-        other.mTextureView = nullptr;
-        mSampler = other.mSampler;
-        other.mSampler = nullptr;
-        mTextureBindGroupLayout = std::move(other.mTextureBindGroupLayout);
-        mTextureBindGroup = std::move(other.mTextureBindGroup);
-        mPipeline = other.mPipeline;
-        other.mPipeline = nullptr;
-    }
-}
-
-TextureBlitRenderer& TextureBlitRenderer::operator=(TextureBlitRenderer&& other)
-{
-    if (this != &other)
-    {
-        // TODO: this leaks memory since existing resources are not released.
-        mVertexBuffer = std::move(other.mVertexBuffer);
-        mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
-        mTexture = other.mTexture;
-        other.mTexture = nullptr;
-        mTextureView = other.mTextureView;
-        other.mTextureView = nullptr;
-        mSampler = other.mSampler;
-        other.mSampler = nullptr;
-        mTextureBindGroupLayout = std::move(other.mTextureBindGroupLayout);
-        mTextureBindGroup = std::move(other.mTextureBindGroup);
-        mPipeline = other.mPipeline;
-        other.mPipeline = nullptr;
-    }
-
-    return *this;
-}
-
 void TextureBlitRenderer::render(
     const GpuContext&   gpuContext,
     Gui&                gui,

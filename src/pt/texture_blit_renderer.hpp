@@ -27,8 +27,8 @@ public:
     TextureBlitRenderer(const TextureBlitRenderer&) = delete;
     TextureBlitRenderer& operator=(const TextureBlitRenderer&) = delete;
 
-    TextureBlitRenderer(TextureBlitRenderer&&);
-    TextureBlitRenderer& operator=(TextureBlitRenderer&&);
+    TextureBlitRenderer(TextureBlitRenderer&&) = delete;
+    TextureBlitRenderer& operator=(TextureBlitRenderer&&) = delete;
 
     // Rendering
 
