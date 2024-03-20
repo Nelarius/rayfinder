@@ -465,7 +465,7 @@ HybridRenderer::~HybridRenderer()
     renderPipelineSafeRelease(mGbufferPipeline);
     mGbufferPipeline = nullptr;
     textureViewSafeRelease(mDepthTextureView);
-    mDepthTexture = nullptr;
+    mDepthTextureView = nullptr;
     textureSafeRelease(mDepthTexture);
     mDepthTexture = nullptr;
     bindGroupSafeRelease(mSamplerBindGroup);
