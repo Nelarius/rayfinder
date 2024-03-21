@@ -4,8 +4,7 @@
 
 namespace nlrs
 {
-const char* const REFERENCE_PATH_TRACER_SOURCE = R"(
-struct Uniforms {
+const char* const REFERENCE_PATH_TRACER_SOURCE = R"(struct Uniforms {
     viewProjectionMatrix: mat4x4f,
 }
 
@@ -554,7 +553,8 @@ fn rayIntersectTriangle(ray: Ray, tri: Positions, tmax: f32, hit: ptr<function, 
 }
 
 const ORIGIN = 1f / 32f;
-const FLOAT_SCALE = 1f / 65536f;
+const FLOAT_SCA)"
+R"(LE = 1f / 65536f;
 const INT_SCALE = 256f;
 
 @must_use
@@ -676,8 +676,7 @@ fn rngNextInt(state: ptr<function, u32>) {
 }
 )";
 
-const char* const TEXTURE_BLIT_SOURCE = R"(
-struct Uniforms {
+const char* const TEXTURE_BLIT_SOURCE = R"(struct Uniforms {
     viewProjectionMatrix: mat4x4f,
 }
 
@@ -711,8 +710,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 }
 )";
 
-const char* const HYBRID_RENDERER_SOURCE = R"(
-@group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
+const char* const HYBRID_RENDERER_SOURCE = R"(@group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
 
 struct VertexOutput {
     @builtin(position) position: vec4f,

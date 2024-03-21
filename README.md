@@ -49,6 +49,12 @@ $ cmake -B build-debug -S . -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build build-debug --target pt -- -j 32
 ```
 
+The shaders are appended to a header file as raw strings during the `pt` build step. Updating the header file can also be invoked manually:
+
+```sh
+$ cmake --build build-debug --target bake-wgsl
+```
+
 It's recommendable to build using ccache in case Dawn ever needs to be rebuilt. See [ccache.md](notes/ccache.md) for instructions.
 
 ## Run
