@@ -4,6 +4,7 @@ build-debug
 build-release
 clangd
 *.pt
+imgui.ini
 
 ### CMake ###
 CMakeLists.txt.user
