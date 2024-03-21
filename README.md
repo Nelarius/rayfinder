@@ -49,6 +49,8 @@ $ cmake -B build-debug -S . -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build build-debug --target pt -- -j 32
 ```
 
+It's recommendable to build using ccache in case Dawn ever needs to be rebuilt. See [ccache.md](notes/ccache.md) for instructions.
+
 ## Run
 
 ### `pt` and `pt-format-tool`
