@@ -1,6 +1,7 @@
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_context.hpp"
 #include "hybrid_renderer.hpp"
+#include "shader_source.hpp"
 #include "webgpu_utils.hpp"
 #include "window.hpp"
 
@@ -288,15 +289,13 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
 
         // Shader modules
 
-        const std::string shaderSource = loadShaderSource("hybrid_renderer.wgsl");
-
         const WGPUShaderModuleWGSLDescriptor shaderCodeDesc = {
             .chain =
                 WGPUChainedStruct{
                     .next = nullptr,
                     .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                 },
-            .code = shaderSource.c_str(),
+            .code = HYBRID_RENDERER_SOURCE,
         };
 
         const WGPUShaderModuleDescriptor shaderDesc{

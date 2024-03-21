@@ -1,6 +1,7 @@
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_context.hpp"
 #include "reference_path_tracer.hpp"
+#include "shader_source.hpp"
 #include "webgpu_utils.hpp"
 #include "window.hpp"
 
@@ -341,15 +342,13 @@ ReferencePathTracer::ReferencePathTracer(
 
         // Shader modules
 
-        const std::string shaderSource = loadShaderSource("reference_path_tracer.wgsl");
-
         const WGPUShaderModuleWGSLDescriptor shaderCodeDesc = {
             .chain =
                 WGPUChainedStruct{
                     .next = nullptr,
                     .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                 },
-            .code = shaderSource.c_str(),
+            .code = REFERENCE_PATH_TRACER_SOURCE,
         };
 
         const WGPUShaderModuleDescriptor shaderDesc{

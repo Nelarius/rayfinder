@@ -218,18 +218,4 @@ constexpr std::array<float[2], 6> quadVertexData{{
     {-0.5f, -0.5f,},
     // clang-format on
 }};
-
-inline std::string loadShaderSource(std::string_view path)
-{
-    // TODO: path could be an actual path
-    std::ifstream file(path.data());
-    std::ifstream(path.data());
-    if (!file)
-    {
-        throw std::runtime_error(fmt::format("Error opening shader source: {}.", path));
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return buffer.str();
-}
 } // namespace nlrs

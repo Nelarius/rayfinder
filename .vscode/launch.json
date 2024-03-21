@@ -19,10 +19,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/pt",
             "args": [
-                "../assets/Duck.pt"
+                "assets/Duck.pt"
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"
@@ -45,10 +45,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/Debug/pt.exe",
             "args": [
-                "../../assets/Duck.pt"
+                "assets/Duck.pt"
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/Debug",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "console": "externalTerminal"
         },

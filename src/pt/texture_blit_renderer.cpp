@@ -1,5 +1,6 @@
 #include "gpu_context.hpp"
 #include "gui.hpp"
+#include "shader_source.hpp"
 #include "texture_blit_renderer.hpp"
 #include "webgpu_utils.hpp"
 #include "window.hpp"
@@ -166,15 +167,13 @@ TextureBlitRenderer::TextureBlitRenderer(
 
         // Shader modules
 
-        const std::string shaderSource = loadShaderSource("texture_blit.wgsl");
-
         const WGPUShaderModuleWGSLDescriptor shaderCodeDesc = {
             .chain =
                 WGPUChainedStruct{
                     .next = nullptr,
                     .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                 },
-            .code = shaderSource.c_str(),
+            .code = TEXTURE_BLIT_SOURCE,
         };
 
         const WGPUShaderModuleDescriptor shaderDesc{
