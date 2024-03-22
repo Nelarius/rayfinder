@@ -338,7 +338,7 @@ void TextureBlitRenderer::render(
         wgpuRenderPassEncoderSetBindGroup(
             renderPassEncoder, 1, mTextureBindGroup.ptr(), 0, nullptr);
         wgpuRenderPassEncoderSetVertexBuffer(
-            renderPassEncoder, 0, mVertexBuffer.handle(), 0, mVertexBuffer.byteSize());
+            renderPassEncoder, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
         wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
     }
 

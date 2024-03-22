@@ -431,7 +431,7 @@ void HybridRenderer::render(
 
     {
         wgpuQueueWriteBuffer(
-            gpuContext.queue, mUniformBuffer.handle(), 0, &viewProjectionMat[0], sizeof(glm::mat4));
+            gpuContext.queue, mUniformBuffer.ptr(), 0, &viewProjectionMat[0], sizeof(glm::mat4));
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {
@@ -489,14 +489,14 @@ void HybridRenderer::render(
         const GpuBuffer& positionBuffer = mPositionBuffers[idx];
         const GpuBuffer& texCoordBuffer = mTexCoordBuffers[idx];
         wgpuRenderPassEncoderSetVertexBuffer(
-            renderPassEncoder, 0, positionBuffer.handle(), 0, positionBuffer.byteSize());
+            renderPassEncoder, 0, positionBuffer.ptr(), 0, positionBuffer.byteSize());
         wgpuRenderPassEncoderSetVertexBuffer(
-            renderPassEncoder, 1, texCoordBuffer.handle(), 0, texCoordBuffer.byteSize());
+            renderPassEncoder, 1, texCoordBuffer.ptr(), 0, texCoordBuffer.byteSize());
 
         const IndexBuffer& indexBuffer = mIndexBuffers[idx];
         wgpuRenderPassEncoderSetIndexBuffer(
             renderPassEncoder,
-            indexBuffer.buffer.handle(),
+            indexBuffer.buffer.ptr(),
             indexBuffer.format,
             0,
             indexBuffer.buffer.byteSize());

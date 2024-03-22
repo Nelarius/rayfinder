@@ -43,7 +43,7 @@ public:
 
     // Raw access
 
-    inline WGPUBuffer handle() const noexcept
+    inline WGPUBuffer ptr() const noexcept
     {
         assert(mBuffer != nullptr);
         return mBuffer;

@@ -639,7 +639,7 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
     do
     {
         wgpuDeviceTick(gpuContext.device);
-    } while (wgpuBufferGetMapState(mTimestampBuffer.handle()) != WGPUBufferMapState_Unmapped);
+    } while (wgpuBufferGetMapState(mTimestampBuffer.ptr()) != WGPUBufferMapState_Unmapped);
 
     {
         assert(mAccumulatedSampleCount <= mCurrentRenderParams.samplingParams.numSamplesPerPixel);
@@ -650,7 +650,7 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
             mAccumulatedSampleCount};
         wgpuQueueWriteBuffer(
             gpuContext.queue,
-            mRenderParamsBuffer.handle(),
+            mRenderParamsBuffer.ptr(),
             0,
             &renderParamsLayout,
             sizeof(RenderParamsLayout));
@@ -658,13 +658,13 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
             mAccumulatedSampleCount + 1, mCurrentRenderParams.samplingParams.numSamplesPerPixel);
         wgpuQueueWriteBuffer(
             gpuContext.queue,
-            mPostProcessingParamsBuffer.handle(),
+            mPostProcessingParamsBuffer.ptr(),
             0,
             &mCurrentPostProcessingParams,
             sizeof(PostProcessingParameters));
         const SkyStateLayout skyStateLayout{mCurrentRenderParams.sky};
         wgpuQueueWriteBuffer(
-            gpuContext.queue, mSkyStateBuffer.handle(), 0, &skyStateLayout, sizeof(SkyStateLayout));
+            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyStateLayout, sizeof(SkyStateLayout));
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {
@@ -715,7 +715,7 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
             wgpuRenderPassEncoderSetBindGroup(
                 renderPassEncoder, 3, mImageBindGroup.ptr(), 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
-                renderPassEncoder, 0, mVertexBuffer.handle(), 0, mVertexBuffer.byteSize());
+                renderPassEncoder, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
         }
 
@@ -724,9 +724,9 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
     wgpuCommandEncoderWriteTimestamp(encoder, mQuerySet, 1);
 
     wgpuCommandEncoderResolveQuerySet(
-        encoder, mQuerySet, 0, TimestampsLayout::QUERY_COUNT, mQueryBuffer.handle(), 0);
+        encoder, mQuerySet, 0, TimestampsLayout::QUERY_COUNT, mQueryBuffer.ptr(), 0);
     wgpuCommandEncoderCopyBufferToBuffer(
-        encoder, mQueryBuffer.handle(), 0, mTimestampBuffer.handle(), 0, sizeof(TimestampsLayout));
+        encoder, mQueryBuffer.ptr(), 0, mTimestampBuffer.ptr(), 0, sizeof(TimestampsLayout));
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -739,7 +739,7 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
 
     // Map query timers
     wgpuBufferMapAsync(
-        mTimestampBuffer.handle(),
+        mTimestampBuffer.ptr(),
         WGPUMapMode_Read,
         0,
         sizeof(TimestampsLayout),
@@ -750,7 +750,7 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
                 ReferencePathTracer& renderer = *static_cast<ReferencePathTracer*>(userdata);
                 GpuBuffer&           timestampBuffer = renderer.mTimestampBuffer;
                 const void*          bufferData = wgpuBufferGetConstMappedRange(
-                    timestampBuffer.handle(), 0, sizeof(TimestampsLayout));
+                    timestampBuffer.ptr(), 0, sizeof(TimestampsLayout));
                 assert(bufferData);
 
                 const TimestampsLayout* const timestamps =
@@ -766,7 +766,7 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
                     renderPassDurations.pop_front();
                 }
 
-                wgpuBufferUnmap(timestampBuffer.handle());
+                wgpuBufferUnmap(timestampBuffer.ptr());
             }
             else
             {
