@@ -295,7 +295,7 @@ HybridRenderer::HybridRenderer(const GpuContext& gpuContext, HybridRendererDescr
                     .next = nullptr,
                     .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                 },
-            .code = HYBRID_RENDERER_SOURCE,
+            .code = HYBRID_RENDERER_GBUFFER_PASS_SOURCE,
         };
 
         const WGPUShaderModuleDescriptor shaderDesc{
