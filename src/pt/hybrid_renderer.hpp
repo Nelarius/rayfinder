@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gpu_bind_group.hpp"
+#include "gpu_bind_group_layout.hpp"
 #include "gpu_buffer.hpp"
 
 #include <common/extent.hpp>
@@ -57,6 +58,26 @@ private:
         WGPUTextureView view;
     };
 
+    struct DebugPass
+    {
+        GpuBuffer          mVertexBuffer = GpuBuffer{};
+        GpuBuffer          mUniformBuffer = GpuBuffer{}; // TODO: replace with WGPUConstantEntry
+        GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
+        WGPURenderPipeline mPipeline = nullptr;
+
+        DebugPass() = default;
+        DebugPass(const GpuContext& gpuContext, const GpuBindGroupLayout& gbufferBindGroupLayout);
+        ~DebugPass();
+
+        DebugPass(const DebugPass&) = delete;
+        DebugPass& operator=(const DebugPass&) = delete;
+
+        DebugPass(DebugPass&&) noexcept;
+        DebugPass& operator=(DebugPass&&) noexcept;
+
+        void render(const GpuBindGroup&, WGPUCommandEncoder, WGPUTextureView);
+    };
+
     std::vector<GpuBuffer>    mPositionBuffers;
     std::vector<GpuBuffer>    mTexCoordBuffers;
     std::vector<IndexBuffer>  mIndexBuffers;
@@ -69,6 +90,12 @@ private:
     GpuBindGroup              mSamplerBindGroup;
     WGPUTexture               mDepthTexture;
     WGPUTextureView           mDepthTextureView;
+    WGPUTexture               mAlbedoTexture;
+    WGPUTextureView           mAlbedoTextureView;
     WGPURenderPipeline        mGbufferPipeline;
+    WGPUSampler               mGbufferSampler;
+    GpuBindGroupLayout        mGbufferBindGroupLayout;
+    GpuBindGroup              mGbufferBindGroup;
+    DebugPass                 mDebugPass;
 };
 } // namespace nlrs

@@ -74,7 +74,8 @@ target_link_libraries(pt-format-tool PRIVATE common fmt pt-format glm::glm)
 set(WGSL_SHADER_FILES
     reference_path_tracer.wgsl
     texture_blit.wgsl
-    hybrid_renderer_gbuffer_pass.wgsl)
+    hybrid_renderer_gbuffer_pass.wgsl
+    hybrid_renderer_debug_pass.wgsl)
 
 set(SHADER_SOURCE_HEADER_FILE src/pt/shader_source.hpp)
 
