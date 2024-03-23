@@ -32,7 +32,7 @@ struct HybridRendererDescriptor
 class HybridRenderer
 {
 public:
-    HybridRenderer(const GpuContext&, HybridRendererDescriptor);
+    HybridRenderer(const GpuContext&, const HybridRendererDescriptor&);
     ~HybridRenderer();
 
     HybridRenderer(const HybridRenderer&) = delete;
@@ -58,6 +58,37 @@ private:
         WGPUTextureView view;
     };
 
+    struct GbufferPass
+    {
+        std::vector<GpuBuffer>    mPositionBuffers;
+        std::vector<GpuBuffer>    mTexCoordBuffers;
+        std::vector<IndexBuffer>  mIndexBuffers;
+        std::vector<std::size_t>  mBaseColorTextureIndices;
+        std::vector<GpuTexture>   mBaseColorTextures;
+        std::vector<GpuBindGroup> mBaseColorTextureBindGroups;
+        WGPUSampler               mBaseColorSampler;
+        GpuBuffer                 mUniformBuffer;
+        GpuBindGroup              mUniformBindGroup;
+        GpuBindGroup              mSamplerBindGroup;
+        WGPURenderPipeline        mPipeline;
+
+        GbufferPass(const GpuContext&, const HybridRendererDescriptor&);
+        ~GbufferPass();
+
+        GbufferPass(const GbufferPass&) = delete;
+        GbufferPass& operator=(const GbufferPass&) = delete;
+
+        GbufferPass(GbufferPass&&) = delete;
+        GbufferPass& operator=(GbufferPass&&) = delete;
+
+        void render(
+            const GpuContext&  gpuContext,
+            const glm::mat4&   viewProjectionMat,
+            WGPUCommandEncoder cmdEncoder,
+            WGPUTextureView    depthTextureView,
+            WGPUTextureView    albedoTextureView);
+    };
+
     struct DebugPass
     {
         GpuBuffer          mVertexBuffer = GpuBuffer{};
@@ -78,24 +109,14 @@ private:
         void render(const GpuBindGroup&, WGPUCommandEncoder, WGPUTextureView);
     };
 
-    std::vector<GpuBuffer>    mPositionBuffers;
-    std::vector<GpuBuffer>    mTexCoordBuffers;
-    std::vector<IndexBuffer>  mIndexBuffers;
-    std::vector<std::size_t>  mBaseColorTextureIndices;
-    std::vector<GpuTexture>   mBaseColorTextures;
-    std::vector<GpuBindGroup> mBaseColorTextureBindGroups;
-    WGPUSampler               mSampler;
-    GpuBuffer                 mUniformBuffer;
-    GpuBindGroup              mUniformBindGroup;
-    GpuBindGroup              mSamplerBindGroup;
-    WGPUTexture               mDepthTexture;
-    WGPUTextureView           mDepthTextureView;
-    WGPUTexture               mAlbedoTexture;
-    WGPUTextureView           mAlbedoTextureView;
-    WGPURenderPipeline        mGbufferPipeline;
-    WGPUSampler               mGbufferSampler;
-    GpuBindGroupLayout        mGbufferBindGroupLayout;
-    GpuBindGroup              mGbufferBindGroup;
-    DebugPass                 mDebugPass;
+    WGPUTexture        mDepthTexture;
+    WGPUTextureView    mDepthTextureView;
+    WGPUTexture        mAlbedoTexture;
+    WGPUTextureView    mAlbedoTextureView;
+    WGPUSampler        mGbufferSampler;
+    GpuBindGroupLayout mGbufferBindGroupLayout;
+    GpuBindGroup       mGbufferBindGroup;
+    GbufferPass        mGbufferPass;
+    DebugPass          mDebugPass;
 };
 } // namespace nlrs
