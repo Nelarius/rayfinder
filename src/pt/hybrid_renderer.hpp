@@ -60,6 +60,7 @@ private:
 
     struct GbufferPass
     {
+    private:
         std::vector<GpuBuffer>    mPositionBuffers;
         std::vector<GpuBuffer>    mTexCoordBuffers;
         std::vector<IndexBuffer>  mIndexBuffers;
@@ -72,6 +73,7 @@ private:
         GpuBindGroup              mSamplerBindGroup;
         WGPURenderPipeline        mPipeline;
 
+    public:
         GbufferPass(const GpuContext&, const HybridRendererDescriptor&);
         ~GbufferPass();
 
@@ -91,11 +93,13 @@ private:
 
     struct DebugPass
     {
+    private:
         GpuBuffer          mVertexBuffer = GpuBuffer{};
         GpuBuffer          mUniformBuffer = GpuBuffer{}; // TODO: replace with WGPUConstantEntry
         GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
 
+    public:
         DebugPass() = default;
         DebugPass(const GpuContext& gpuContext, const GpuBindGroupLayout& gbufferBindGroupLayout);
         ~DebugPass();
