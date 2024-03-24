@@ -17,6 +17,7 @@
 #include <fstream>
 #include <iterator>
 #include <stdexcept>
+#include <tuple>
 
 namespace fs = std::filesystem;
 
@@ -25,10 +26,10 @@ namespace nlrs
 namespace
 {
 void traverseNodeHierarchy(
-    const cgltf_node* const node,
-    const cgltf_mesh* const meshBegin,
-    const glm::mat4&        parentTransform,
-    std::vector<glm::mat4>& transforms)
+    const cgltf_node* const                     node,
+    const cgltf_mesh* const                     meshBegin,
+    const glm::mat4&                            parentTransform,
+    std::span<std::tuple<glm::mat4, glm::mat4>> transforms)
 {
     const glm::mat4 local = [node]() -> glm::mat4 {
         if (node->has_matrix)
@@ -48,7 +49,8 @@ void traverseNodeHierarchy(
         }
     }();
 
-    const glm::mat4 transform = parentTransform * local;
+    const glm::mat4 transformMatrix = parentTransform * local;
+    const glm::mat4 normalMatrix = glm::transpose(glm::inverse(transformMatrix));
 
     if (node->mesh != nullptr)
     {
@@ -56,14 +58,14 @@ void traverseNodeHierarchy(
         NLRS_ASSERT(distance >= 0);
         NLRS_ASSERT(static_cast<std::size_t>(distance) < transforms.size());
         const std::size_t meshIdx = static_cast<std::size_t>(distance);
-        transforms[meshIdx] = transform;
+        transforms[meshIdx] = std::make_tuple(transformMatrix, normalMatrix);
     }
 
     if (node->children != nullptr)
     {
         for (std::size_t childIdx = 0; childIdx < node->children_count; ++childIdx)
         {
-            traverseNodeHierarchy(node->children[childIdx], meshBegin, transform, transforms);
+            traverseNodeHierarchy(node->children[childIdx], meshBegin, transformMatrix, transforms);
         }
     }
 }
@@ -100,7 +102,8 @@ GltfModel::GltfModel(const fs::path gltfPath)
     }
     NLRS_ASSERT(data != nullptr);
 
-    std::vector<glm::mat4> meshTransforms(data->meshes_count, glm::mat4(1.0));
+    std::vector<std::tuple<glm::mat4, glm::mat4>> meshTransforms(
+        data->meshes_count, std::make_tuple(glm::mat4(1.0), glm::mat4(1.0)));
     {
         NLRS_ASSERT(data->scenes_count == 1);
         const size_t count = data->scene->nodes_count;
@@ -218,36 +221,44 @@ GltfModel::GltfModel(const fs::path gltfPath)
                 NLRS_ASSERT(positionAccessor->count == normalAccessor->count);
                 NLRS_ASSERT(positionAccessor->count == texCoordAccessor->count);
 
-                const std::size_t      vertexCount = positionAccessor->count;
-                std::vector<glm::vec3> localPositions;
-                std::vector<glm::vec3> normals;
-                std::vector<glm::vec2> texCoords;
-                localPositions.resize(vertexCount);
-                normals.resize(vertexCount);
-                texCoords.resize(vertexCount);
+                const std::size_t vertexCount = positionAccessor->count;
 
+                std::vector<glm::vec3> localPositions;
+                localPositions.resize(vertexCount);
                 NLRS_ASSERT(
                     cgltf_accessor_unpack_floats(
                         positionAccessor, &localPositions[0][0], 3 * vertexCount) ==
                     3 * vertexCount);
-                NLRS_ASSERT(
-                    cgltf_accessor_unpack_floats(normalAccessor, &normals[0][0], 3 * vertexCount) ==
-                    3 * vertexCount);
-                NLRS_ASSERT(
-                    cgltf_accessor_unpack_floats(
-                        texCoordAccessor, &texCoords[0][0], 2 * vertexCount) == 2 * vertexCount);
-
                 std::vector<glm::vec3> positions;
                 std::transform(
                     localPositions.begin(),
                     localPositions.end(),
                     std::back_inserter(positions),
-                    [&transform = meshTransforms[meshIdx]](const glm::vec3& p) -> glm::vec3 {
-                        return transform * glm::vec4(p, 1.0f);
+                    [&matrices = meshTransforms[meshIdx]](const glm::vec3& p) -> glm::vec3 {
+                        return std::get<0>(matrices) * glm::vec4(p, 1.0f);
                     });
-
                 meshPositions.emplace_back(std::move(positions));
+
+                std::vector<glm::vec3> localNormals;
+                localNormals.resize(vertexCount);
+                NLRS_ASSERT(
+                    cgltf_accessor_unpack_floats(
+                        normalAccessor, &localNormals[0][0], 3 * vertexCount) == 3 * vertexCount);
+                std::vector<glm::vec3> normals;
+                std::transform(
+                    localNormals.begin(),
+                    localNormals.end(),
+                    std::back_inserter(normals),
+                    [&matrices = meshTransforms[meshIdx]](const glm::vec3& n) -> glm::vec3 {
+                        return std::get<1>(matrices) * glm::vec4(n, 0.0f);
+                    });
                 meshNormals.emplace_back(std::move(normals));
+
+                std::vector<glm::vec2> texCoords;
+                texCoords.resize(vertexCount);
+                NLRS_ASSERT(
+                    cgltf_accessor_unpack_floats(
+                        texCoordAccessor, &texCoords[0][0], 2 * vertexCount) == 2 * vertexCount);
                 meshTexCoords.emplace_back(std::move(texCoords));
             }
         }
