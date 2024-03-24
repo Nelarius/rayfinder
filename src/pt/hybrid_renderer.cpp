@@ -742,6 +742,38 @@ HybridRenderer::DebugPass::DebugPass(
         mUniformBuffer.bindGroupEntry(0)};
 
     {
+        // Pipeline layout
+
+        const std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
+            uniformBindGroupLayout.ptr(), gbufferBindGroupLayout.ptr()};
+
+        const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "Debug pass pipeline layout",
+            .bindGroupLayoutCount = bindGroupLayouts.size(),
+            .bindGroupLayouts = bindGroupLayouts.data(),
+        };
+
+        const WGPUPipelineLayout pipelineLayout =
+            wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
+
+        // Vertex layout
+
+        const std::array<WGPUVertexAttribute, 1> vertexAttributes{WGPUVertexAttribute{
+            .format = WGPUVertexFormat_Float32x2,
+            .offset = 0,
+            .shaderLocation = 0,
+        }};
+
+        const WGPUVertexBufferLayout vertexBufferLayout{
+            .arrayStride = sizeof(float[2]),
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .attributeCount = vertexAttributes.size(),
+            .attributes = vertexAttributes.data(),
+        };
+
+        // Shader module
+
         const WGPUShaderModule shaderModule = [&gpuContext]() -> WGPUShaderModule {
             const WGPUShaderModuleWGSLDescriptor wgslDesc = {
                 .chain =
@@ -761,7 +793,7 @@ HybridRenderer::DebugPass::DebugPass(
         }();
         NLRS_ASSERT(shaderModule != nullptr);
 
-        // Blend state for color target
+        // Fragment state
 
         const WGPUBlendState blendState{
             .color =
@@ -793,36 +825,6 @@ HybridRenderer::DebugPass::DebugPass(
             .targetCount = colorTargets.size(),
             .targets = colorTargets.data(),
         };
-
-        // Vertex layout
-
-        const std::array<WGPUVertexAttribute, 1> vertexAttributes{WGPUVertexAttribute{
-            .format = WGPUVertexFormat_Float32x2,
-            .offset = 0,
-            .shaderLocation = 0,
-        }};
-
-        const WGPUVertexBufferLayout vertexBufferLayout{
-            .arrayStride = sizeof(float[2]),
-            .stepMode = WGPUVertexStepMode_Vertex,
-            .attributeCount = vertexAttributes.size(),
-            .attributes = vertexAttributes.data(),
-        };
-
-        // Pipeline layout
-
-        const std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
-            uniformBindGroupLayout.ptr(), gbufferBindGroupLayout.ptr()};
-
-        const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
-            .nextInChain = nullptr,
-            .label = "Debug pass pipeline layout",
-            .bindGroupLayoutCount = bindGroupLayouts.size(),
-            .bindGroupLayouts = bindGroupLayouts.data(),
-        };
-
-        const WGPUPipelineLayout pipelineLayout =
-            wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
 
         // Pipeline
 
