@@ -23,10 +23,12 @@ fn vsMain(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-@group(1) @binding(0) var albedo: texture_2d<f32>;
-@group(1) @binding(1) var textureSampler: sampler;
+@group(1) @binding(0) var textureSampler: sampler;
+@group(1) @binding(1) var gbufferAlbedo: texture_2d<f32>;
+@group(1) @binding(2) var gbufferNormal: texture_2d<f32>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
-    return textureSample(albedo, textureSampler, in.texCoord);
+    let n = textureSample(gbufferNormal, textureSampler, in.texCoord);
+    return vec4(vec3(0.5) * (n.xyz + vec3(1f)), 1.0);
 }

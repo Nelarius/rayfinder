@@ -154,6 +154,10 @@ try
         flattenedVertices.reserve(numModelVertices);
         std::vector<std::span<const glm::vec4>> modelVertices;
 
+        std::vector<glm::vec4> flattenedNormals;
+        flattenedNormals.reserve(numModelVertices);
+        std::vector<std::span<const glm::vec4>> modelNormals;
+
         std::vector<glm::vec2> flattenedTexCoords;
         flattenedTexCoords.reserve(numModelVertices);
         std::vector<std::span<const glm::vec2>> modelTexCoords;
@@ -169,12 +173,22 @@ try
             const std::size_t vertexOffsetIdx = flattenedVertices.size();
             const std::size_t numVertices = mesh.positions.size();
 
+            NLRS_ASSERT(mesh.positions.size() == mesh.normals.size());
+            NLRS_ASSERT(mesh.positions.size() == mesh.texCoords.size());
+
             std::transform(
                 mesh.positions.begin(),
                 mesh.positions.end(),
                 std::back_inserter(flattenedVertices),
                 [](const glm::vec3& v) -> glm::vec4 { return glm::vec4(v, 1.0f); });
             modelVertices.emplace_back(flattenedVertices.data() + vertexOffsetIdx, numVertices);
+
+            std::transform(
+                mesh.normals.begin(),
+                mesh.normals.end(),
+                std::back_inserter(flattenedNormals),
+                [](const glm::vec3& n) -> glm::vec4 { return glm::vec4(n, 0.0f); });
+            modelNormals.emplace_back(flattenedNormals.data() + vertexOffsetIdx, numVertices);
 
             flattenedTexCoords.insert(
                 flattenedTexCoords.end(), mesh.texCoords.begin(), mesh.texCoords.end());
@@ -194,6 +208,7 @@ try
             nlrs::HybridRendererDescriptor{
                 .framebufferSize = nlrs::Extent2u(window.resolution()),
                 .modelPositions = modelVertices,
+                .modelNormals = modelNormals,
                 .modelTexCoords = modelTexCoords,
                 .modelIndices = modelIndices,
                 .baseColorTextureIndices = baseColorTextureIndices,

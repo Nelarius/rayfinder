@@ -8,6 +8,7 @@
 #include <common/texture.hpp>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <webgpu/webgpu.h>
 
 #include <cstddef>
@@ -23,6 +24,7 @@ struct HybridRendererDescriptor
 {
     Extent2u                                  framebufferSize;
     std::span<std::span<const glm::vec4>>     modelPositions;
+    std::span<std::span<const glm::vec4>>     modelNormals;
     std::span<std::span<const glm::vec2>>     modelTexCoords;
     std::span<std::span<const std::uint32_t>> modelIndices;
     std::span<std::size_t>                    baseColorTextureIndices;
@@ -62,6 +64,7 @@ private:
     {
     private:
         std::vector<GpuBuffer>    mPositionBuffers;
+        std::vector<GpuBuffer>    mNormalBuffers;
         std::vector<GpuBuffer>    mTexCoordBuffers;
         std::vector<IndexBuffer>  mIndexBuffers;
         std::vector<std::size_t>  mBaseColorTextureIndices;
@@ -88,7 +91,8 @@ private:
             const glm::mat4&   viewProjectionMat,
             WGPUCommandEncoder cmdEncoder,
             WGPUTextureView    depthTextureView,
-            WGPUTextureView    albedoTextureView);
+            WGPUTextureView    albedoTextureView,
+            WGPUTextureView    normalTextureView);
     };
 
     struct DebugPass
@@ -110,13 +114,18 @@ private:
         DebugPass(DebugPass&&) noexcept;
         DebugPass& operator=(DebugPass&&) noexcept;
 
-        void render(const GpuBindGroup&, WGPUCommandEncoder, WGPUTextureView);
+        void render(
+            const GpuBindGroup& gbufferBindGroup,
+            WGPUCommandEncoder  encoder,
+            WGPUTextureView     textureView);
     };
 
     WGPUTexture        mDepthTexture;
     WGPUTextureView    mDepthTextureView;
     WGPUTexture        mAlbedoTexture;
     WGPUTextureView    mAlbedoTextureView;
+    WGPUTexture        mNormalTexture;
+    WGPUTextureView    mNormalTextureView;
     WGPUSampler        mGbufferSampler;
     GpuBindGroupLayout mGbufferBindGroupLayout;
     GpuBindGroup       mGbufferBindGroup;
