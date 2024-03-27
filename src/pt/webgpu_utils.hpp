@@ -210,12 +210,12 @@ inline WGPUBindGroupEntry samplerBindGroupEntry(
 
 constexpr std::array<float[2], 6> quadVertexData{{
     // clang-format off
-    {-0.5f, -0.5f,},
-    {0.5f, -0.5f,},
-    {0.5f, 0.5f,},
-    {0.5f, 0.5f,},
-    {-0.5f, 0.5f,},
-    {-0.5f, -0.5f,},
+    {-1.0, -1.0,},
+    {1.0, -1.0,},
+    {1.0, 1.0,},
+    {1.0, 1.0,},
+    {-1.0, 1.0,},
+    {-1.0, -1.0,},
     // clang-format on
 }};
 } // namespace nlrs

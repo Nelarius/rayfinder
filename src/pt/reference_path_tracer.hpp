@@ -138,8 +138,6 @@ public:
 
 private:
     GpuBuffer          mVertexBuffer;
-    GpuBuffer          mUniformsBuffer;
-    GpuBindGroup       mUniformsBindGroup;
     GpuBuffer          mRenderParamsBuffer;
     GpuBuffer          mPostProcessingParamsBuffer;
     GpuBuffer          mSkyStateBuffer;

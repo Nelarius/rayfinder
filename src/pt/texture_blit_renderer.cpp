@@ -25,21 +25,6 @@ TextureBlitRenderer::TextureBlitRenderer(
           "Vertex buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
           std::span<const float[2]>(quadVertexData)),
-      mUniformsBuffer([&gpuContext]() -> GpuBuffer {
-          // DirectX, Metal, wgpu share the same left-handed coordinate system
-          // for their normalized device coordinates:
-          // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
-          const glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
-
-          return GpuBuffer(
-              gpuContext.device,
-              "uniforms buffer",
-              WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-              std::span<const std::uint8_t>(
-                  reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
-                  sizeof(glm::mat4)));
-      }()),
-      mUniformsBindGroup(),
       mTexture(nullptr),
       mTextureView(nullptr),
       mSampler(nullptr),
@@ -47,17 +32,6 @@ TextureBlitRenderer::TextureBlitRenderer(
       mTextureBindGroup(),
       mPipeline(nullptr)
 {
-    const GpuBindGroupLayout uniformsBindGroupLayout{
-        gpuContext.device,
-        "Uniforms bind group layout",
-        mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4))};
-
-    mUniformsBindGroup = GpuBindGroup{
-        gpuContext.device,
-        "Uniforms bind group",
-        uniformsBindGroupLayout.ptr(),
-        mUniformsBuffer.bindGroupEntry(0)};
-
     // color attachment texture
 
     constexpr WGPUTextureFormat TEXTURE_FORMAT = Window::SWAP_CHAIN_FORMAT;
@@ -212,8 +186,7 @@ TextureBlitRenderer::TextureBlitRenderer(
 
         // pipeline layout
 
-        const std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
-            uniformsBindGroupLayout.ptr(), mTextureBindGroupLayout.ptr()};
+        const std::array<WGPUBindGroupLayout, 1> bindGroupLayouts{mTextureBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -334,9 +307,7 @@ void TextureBlitRenderer::render(
     {
         wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mPipeline);
         wgpuRenderPassEncoderSetBindGroup(
-            renderPassEncoder, 0, mUniformsBindGroup.ptr(), 0, nullptr);
-        wgpuRenderPassEncoderSetBindGroup(
-            renderPassEncoder, 1, mTextureBindGroup.ptr(), 0, nullptr);
+            renderPassEncoder, 0, mTextureBindGroup.ptr(), 0, nullptr);
         wgpuRenderPassEncoderSetVertexBuffer(
             renderPassEncoder, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
         wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);

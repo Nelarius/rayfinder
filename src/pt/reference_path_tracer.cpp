@@ -174,8 +174,6 @@ ReferencePathTracer::ReferencePathTracer(
           "Vertex buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
           std::span<const float[2]>(quadVertexData)),
-      mUniformsBuffer(),
-      mUniformsBindGroup(),
       mRenderParamsBuffer(
           gpuContext.device,
           "render params buffer",
@@ -234,21 +232,6 @@ ReferencePathTracer::ReferencePathTracer(
       mAccumulatedSampleCount(0),
       mRenderPassDurationsNs()
 {
-    {
-        // DirectX, Metal, wgpu share the same left-handed coordinate system
-        // for their normalized device coordinates:
-        // https://github.com/gfx-rs/gfx/tree/master/src/backend/dx12
-        const glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
-
-        mUniformsBuffer = GpuBuffer(
-            gpuContext.device,
-            "uniforms buffer",
-            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-            std::span<const std::uint8_t>(
-                reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
-                sizeof(glm::mat4)));
-    }
-
     {
         struct TextureDescriptor
         {
@@ -385,13 +368,6 @@ ReferencePathTracer::ReferencePathTracer(
             .attributes = vertexAttributes.data(),
         };
 
-        // uniforms bind group layout
-
-        const GpuBindGroupLayout uniformsBindGroupLayout{
-            gpuContext.device,
-            "Uniforms group layout",
-            mUniformsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex)};
-
         // renderParams group layout
 
         const std::array<WGPUBindGroupLayoutEntry, 3> renderParamsBindGroupLayoutEntries{
@@ -425,8 +401,7 @@ ReferencePathTracer::ReferencePathTracer(
 
         // pipeline layout
 
-        const std::array<WGPUBindGroupLayout, 4> bindGroupLayouts{
-            uniformsBindGroupLayout.ptr(),
+        const std::array<WGPUBindGroupLayout, 3> bindGroupLayouts{
             renderParamsBindGroupLayout.ptr(),
             sceneBindGroupLayout.ptr(),
             imageBindGroupLayout.ptr(),
@@ -440,14 +415,6 @@ ReferencePathTracer::ReferencePathTracer(
         };
         const WGPUPipelineLayout pipelineLayout =
             wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
-
-        // uniforms bind group
-
-        mUniformsBindGroup = GpuBindGroup{
-            gpuContext.device,
-            "Uniforms bind group",
-            uniformsBindGroupLayout.ptr(),
-            mUniformsBuffer.bindGroupEntry(0)};
 
         // renderParams bind group
 
@@ -544,8 +511,6 @@ ReferencePathTracer::ReferencePathTracer(ReferencePathTracer&& other)
     if (this != &other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
-        mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
         mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
         mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
         mSkyStateBuffer = std::move(other.mSkyStateBuffer);
@@ -579,8 +544,6 @@ ReferencePathTracer& ReferencePathTracer::operator=(ReferencePathTracer&& other)
     if (this != &other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
-        mUniformsBuffer = std::move(other.mUniformsBuffer);
-        mUniformsBindGroup = std::move(other.mUniformsBindGroup);
         mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
         mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
         mSkyStateBuffer = std::move(other.mSkyStateBuffer);
@@ -707,13 +670,11 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
         {
             wgpuRenderPassEncoderSetPipeline(renderPassEncoder, mRenderPipeline);
             wgpuRenderPassEncoderSetBindGroup(
-                renderPassEncoder, 0, mUniformsBindGroup.ptr(), 0, nullptr);
+                renderPassEncoder, 0, mRenderParamsBindGroup.ptr(), 0, nullptr);
             wgpuRenderPassEncoderSetBindGroup(
-                renderPassEncoder, 1, mRenderParamsBindGroup.ptr(), 0, nullptr);
+                renderPassEncoder, 1, mSceneBindGroup.ptr(), 0, nullptr);
             wgpuRenderPassEncoderSetBindGroup(
-                renderPassEncoder, 2, mSceneBindGroup.ptr(), 0, nullptr);
-            wgpuRenderPassEncoderSetBindGroup(
-                renderPassEncoder, 3, mImageBindGroup.ptr(), 0, nullptr);
+                renderPassEncoder, 2, mImageBindGroup.ptr(), 0, nullptr);
             wgpuRenderPassEncoderSetVertexBuffer(
                 renderPassEncoder, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);

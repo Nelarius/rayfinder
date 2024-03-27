@@ -807,36 +807,12 @@ HybridRenderer::DebugPass::DebugPass(
           "Vertex buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
           std::span<const float[2]>(quadVertexData)),
-      mUniformBuffer([&gpuContext]() -> GpuBuffer {
-          const glm::mat4 viewProjectionMatrix = glm::orthoLH(-0.5f, 0.5f, -0.5f, 0.5f, -1.f, 1.f);
-
-          return GpuBuffer(
-              gpuContext.device,
-              "uniforms buffer",
-              WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-              std::span<const std::uint8_t>(
-                  reinterpret_cast<const std::uint8_t*>(&viewProjectionMatrix[0]),
-                  sizeof(glm::mat4)));
-      }()),
-      mUniformBindGroup(),
       mPipeline(nullptr)
 {
-    const GpuBindGroupLayout uniformBindGroupLayout{
-        gpuContext.device,
-        "Uniform bind group layout",
-        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4))};
-
-    mUniformBindGroup = GpuBindGroup{
-        gpuContext.device,
-        "Uniform bind group",
-        uniformBindGroupLayout.ptr(),
-        mUniformBuffer.bindGroupEntry(0)};
-
     {
         // Pipeline layout
 
-        const std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
-            uniformBindGroupLayout.ptr(), gbufferBindGroupLayout.ptr()};
+        const std::array<WGPUBindGroupLayout, 1> bindGroupLayouts{gbufferBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -969,8 +945,6 @@ HybridRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
     if (this != &other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
-        mUniformBuffer = std::move(other.mUniformBuffer);
-        mUniformBindGroup = std::move(other.mUniformBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
@@ -981,8 +955,6 @@ HybridRenderer::DebugPass& HybridRenderer::DebugPass::operator=(DebugPass&& othe
     if (this != &other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
-        mUniformBuffer = std::move(other.mUniformBuffer);
-        mUniformBindGroup = std::move(other.mUniformBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
@@ -1021,8 +993,7 @@ void HybridRenderer::DebugPass::render(
     NLRS_ASSERT(renderPass != nullptr);
 
     wgpuRenderPassEncoderSetPipeline(renderPass, mPipeline);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mUniformBindGroup.ptr(), 0, nullptr);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, gbufferBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, gbufferBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);

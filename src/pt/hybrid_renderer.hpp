@@ -99,8 +99,6 @@ private:
     {
     private:
         GpuBuffer          mVertexBuffer = GpuBuffer{};
-        GpuBuffer          mUniformBuffer = GpuBuffer{}; // TODO: replace with WGPUConstantEntry
-        GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
 
     public:

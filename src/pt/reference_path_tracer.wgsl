@@ -1,9 +1,3 @@
-struct Uniforms {
-    viewProjectionMatrix: mat4x4f,
-}
-
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
-
 struct VertexInput {
     @location(0) position: vec2f,
 }
@@ -16,28 +10,27 @@ struct VertexOutput {
 @vertex
 fn vsMain(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.position = uniforms.viewProjectionMatrix * vec4f(in.position, 0.0, 1.0);
-    out.texCoord = in.position + vec2f(0.5);
-
+    out.position = vec4f(in.position, 0.0, 1.0);
+    out.texCoord = 0.5 * in.position + vec2f(0.5);
     return out;
 }
 
 // render params bind group
-@group(1) @binding(0) var<uniform> renderParams: RenderParams;
-@group(1) @binding(1) var<uniform> postProcessingParams: PostProcessingParams;
-@group(1) @binding(2) var<storage, read_write> skyState: SkyState;
+@group(0) @binding(0) var<uniform> renderParams: RenderParams;
+@group(0) @binding(1) var<uniform> postProcessingParams: PostProcessingParams;
+@group(0) @binding(2) var<storage, read_write> skyState: SkyState;
 
 // scene bind group
 // TODO: these are `read` only buffers. How can I create a buffer layout type which allows this?
 // Annotating these as read causes validation failures.
-@group(2) @binding(0) var<storage, read_write> bvhNodes: array<BvhNode>;
-@group(2) @binding(1) var<storage, read_write> positionAttributes: array<Positions>;
-@group(2) @binding(2) var<storage, read_write> vertexAttributes: array<VertexAttributes>;
-@group(2) @binding(3) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
-@group(2) @binding(4) var<storage, read_write> textures: array<u32>;
+@group(1) @binding(0) var<storage, read_write> bvhNodes: array<BvhNode>;
+@group(1) @binding(1) var<storage, read_write> positionAttributes: array<Positions>;
+@group(1) @binding(2) var<storage, read_write> vertexAttributes: array<VertexAttributes>;
+@group(1) @binding(3) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
+@group(1) @binding(4) var<storage, read_write> textures: array<u32>;
 
 // image bind group
-@group(3) @binding(0) var<storage, read_write> imageBuffer: array<vec3f>;
+@group(2) @binding(0) var<storage, read_write> imageBuffer: array<vec3f>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
