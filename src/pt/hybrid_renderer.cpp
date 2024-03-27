@@ -68,7 +68,6 @@ HybridRenderer::HybridRenderer(
       mAlbedoTextureView(nullptr),
       mNormalTexture(nullptr),
       mNormalTextureView(nullptr),
-      mGbufferSampler(nullptr),
       mGbufferBindGroupLayout(),
       mGbufferBindGroup(),
       mGbufferPass(gpuContext, rendererDesc),
@@ -132,49 +131,25 @@ HybridRenderer::HybridRenderer(
         mNormalTexture, "Gbuffer normal texture view", NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTextureView != nullptr);
 
-    {
-        const WGPUSamplerDescriptor desc{
-            .nextInChain = nullptr,
-            .label = "Gbuffer sampler",
-            .addressModeU = WGPUAddressMode_ClampToEdge,
-            .addressModeV = WGPUAddressMode_ClampToEdge,
-            .addressModeW = WGPUAddressMode_ClampToEdge,
-            .magFilter = WGPUFilterMode_Nearest,
-            .minFilter = WGPUFilterMode_Nearest,
-            .mipmapFilter = WGPUMipmapFilterMode_Nearest,
-            .lodMinClamp = 0.f,
-            .lodMaxClamp = 32.f,
-            .compare = WGPUCompareFunction_Undefined,
-            .maxAnisotropy = 1,
-        };
-        mGbufferSampler = wgpuDeviceCreateSampler(gpuContext.device, &desc);
-        NLRS_ASSERT(mGbufferSampler != nullptr);
-    }
-
     mGbufferBindGroupLayout = GpuBindGroupLayout{
         gpuContext.device,
         "Gbuffer bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 3>{
-            samplerBindGroupLayoutEntry(0),
-            textureBindGroupLayoutEntry(1),
-            textureBindGroupLayoutEntry(2)}};
+        std::array<WGPUBindGroupLayoutEntry, 2>{
+            textureBindGroupLayoutEntry(0), textureBindGroupLayoutEntry(1)}};
 
     mGbufferBindGroup = GpuBindGroup{
         gpuContext.device,
         "Gbuffer bind group",
         mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 3>{
-            samplerBindGroupEntry(0, mGbufferSampler),
-            textureBindGroupEntry(1, mAlbedoTextureView),
-            textureBindGroupEntry(2, mNormalTextureView)}};
+        std::array<WGPUBindGroupEntry, 2>{
+            textureBindGroupEntry(0, mAlbedoTextureView),
+            textureBindGroupEntry(1, mNormalTextureView)}};
 
-    mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout};
+    mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
 }
 
 HybridRenderer::~HybridRenderer()
 {
-    samplerSafeRelease(mGbufferSampler);
-    mGbufferSampler = nullptr;
     textureViewSafeRelease(mNormalTextureView);
     mNormalTextureView = nullptr;
     textureSafeRelease(mNormalTexture);
@@ -227,6 +202,8 @@ void HybridRenderer::render(
 void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSize)
 {
     NLRS_ASSERT(newSize.x > 0 && newSize.y > 0);
+
+    mDebugPass.resize(gpuContext, newSize);
 
     textureViewSafeRelease(mNormalTextureView);
     textureSafeRelease(mNormalTexture);
@@ -304,10 +281,9 @@ void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSiz
         gpuContext.device,
         "Gbuffer bind group",
         mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 3>{
-            samplerBindGroupEntry(0, mGbufferSampler),
-            textureBindGroupEntry(1, mAlbedoTextureView),
-            textureBindGroupEntry(2, mNormalTextureView)}};
+        std::array<WGPUBindGroupEntry, 2>{
+            textureBindGroupEntry(0, mAlbedoTextureView),
+            textureBindGroupEntry(1, mNormalTextureView)}};
 }
 
 HybridRenderer::GbufferPass::GbufferPass(
@@ -801,18 +777,42 @@ void HybridRenderer::GbufferPass::render(
 
 HybridRenderer::DebugPass::DebugPass(
     const GpuContext&         gpuContext,
-    const GpuBindGroupLayout& gbufferBindGroupLayout)
+    const GpuBindGroupLayout& gbufferBindGroupLayout,
+    const Extent2u&           framebufferSize)
     : mVertexBuffer(
           gpuContext.device,
           "Vertex buffer",
           WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
           std::span<const float[2]>(quadVertexData)),
+      mUniformBuffer(),
+      mUniformBindGroup(),
       mPipeline(nullptr)
 {
     {
+        const auto uniformData = Extent2<float>{framebufferSize};
+        mUniformBuffer = GpuBuffer{
+            gpuContext.device,
+            "Uniform buffer",
+            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+            std::span<const float>(&uniformData.x, sizeof(Extent2<float>))};
+    }
+
+    const GpuBindGroupLayout uniformBindGroupLayout{
+        gpuContext.device,
+        "Uniform bind group layout",
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Extent2<float>))};
+
+    mUniformBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Uniform bind group",
+        uniformBindGroupLayout.ptr(),
+        mUniformBuffer.bindGroupEntry(0)};
+
+    {
         // Pipeline layout
 
-        const std::array<WGPUBindGroupLayout, 1> bindGroupLayouts{gbufferBindGroupLayout.ptr()};
+        const std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
+            uniformBindGroupLayout.ptr(), gbufferBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -945,6 +945,8 @@ HybridRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
     if (this != &other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
@@ -955,6 +957,8 @@ HybridRenderer::DebugPass& HybridRenderer::DebugPass::operator=(DebugPass&& othe
     if (this != &other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
@@ -993,11 +997,19 @@ void HybridRenderer::DebugPass::render(
     NLRS_ASSERT(renderPass != nullptr);
 
     wgpuRenderPassEncoderSetPipeline(renderPass, mPipeline);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, gbufferBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mUniformBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, gbufferBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
 
     wgpuRenderPassEncoderEnd(renderPass);
+}
+
+void HybridRenderer::DebugPass::resize(const GpuContext& gpuContext, const Extent2u& newSize)
+{
+    const auto uniformData = Extent2<float>{newSize};
+    wgpuQueueWriteBuffer(
+        gpuContext.queue, mUniformBuffer.ptr(), 0, &uniformData.x, sizeof(Extent2<float>));
 }
 } // namespace nlrs

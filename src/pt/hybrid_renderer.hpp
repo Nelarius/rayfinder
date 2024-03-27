@@ -99,11 +99,16 @@ private:
     {
     private:
         GpuBuffer          mVertexBuffer = GpuBuffer{};
+        GpuBuffer          mUniformBuffer = GpuBuffer{};
+        GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
 
     public:
         DebugPass() = default;
-        DebugPass(const GpuContext& gpuContext, const GpuBindGroupLayout& gbufferBindGroupLayout);
+        DebugPass(
+            const GpuContext&         gpuContext,
+            const GpuBindGroupLayout& gbufferBindGroupLayout,
+            const Extent2u&           framebufferSize);
         ~DebugPass();
 
         DebugPass(const DebugPass&) = delete;
@@ -116,6 +121,7 @@ private:
             const GpuBindGroup& gbufferBindGroup,
             WGPUCommandEncoder  encoder,
             WGPUTextureView     textureView);
+        void resize(const GpuContext&, const Extent2u&);
     };
 
     WGPUTexture        mDepthTexture;
@@ -124,7 +130,6 @@ private:
     WGPUTextureView    mAlbedoTextureView;
     WGPUTexture        mNormalTexture;
     WGPUTextureView    mNormalTextureView;
-    WGPUSampler        mGbufferSampler;
     GpuBindGroupLayout mGbufferBindGroupLayout;
     GpuBindGroup       mGbufferBindGroup;
     GbufferPass        mGbufferPass;

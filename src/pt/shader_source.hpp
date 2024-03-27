@@ -756,20 +756,18 @@ fn vsMain(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-@group(0) @binding(0) var textureSampler: sampler;
-@group(0) @binding(1) var gbufferAlbedo: texture_2d<f32>;
-@group(0) @binding(2) var gbufferNormal: texture_2d<f32>;
+@group(0) @binding(0) var<uniform> framebufferSize: vec2f;
+@group(1) @binding(0) var gbufferAlbedo: texture_2d<f32>;
+@group(1) @binding(1) var gbufferNormal: texture_2d<f32>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
-    // NOTE: textureSample can't be called from non-uniform control flow
-    // TODO: replace with textureLoad calls which can be called from non-uniform control flow and get rid of the sampler
     let c = in.texCoord;
-    let a = textureSample(gbufferAlbedo, textureSampler, c);
-    let n = textureSample(gbufferNormal, textureSampler, c);
+    let idx = vec2u(floor(c * framebufferSize));
     if c.x < 0.5 {
-        return a;
+        return textureLoad(gbufferAlbedo, idx, 0);
     } else {
+        let n = textureLoad(gbufferNormal, idx, 0);
         return vec4(vec3(0.5) * (n.xyz + vec3(1f)), 1.0);
     }
 }
