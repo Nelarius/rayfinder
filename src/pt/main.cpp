@@ -45,7 +45,7 @@ enum RendererType
 
 struct UiState
 {
-    int   rendererType = RendererType_PathTracer;
+    int   rendererType = RendererType_Hybrid;
     float vfovDegrees = 70.0f;
     // sampling
     int numSamplesPerPixel = 128;
