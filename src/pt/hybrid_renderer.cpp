@@ -80,7 +80,7 @@ HybridRenderer::HybridRenderer(
         const WGPUTextureDescriptor depthTextureDesc{
             .nextInChain = nullptr,
             .label = "Depth texture",
-            .usage = WGPUTextureUsage_RenderAttachment,
+            .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
             .dimension = WGPUTextureDimension_2D,
             .size = {rendererDesc.framebufferSize.x, rendererDesc.framebufferSize.y, 1},
             .format = DEPTH_TEXTURE_FORMAT,
@@ -134,17 +134,19 @@ HybridRenderer::HybridRenderer(
     mGbufferBindGroupLayout = GpuBindGroupLayout{
         gpuContext.device,
         "Gbuffer bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 2>{
+        std::array<WGPUBindGroupLayoutEntry, 3>{
             textureBindGroupLayoutEntry(0, WGPUTextureSampleType_UnfilterableFloat),
-            textureBindGroupLayoutEntry(1, WGPUTextureSampleType_UnfilterableFloat)}};
+            textureBindGroupLayoutEntry(1, WGPUTextureSampleType_UnfilterableFloat),
+            textureBindGroupLayoutEntry(2, WGPUTextureSampleType_Depth)}};
 
     mGbufferBindGroup = GpuBindGroup{
         gpuContext.device,
         "Gbuffer bind group",
         mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 2>{
+        std::array<WGPUBindGroupEntry, 3>{
             textureBindGroupEntry(0, mAlbedoTextureView),
-            textureBindGroupEntry(1, mNormalTextureView)}};
+            textureBindGroupEntry(1, mNormalTextureView),
+            textureBindGroupEntry(2, mDepthTextureView)}};
 
     mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
 }
@@ -227,7 +229,7 @@ void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSiz
         const WGPUTextureDescriptor depthTextureDesc{
             .nextInChain = nullptr,
             .label = "Depth texture",
-            .usage = WGPUTextureUsage_RenderAttachment,
+            .usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
             .dimension = WGPUTextureDimension_2D,
             .size = {newSize.x, newSize.y, 1},
             .format = DEPTH_TEXTURE_FORMAT,
@@ -282,9 +284,10 @@ void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSiz
         gpuContext.device,
         "Gbuffer bind group",
         mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 2>{
+        std::array<WGPUBindGroupEntry, 3>{
             textureBindGroupEntry(0, mAlbedoTextureView),
-            textureBindGroupEntry(1, mNormalTextureView)}};
+            textureBindGroupEntry(1, mNormalTextureView),
+            textureBindGroupEntry(2, mDepthTextureView)}};
 }
 
 HybridRenderer::GbufferPass::GbufferPass(

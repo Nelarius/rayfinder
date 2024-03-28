@@ -20,15 +20,21 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(0) @binding(0) var<uniform> framebufferSize: vec2f;
 @group(1) @binding(0) var gbufferAlbedo: texture_2d<f32>;
 @group(1) @binding(1) var gbufferNormal: texture_2d<f32>;
+@group(1) @binding(2) var gbufferDepth: texture_depth_2d;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let c = in.texCoord;
     let idx = vec2u(floor(c * framebufferSize));
-    if c.x < 0.5 {
+    if c.x < 0.333 {
         return textureLoad(gbufferAlbedo, idx, 0);
-    } else {
+    } else if c.x < 0.666 {
         let n = textureLoad(gbufferNormal, idx, 0);
         return vec4(vec3(0.5) * (n.xyz + vec3(1f)), 1.0);
+    } else {
+        let d = vec3(1.0) - textureLoad(gbufferDepth, idx, 0);
+        let x = d;
+        let a = 0.05;
+        return vec4((1.0 + a) * x / (x + vec3(a)), 1.0);
     }
 }
