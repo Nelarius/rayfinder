@@ -142,7 +142,9 @@ inline WGPUBindGroupEntry bufferBindGroupEntry(
     };
 }
 
-inline WGPUBindGroupLayoutEntry textureBindGroupLayoutEntry(const std::uint32_t bindingIdx)
+inline WGPUBindGroupLayoutEntry textureBindGroupLayoutEntry(
+    const std::uint32_t         bindingIdx,
+    const WGPUTextureSampleType sampleType)
 {
     return WGPUBindGroupLayoutEntry{
         .nextInChain = nullptr,
@@ -153,7 +155,7 @@ inline WGPUBindGroupLayoutEntry textureBindGroupLayoutEntry(const std::uint32_t 
         .texture =
             WGPUTextureBindingLayout{
                 .nextInChain = nullptr,
-                .sampleType = WGPUTextureSampleType_Float,
+                .sampleType = sampleType,
                 .viewDimension = WGPUTextureViewDimension_2D,
                 .multisampled = false,
             },
@@ -176,7 +178,9 @@ inline WGPUBindGroupEntry textureBindGroupEntry(
     };
 }
 
-inline WGPUBindGroupLayoutEntry samplerBindGroupLayoutEntry(const std::uint32_t bindingIdx)
+inline WGPUBindGroupLayoutEntry samplerBindGroupLayoutEntry(
+    const std::uint32_t          bindingIdx,
+    const WGPUSamplerBindingType samplerType)
 {
     return WGPUBindGroupLayoutEntry{
         .nextInChain = nullptr,
@@ -186,7 +190,7 @@ inline WGPUBindGroupLayoutEntry samplerBindGroupLayoutEntry(const std::uint32_t 
         .sampler =
             WGPUSamplerBindingLayout{
                 .nextInChain = nullptr,
-                .type = WGPUSamplerBindingType_Filtering,
+                .type = samplerType,
             },
         .texture = DEFAULT_TEXTURE_BINDING_LAYOUT,
         .storageTexture = DEFAULT_STORAGE_TEXTURE_BINDING_LAYOUT,

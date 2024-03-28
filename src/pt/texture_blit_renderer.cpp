@@ -96,7 +96,8 @@ TextureBlitRenderer::TextureBlitRenderer(
     // texture bind group
     {
         std::array<const WGPUBindGroupLayoutEntry, 2> textureBindGroupLayoutEntries{
-            textureBindGroupLayoutEntry(0), samplerBindGroupLayoutEntry(1)};
+            textureBindGroupLayoutEntry(0, WGPUTextureSampleType_Float),
+            samplerBindGroupLayoutEntry(1, WGPUSamplerBindingType_Filtering)};
         mTextureBindGroupLayout = GpuBindGroupLayout{
             gpuContext.device, "Texture bind group layout", textureBindGroupLayoutEntries};
 

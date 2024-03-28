@@ -135,7 +135,8 @@ HybridRenderer::HybridRenderer(
         gpuContext.device,
         "Gbuffer bind group layout",
         std::array<WGPUBindGroupLayoutEntry, 2>{
-            textureBindGroupLayoutEntry(0), textureBindGroupLayoutEntry(1)}};
+            textureBindGroupLayoutEntry(0, WGPUTextureSampleType_UnfilterableFloat),
+            textureBindGroupLayoutEntry(1, WGPUTextureSampleType_UnfilterableFloat)}};
 
     mGbufferBindGroup = GpuBindGroup{
         gpuContext.device,
@@ -458,7 +459,9 @@ HybridRenderer::GbufferPass::GbufferPass(
     }
 
     const GpuBindGroupLayout samplerBindGroupLayout{
-        gpuContext.device, "Sampler bind group layout", samplerBindGroupLayoutEntry(0)};
+        gpuContext.device,
+        "Sampler bind group layout",
+        samplerBindGroupLayoutEntry(0, WGPUSamplerBindingType_Filtering)};
 
     mSamplerBindGroup = GpuBindGroup{
         gpuContext.device,
@@ -467,7 +470,9 @@ HybridRenderer::GbufferPass::GbufferPass(
         samplerBindGroupEntry(0, mBaseColorSampler)};
 
     const GpuBindGroupLayout textureBindGroupLayout{
-        gpuContext.device, "Texture bind group layout", textureBindGroupLayoutEntry(0)};
+        gpuContext.device,
+        "Texture bind group layout",
+        textureBindGroupLayoutEntry(0, WGPUTextureSampleType_Float)};
 
     std::transform(
         mBaseColorTextures.begin(),
