@@ -34,7 +34,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     } else {
         let d = vec3(1.0) - textureLoad(gbufferDepth, idx, 0);
         let x = d;
-        let a = 0.05;
+        let a = 0.1;
         return vec4((1.0 + a) * x / (x + vec3(a)), 1.0);
     }
 }

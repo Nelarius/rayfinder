@@ -66,9 +66,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     let tonemapFn = postProcessingParams.tonemapFn;
     let rgb = expose(tonemapFn, exposure * estimator);
-
-    let srgb = pow(rgb, vec3(1f / 2.2f));
-    return vec4f(srgb, 1f);
+    return vec4f(rgb, 1f);
 }
 
 const EPSILON = 0.00001f;

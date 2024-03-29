@@ -22,5 +22,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
-    return textureSample(texture, textureSampler, in.texCoord);
+    let c = textureSample(texture, textureSampler, in.texCoord);
+    let srgb = pow(c.xyz, vec3(1f / 2.2f));
+    return vec4f(srgb, 1f);
 }

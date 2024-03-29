@@ -72,9 +72,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     let tonemapFn = postProcessingParams.tonemapFn;
     let rgb = expose(tonemapFn, exposure * estimator);
-
-    let srgb = pow(rgb, vec3(1f / 2.2f));
-    return vec4f(srgb, 1f);
+    return vec4f(rgb, 1f);
 }
 
 const EPSILON = 0.00001f;
@@ -551,8 +549,8 @@ const INT_SCALE = 256f;
 
 @must_use
 fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
-    // Source: A Fast and Robust Method fo)"
-R"(r Avoiding Self-Intersection, Ray Tracing Gems
+    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Ge)"
+R"(ms
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
     // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
     // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
@@ -693,7 +691,9 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
-    return textureSample(texture, textureSampler, in.texCoord);
+    let c = textureSample(texture, textureSampler, in.texCoord);
+    let srgb = pow(c.xyz, vec3(1f / 2.2f));
+    return vec4f(srgb, 1f);
 }
 )";
 
@@ -730,10 +730,8 @@ struct GbufferOutput {
 
 @fragment
 fn fsMain(in: VertexOutput) -> GbufferOutput {
-    var out: GbufferOutput;
-    out.albedo = textureSample(texture, textureSampler, in.texCoord);
-    out.normal = vec4(normalize(in.normal.xyz), 1.0);
-    return out;
+    var c = pow(textureSample(texture, textureSampler, in.texCoord).xyz, vec3(2.2f));
+    return GbufferOutput(vec4(c, 1f), vec4(normalize(in.normal.xyz), 1f));
 }
 )";
 
@@ -773,7 +771,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     } else {
         let d = vec3(1.0) - textureLoad(gbufferDepth, idx, 0);
         let x = d;
-        let a = 0.05;
+        let a = 0.1;
         return vec4((1.0 + a) * x / (x + vec3(a)), 1.0);
     }
 }
