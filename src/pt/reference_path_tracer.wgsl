@@ -21,8 +21,6 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(0) @binding(2) var<storage, read> skyState: SkyState;
 
 // scene bind group
-// TODO: these are `read` only buffers. How can I create a buffer layout type which allows this?
-// Annotating these as read causes validation failures.
 @group(1) @binding(0) var<storage, read> bvhNodes: array<BvhNode>;
 @group(1) @binding(1) var<storage, read> positionAttributes: array<Positions>;
 @group(1) @binding(2) var<storage, read> vertexAttributes: array<VertexAttributes>;
