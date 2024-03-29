@@ -71,7 +71,8 @@ HybridRenderer::HybridRenderer(
       mGbufferBindGroupLayout(),
       mGbufferBindGroup(),
       mGbufferPass(gpuContext, rendererDesc),
-      mDebugPass()
+      mDebugPass(),
+      mSkyPass(gpuContext)
 {
     {
         const std::array<WGPUTextureFormat, 1> depthFormats{
@@ -169,8 +170,10 @@ HybridRenderer::~HybridRenderer()
 
 void HybridRenderer::render(
     const GpuContext&     gpuContext,
-    const WGPUTextureView textureView,
-    const glm::mat4&      viewProjectionMat)
+    const glm::mat4&      viewProjectionMat,
+    const glm::vec3&      cameraPosition,
+    const Sky&            sky,
+    const WGPUTextureView textureView)
 {
     wgpuDeviceTick(gpuContext.device);
 
@@ -190,7 +193,7 @@ void HybridRenderer::render(
         mAlbedoTextureView,
         mNormalTextureView);
 
-    mDebugPass.render(mGbufferBindGroup, encoder, textureView);
+    mSkyPass.render(gpuContext, viewProjectionMat, cameraPosition, sky, encoder, textureView);
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -1019,5 +1022,241 @@ void HybridRenderer::DebugPass::resize(const GpuContext& gpuContext, const Exten
     const auto uniformData = Extent2<float>{newSize};
     wgpuQueueWriteBuffer(
         gpuContext.queue, mUniformBuffer.ptr(), 0, &uniformData.x, sizeof(Extent2<float>));
+}
+
+HybridRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
+    : mCurrentSky{},
+      mVertexBuffer{
+          gpuContext.device,
+          "Sky vertex buffer",
+          GpuBufferUsage::Vertex | GpuBufferUsage::CopyDst,
+          std::span<const float[2]>(quadVertexData)},
+      mSkyStateBuffer{
+          gpuContext.device,
+          "Sky state buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          sizeof(AlignedSkyState)},
+      mSkyStateBindGroup{},
+      mUniformBuffer{
+          gpuContext.device,
+          "Sky uniform buffer",
+          GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
+          sizeof(Uniforms)},
+      mUniformBindGroup{},
+      mPipeline(nullptr)
+{
+    {
+        const AlignedSkyState skyState{mCurrentSky};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
+    }
+
+    const GpuBindGroupLayout skyStateBindGroupLayout{
+        gpuContext.device,
+        "Sky pass sky state bind group layout",
+        mSkyStateBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(AlignedSkyState))};
+
+    mSkyStateBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Sky pass sky state bind group",
+        skyStateBindGroupLayout.ptr(),
+        mSkyStateBuffer.bindGroupEntry(0)};
+
+    const GpuBindGroupLayout uniformBindGroupLayout{
+        gpuContext.device,
+        "Sky passs uniform bind group layout",
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Uniforms))};
+
+    mUniformBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Sky pass uniform bind group",
+        uniformBindGroupLayout.ptr(),
+        mUniformBuffer.bindGroupEntry(0)};
+
+    {
+        // Pipeline layout
+
+        const WGPUBindGroupLayout bindGroupLayouts[] = {
+            skyStateBindGroupLayout.ptr(), uniformBindGroupLayout.ptr()};
+
+        const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "Sky pass pipeline layout",
+            .bindGroupLayoutCount = std::size(bindGroupLayouts),
+            .bindGroupLayouts = bindGroupLayouts,
+        };
+
+        const WGPUPipelineLayout pipelineLayout =
+            wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
+
+        // Vertex layout
+
+        const WGPUVertexAttribute vertexAttributes[] = {WGPUVertexAttribute{
+            .format = WGPUVertexFormat_Float32x2,
+            .offset = 0,
+            .shaderLocation = 0,
+        }};
+
+        const WGPUVertexBufferLayout vertexBufferLayout{
+            .arrayStride = sizeof(float[2]),
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .attributeCount = std::size(vertexAttributes),
+            .attributes = vertexAttributes,
+        };
+
+        // Shader module
+
+        const WGPUShaderModule shaderModule = [&gpuContext]() -> WGPUShaderModule {
+            const WGPUShaderModuleWGSLDescriptor wgslDesc = {
+                .chain =
+                    WGPUChainedStruct{
+                        .next = nullptr,
+                        .sType = WGPUSType_ShaderModuleWGSLDescriptor,
+                    },
+                .code = HYBRID_RENDERER_SKY_PASS_SOURCE,
+            };
+
+            const WGPUShaderModuleDescriptor moduleDesc{
+                .nextInChain = &wgslDesc.chain,
+                .label = "Sky pass shader",
+            };
+
+            return wgpuDeviceCreateShaderModule(gpuContext.device, &moduleDesc);
+        }();
+        NLRS_ASSERT(shaderModule != nullptr);
+
+        // Fragment state
+
+        const WGPUBlendState blendState{
+            .color =
+                WGPUBlendComponent{
+                    .operation = WGPUBlendOperation_Add,
+                    .srcFactor = WGPUBlendFactor_One,
+                    .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
+                },
+            .alpha =
+                WGPUBlendComponent{
+                    .operation = WGPUBlendOperation_Add,
+                    .srcFactor = WGPUBlendFactor_Zero,
+                    .dstFactor = WGPUBlendFactor_One,
+                },
+        };
+
+        const WGPUColorTargetState colorTargets[] = {WGPUColorTargetState{
+            .nextInChain = nullptr,
+            .format = Window::SWAP_CHAIN_FORMAT,
+            .blend = &blendState,
+            .writeMask = WGPUColorWriteMask_All}};
+
+        const WGPUFragmentState fragmentState{
+            .nextInChain = nullptr,
+            .module = shaderModule,
+            .entryPoint = "fsMain",
+            .constantCount = 0,
+            .constants = nullptr,
+            .targetCount = std::size(colorTargets),
+            .targets = colorTargets,
+        };
+
+        // Pipeline
+
+        const WGPURenderPipelineDescriptor pipelineDesc{
+            .nextInChain = nullptr,
+            .label = "Sky pass render pipeline",
+            .layout = pipelineLayout,
+            .vertex =
+                WGPUVertexState{
+                    .nextInChain = nullptr,
+                    .module = shaderModule,
+                    .entryPoint = "vsMain",
+                    .constantCount = 0,
+                    .constants = nullptr,
+                    .bufferCount = 1,
+                    .buffers = &vertexBufferLayout,
+                },
+            .primitive =
+                WGPUPrimitiveState{
+                    .nextInChain = nullptr,
+                    .topology = WGPUPrimitiveTopology_TriangleList,
+                    .stripIndexFormat = WGPUIndexFormat_Undefined,
+                    .frontFace = WGPUFrontFace_CCW,
+                    .cullMode = WGPUCullMode_Back,
+                },
+            .depthStencil = nullptr,
+            .multisample =
+                WGPUMultisampleState{
+                    .nextInChain = nullptr,
+                    .count = 1,
+                    .mask = ~0u,
+                    .alphaToCoverageEnabled = false,
+                },
+            .fragment = &fragmentState,
+        };
+
+        mPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
+        wgpuPipelineLayoutRelease(pipelineLayout);
+    }
+}
+
+HybridRenderer::SkyPass::~SkyPass()
+{
+    renderPipelineSafeRelease(mPipeline);
+    mPipeline = nullptr;
+}
+
+void HybridRenderer::SkyPass::render(
+    const GpuContext&        gpuContext,
+    const glm::mat4&         viewProjectionMat,
+    const glm::vec3&         cameraPosition,
+    const Sky&               sky,
+    const WGPUCommandEncoder cmdEncoder,
+    const WGPUTextureView    textureView)
+{
+    if (mCurrentSky != sky)
+    {
+        mCurrentSky = sky;
+        const AlignedSkyState skyState{sky};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
+    }
+
+    {
+        const Uniforms uniforms{glm::inverse(viewProjectionMat), glm::vec4(cameraPosition, 1.f)};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
+    }
+
+    const WGPURenderPassEncoder renderPass = [cmdEncoder, textureView]() -> WGPURenderPassEncoder {
+        const WGPURenderPassColorAttachment colorAttachment{
+            .nextInChain = nullptr,
+            .view = textureView,
+            .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+            .resolveTarget = nullptr,
+            .loadOp = WGPULoadOp_Clear,
+            .storeOp = WGPUStoreOp_Store,
+            .clearValue = WGPUColor{0.0, 0.0, 0.0, 1.0},
+        };
+
+        const WGPURenderPassDescriptor renderPassDesc{
+            .nextInChain = nullptr,
+            .label = "Sky pass render pass",
+            .colorAttachmentCount = 1,
+            .colorAttachments = &colorAttachment,
+            .depthStencilAttachment = nullptr,
+            .occlusionQuerySet = nullptr,
+            .timestampWrites = nullptr,
+        };
+
+        return wgpuCommandEncoderBeginRenderPass(cmdEncoder, &renderPassDesc);
+    }();
+    NLRS_ASSERT(renderPass != nullptr);
+
+    wgpuRenderPassEncoderSetPipeline(renderPass, mPipeline);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mSkyStateBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mUniformBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetVertexBuffer(
+        renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
+    wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
+    wgpuRenderPassEncoderEnd(renderPass);
 }
 } // namespace nlrs

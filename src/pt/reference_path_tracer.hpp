@@ -1,5 +1,6 @@
 #pragma once
 
+#include "aligned_sky_state.hpp"
 #include "gpu_bind_group.hpp"
 #include "gpu_buffer.hpp"
 
@@ -27,16 +28,6 @@ struct SamplingParams
     std::uint32_t numBounces = 4;
 
     bool operator==(const SamplingParams&) const noexcept = default;
-};
-
-struct Sky
-{
-    float                turbidity = 1.0f;
-    std::array<float, 3> albedo = {1.0f, 1.0f, 1.0f};
-    float                sunZenithDegrees = 30.0f;
-    float                sunAzimuthDegrees = 0.0f;
-
-    bool operator==(const Sky&) const noexcept = default;
 };
 
 struct RenderParameters

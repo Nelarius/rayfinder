@@ -1,5 +1,6 @@
 #pragma once
 
+#include "aligned_sky_state.hpp"
 #include "gpu_bind_group.hpp"
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_buffer.hpp"
@@ -43,7 +44,12 @@ public:
     HybridRenderer(HybridRenderer&&) = delete;
     HybridRenderer& operator=(HybridRenderer&&) = delete;
 
-    void render(const GpuContext&, WGPUTextureView, const glm::mat4& viewProjectionMatrix);
+    void render(
+        const GpuContext& gpuContext,
+        const glm::mat4&  viewProjectionMatrix,
+        const glm::vec3&  cameraPosition,
+        const Sky&        sky,
+        WGPUTextureView   targetTextureView);
     void resize(const GpuContext&, const Extent2u&);
 
 private:
@@ -124,6 +130,42 @@ private:
         void resize(const GpuContext&, const Extent2u&);
     };
 
+    struct SkyPass
+    {
+    private:
+        Sky                mCurrentSky;
+        GpuBuffer          mVertexBuffer;
+        GpuBuffer          mSkyStateBuffer;
+        GpuBindGroup       mSkyStateBindGroup;
+        GpuBuffer          mUniformBuffer;
+        GpuBindGroup       mUniformBindGroup;
+        WGPURenderPipeline mPipeline;
+
+        struct Uniforms
+        {
+            glm::mat4 inverseViewProjection;
+            glm::vec4 cameraPosition;
+        };
+
+    public:
+        SkyPass(const GpuContext&);
+        ~SkyPass();
+
+        SkyPass(const SkyPass&) = delete;
+        SkyPass& operator=(const SkyPass&) = delete;
+
+        SkyPass(SkyPass&&) = delete;
+        SkyPass& operator=(SkyPass&&) = delete;
+
+        void render(
+            const GpuContext&  gpuContext,
+            const glm::mat4&   viewProjectionMatrix,
+            const glm::vec3&   cameraPosition,
+            const Sky&         sky,
+            WGPUCommandEncoder cmdEncoder,
+            WGPUTextureView    textureView);
+    };
+
     WGPUTexture        mDepthTexture;
     WGPUTextureView    mDepthTextureView;
     WGPUTexture        mAlbedoTexture;
@@ -134,5 +176,6 @@ private:
     GpuBindGroup       mGbufferBindGroup;
     GbufferPass        mGbufferPass;
     DebugPass          mDebugPass;
+    SkyPass            mSkyPass;
 };
 } // namespace nlrs

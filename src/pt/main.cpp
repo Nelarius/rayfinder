@@ -423,9 +423,22 @@ try
             renderer.render(gpuContext, textureBlitter.textureView());
             break;
         case RendererType_Hybrid:
+        {
             const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
-            hybridRenderer.render(gpuContext, textureBlitter.textureView(), viewProjectionMat);
+            const nlrs::Sky sky{
+                appState.ui.skyTurbidity,
+                appState.ui.skyAlbedo,
+                appState.ui.sunZenithDegrees,
+                appState.ui.sunAzimuthDegrees,
+            };
+            hybridRenderer.render(
+                gpuContext,
+                viewProjectionMat,
+                appState.cameraController.position(),
+                sky,
+                textureBlitter.textureView());
             break;
+        }
         }
         textureBlitter.render(gpuContext, gui, swapChain);
     };
