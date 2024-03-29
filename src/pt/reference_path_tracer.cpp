@@ -7,7 +7,6 @@
 
 #include <common/bvh.hpp>
 #include <common/gltf_model.hpp>
-#include <common/platform.hpp>
 #include <hw-skymodel/hw_skymodel.h>
 
 #include <fmt/core.h>

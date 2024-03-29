@@ -1,7 +1,5 @@
 #include "gpu_context.hpp"
 
-#include <common/platform.hpp>
-
 #include <GLFW/glfw3.h>
 
 #include <array>
