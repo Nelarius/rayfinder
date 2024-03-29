@@ -2,10 +2,11 @@
 
 #include "webgpu_utils.hpp"
 
+#include <common/assert.hpp>
+
 #include <fmt/core.h>
 #include <webgpu/webgpu.h>
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -14,6 +15,22 @@
 
 namespace nlrs
 {
+enum class GpuBufferUsage : uint32_t
+{
+    None = 0,
+    CopySrc = 1 << 0,
+    CopyDst = 1 << 1,
+    MapRead = 1 << 2,
+    MapWrite = 1 << 3,
+    Index = 1 << 4,
+    Vertex = 1 << 5,
+    Uniform = 1 << 6,
+    Storage = 1 << 7,
+    ReadOnlyStorage = 1 << 8,
+    Indirect = 1 << 9,
+    QueryResolve = 1 << 10,
+};
+
 // A wrapper around WGPUBuffer with unique ownership semantics.
 class GpuBuffer
 {
@@ -26,18 +43,10 @@ public:
     GpuBuffer(GpuBuffer&&) noexcept;
     GpuBuffer& operator=(GpuBuffer&&) noexcept;
 
-    GpuBuffer(
-        WGPUDevice           device,
-        const char*          label,
-        WGPUBufferUsageFlags usage,
-        std::size_t          byteSize);
+    GpuBuffer(WGPUDevice device, const char* label, GpuBufferUsage usage, std::size_t byteSize);
 
     template<typename T>
-    GpuBuffer(
-        WGPUDevice           device,
-        const char*          label,
-        WGPUBufferUsageFlags usage,
-        std::span<const T>   data);
+    GpuBuffer(WGPUDevice device, const char* label, GpuBufferUsage usage, std::span<const T> data);
 
     ~GpuBuffer();
 
@@ -45,12 +54,12 @@ public:
 
     inline WGPUBuffer ptr() const noexcept
     {
-        assert(mBuffer != nullptr);
+        NLRS_ASSERT(mBuffer != nullptr);
         return mBuffer;
     }
     inline std::size_t byteSize() const noexcept
     {
-        assert(mByteSize > 0);
+        NLRS_ASSERT(mByteSize > 0);
         return mByteSize;
     }
 
@@ -63,27 +72,94 @@ public:
     WGPUBindGroupEntry bindGroupEntry(std::uint32_t bindingIndex) const;
 
 private:
-    WGPUBuffer           mBuffer = nullptr;
-    std::size_t          mByteSize = 0;
-    WGPUBufferUsageFlags mUsage = WGPUBufferUsage_None;
+    WGPUBuffer     mBuffer = nullptr;
+    std::size_t    mByteSize = 0;
+    GpuBufferUsage mUsage = GpuBufferUsage::None;
 };
+
+inline GpuBufferUsage operator|(GpuBufferUsage lhs, GpuBufferUsage rhs) noexcept
+{
+    return static_cast<GpuBufferUsage>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+inline GpuBufferUsage operator|=(GpuBufferUsage& lhs, GpuBufferUsage rhs) noexcept
+{
+    return lhs = lhs | rhs;
+}
+
+inline GpuBufferUsage operator&(GpuBufferUsage lhs, GpuBufferUsage rhs) noexcept
+{
+    return static_cast<GpuBufferUsage>(static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs));
+}
+
+inline WGPUBufferUsageFlags gpuBufferUsageToWGPUBufferUsage(const GpuBufferUsage usage) noexcept
+{
+    WGPUBufferUsageFlags wgpuUsage = WGPUBufferUsage_None;
+
+    if ((usage & GpuBufferUsage::CopySrc) == GpuBufferUsage::CopySrc)
+    {
+        wgpuUsage |= WGPUBufferUsage_CopySrc;
+    }
+    if ((usage & GpuBufferUsage::CopyDst) == GpuBufferUsage::CopyDst)
+    {
+        wgpuUsage |= WGPUBufferUsage_CopyDst;
+    }
+    if ((usage & GpuBufferUsage::MapRead) == GpuBufferUsage::MapRead)
+    {
+        wgpuUsage |= WGPUBufferUsage_MapRead;
+    }
+    if ((usage & GpuBufferUsage::MapWrite) == GpuBufferUsage::MapWrite)
+    {
+        wgpuUsage |= WGPUBufferUsage_MapWrite;
+    }
+    if ((usage & GpuBufferUsage::Index) == GpuBufferUsage::Index)
+    {
+        wgpuUsage |= WGPUBufferUsage_Index;
+    }
+    if ((usage & GpuBufferUsage::Vertex) == GpuBufferUsage::Vertex)
+    {
+        wgpuUsage |= WGPUBufferUsage_Vertex;
+    }
+    if ((usage & GpuBufferUsage::Uniform) == GpuBufferUsage::Uniform)
+    {
+        wgpuUsage |= WGPUBufferUsage_Uniform;
+    }
+    if ((usage & GpuBufferUsage::Storage) == GpuBufferUsage::Storage)
+    {
+        wgpuUsage |= WGPUBufferUsage_Storage;
+    }
+    if ((usage & GpuBufferUsage::ReadOnlyStorage) == GpuBufferUsage::ReadOnlyStorage)
+    {
+        wgpuUsage |= WGPUBufferUsage_Storage;
+    }
+    if ((usage & GpuBufferUsage::Indirect) == GpuBufferUsage::Indirect)
+    {
+        wgpuUsage |= WGPUBufferUsage_Indirect;
+    }
+    if ((usage & GpuBufferUsage::QueryResolve) == GpuBufferUsage::QueryResolve)
+    {
+        wgpuUsage |= WGPUBufferUsage_QueryResolve;
+    }
+
+    return wgpuUsage;
+}
 
 template<typename T>
 GpuBuffer::GpuBuffer(
-    const WGPUDevice           device,
-    const char* const          label,
-    const WGPUBufferUsageFlags usage,
-    const std::span<const T>   data)
+    const WGPUDevice         device,
+    const char* const        label,
+    const GpuBufferUsage     usage,
+    const std::span<const T> data)
     : mBuffer(nullptr),
       mByteSize(sizeof(T) * data.size()),
       mUsage(usage)
 {
-    assert(device != nullptr);
+    NLRS_ASSERT(device != nullptr);
 
     const WGPUBufferDescriptor bufferDesc{
         .nextInChain = nullptr,
         .label = label,
-        .usage = mUsage,
+        .usage = gpuBufferUsageToWGPUBufferUsage(usage),
         .size = mByteSize,
         .mappedAtCreation = true,
     };
@@ -99,7 +175,7 @@ GpuBuffer::GpuBuffer(
     // https://www.w3.org/TR/webgpu/#dom-gpubufferdescriptor-mappedatcreation
 
     void* const mappedData = wgpuBufferGetMappedRange(mBuffer, 0, mByteSize);
-    assert(mappedData);
+    NLRS_ASSERT(mappedData);
     std::memcpy(mappedData, data.data(), mByteSize);
     wgpuBufferUnmap(mBuffer);
 }

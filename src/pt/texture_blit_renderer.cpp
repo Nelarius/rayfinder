@@ -23,7 +23,7 @@ TextureBlitRenderer::TextureBlitRenderer(
     : mVertexBuffer(
           gpuContext.device,
           "Vertex buffer",
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
+          GpuBufferUsage::Vertex | GpuBufferUsage::CopyDst,
           std::span<const float[2]>(quadVertexData)),
       mTexture(nullptr),
       mTextureView(nullptr),

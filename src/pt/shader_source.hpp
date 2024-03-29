@@ -24,16 +24,16 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 // render params bind group
 @group(0) @binding(0) var<uniform> renderParams: RenderParams;
 @group(0) @binding(1) var<uniform> postProcessingParams: PostProcessingParams;
-@group(0) @binding(2) var<storage, read_write> skyState: SkyState;
+@group(0) @binding(2) var<storage, read> skyState: SkyState;
 
 // scene bind group
 // TODO: these are `read` only buffers. How can I create a buffer layout type which allows this?
 // Annotating these as read causes validation failures.
-@group(1) @binding(0) var<storage, read_write> bvhNodes: array<BvhNode>;
-@group(1) @binding(1) var<storage, read_write> positionAttributes: array<Positions>;
-@group(1) @binding(2) var<storage, read_write> vertexAttributes: array<VertexAttributes>;
-@group(1) @binding(3) var<storage, read_write> textureDescriptors: array<TextureDescriptor>;
-@group(1) @binding(4) var<storage, read_write> textures: array<u32>;
+@group(1) @binding(0) var<storage, read> bvhNodes: array<BvhNode>;
+@group(1) @binding(1) var<storage, read> positionAttributes: array<Positions>;
+@group(1) @binding(2) var<storage, read> vertexAttributes: array<VertexAttributes>;
+@group(1) @binding(3) var<storage, read> textureDescriptors: array<TextureDescriptor>;
+@group(1) @binding(4) var<storage, read> textures: array<u32>;
 
 // image bind group
 @group(2) @binding(0) var<storage, read_write> imageBuffer: array<vec3f>;
@@ -549,9 +549,9 @@ const INT_SCALE = 256f;
 
 @must_use
 fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
-    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Ge)"
-R"(ms
-    let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
+    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
+    let offset = vec3i(i32(INT_SC)"
+R"(ALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
     // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
     // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
     let po = vec3f(

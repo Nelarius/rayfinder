@@ -13,23 +13,22 @@ void bufferSafeRelease(WGPUBuffer buffer)
     }
 }
 
-WGPUBufferBindingType bufferUsageToBufferBindingType(const WGPUBufferUsageFlags usage)
+inline WGPUBufferBindingType gpuBufferUsageToWGPUBufferBindingType(const GpuBufferUsage usage)
 {
-    assert(usage != WGPUBufferUsage_None);
-
-    // BufferUsage flags contains redundant binding type information that we can reuse, so that the
-    // user doesn't have to provide the additional flag.
-
-    if (usage & WGPUBufferUsage_Uniform)
-    {
-        return WGPUBufferBindingType_Uniform;
-    }
-    else if (usage & WGPUBufferUsage_Storage)
+    if ((usage & GpuBufferUsage::Storage) == GpuBufferUsage::Storage)
     {
         return WGPUBufferBindingType_Storage;
     }
+    else if ((usage & GpuBufferUsage::ReadOnlyStorage) == GpuBufferUsage::ReadOnlyStorage)
+    {
+        return WGPUBufferBindingType_ReadOnlyStorage;
+    }
+    else if ((usage & GpuBufferUsage::Uniform) == GpuBufferUsage::Uniform)
+    {
+        return WGPUBufferBindingType_Uniform;
+    }
 
-    assert(!"No matching WGPUBufferBindingType for WGPUBufferUsage.");
+    NLRS_ASSERT("Invalid buffer usage for binding type!");
 
     return WGPUBufferBindingType_Undefined;
 }
@@ -45,7 +44,7 @@ GpuBuffer::GpuBuffer(GpuBuffer&& other) noexcept
 
         other.mBuffer = nullptr;
         other.mByteSize = 0;
-        other.mUsage = WGPUBufferUsage_None;
+        other.mUsage = GpuBufferUsage::None;
     }
 }
 
@@ -61,26 +60,26 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept
 
         other.mBuffer = nullptr;
         other.mByteSize = 0;
-        other.mUsage = WGPUBufferUsage_None;
+        other.mUsage = GpuBufferUsage::None;
     }
     return *this;
 }
 
 GpuBuffer::GpuBuffer(
-    const WGPUDevice           device,
-    const char* const          label,
-    const WGPUBufferUsageFlags usage,
-    const std::size_t          byteSize)
+    const WGPUDevice     device,
+    const char* const    label,
+    const GpuBufferUsage usage,
+    const std::size_t    byteSize)
     : mBuffer(nullptr),
       mByteSize(byteSize),
       mUsage(usage)
 {
-    assert(device != nullptr);
+    NLRS_ASSERT(device != nullptr);
 
     const WGPUBufferDescriptor bufferDesc{
         .nextInChain = nullptr,
         .label = label,
-        .usage = mUsage,
+        .usage = gpuBufferUsageToWGPUBufferUsage(usage),
         .size = mByteSize,
         .mappedAtCreation = false,
     };
@@ -103,14 +102,14 @@ WGPUBindGroupLayoutEntry GpuBuffer::bindGroupLayoutEntry(
     const WGPUShaderStageFlags visibility,
     const std::size_t          minBindingSize) const
 {
-    assert(mBuffer != nullptr);
-    const WGPUBufferBindingType bindingType = bufferUsageToBufferBindingType(mUsage);
+    NLRS_ASSERT(mBuffer != nullptr);
+    const WGPUBufferBindingType bindingType = gpuBufferUsageToWGPUBufferBindingType(mUsage);
     return bufferBindGroupLayoutEntry(bindingIdx, visibility, bindingType, minBindingSize);
 }
 
 WGPUBindGroupEntry GpuBuffer::bindGroupEntry(const std::uint32_t bindingIdx) const
 {
-    assert(mBuffer != nullptr);
+    NLRS_ASSERT(mBuffer != nullptr);
     return bufferBindGroupEntry(bindingIdx, mBuffer, mByteSize);
 }
 } // namespace nlrs

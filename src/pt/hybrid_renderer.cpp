@@ -301,7 +301,7 @@ HybridRenderer::GbufferPass::GbufferPass(
               std::back_inserter(buffers),
               [&gpuContext](const std::span<const glm::vec4> vertices) -> GpuBuffer {
                   return GpuBuffer(
-                      gpuContext.device, "Mesh Vertex Buffer", WGPUBufferUsage_Vertex, vertices);
+                      gpuContext.device, "Mesh Vertex Buffer", GpuBufferUsage::Vertex, vertices);
               });
           return buffers;
       }()),
@@ -313,7 +313,7 @@ HybridRenderer::GbufferPass::GbufferPass(
               std::back_inserter(buffers),
               [&gpuContext](const std::span<const glm::vec4> normals) -> GpuBuffer {
                   return GpuBuffer{
-                      gpuContext.device, "Mesh normal buffer", WGPUBufferUsage_Vertex, normals};
+                      gpuContext.device, "Mesh normal buffer", GpuBufferUsage::Vertex, normals};
               });
           return buffers;
       }()),
@@ -325,7 +325,7 @@ HybridRenderer::GbufferPass::GbufferPass(
               std::back_inserter(buffers),
               [&gpuContext](const std::span<const glm::vec2> texCoords) {
                   return GpuBuffer(
-                      gpuContext.device, "Mesh TexCoord Buffer", WGPUBufferUsage_Vertex, texCoords);
+                      gpuContext.device, "Mesh TexCoord Buffer", GpuBufferUsage::Vertex, texCoords);
               });
           return buffers;
       }()),
@@ -338,7 +338,7 @@ HybridRenderer::GbufferPass::GbufferPass(
               [&gpuContext](const std::span<const std::uint32_t> indices) {
                   return IndexBuffer{
                       .buffer = GpuBuffer(
-                          gpuContext.device, "Mesh Index Buffer", WGPUBufferUsage_Index, indices),
+                          gpuContext.device, "Mesh Index Buffer", GpuBufferUsage::Index, indices),
                       .count = static_cast<std::uint32_t>(indices.size()),
                       .format = WGPUIndexFormat_Uint32,
                   };
@@ -425,7 +425,7 @@ HybridRenderer::GbufferPass::GbufferPass(
       mUniformBuffer(
           gpuContext.device,
           "Uniform buffer",
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+          GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
           sizeof(glm::mat4)),
       mUniformBindGroup(),
       mSamplerBindGroup(),
@@ -790,7 +790,7 @@ HybridRenderer::DebugPass::DebugPass(
     : mVertexBuffer(
           gpuContext.device,
           "Vertex buffer",
-          WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
+          GpuBufferUsage::Vertex | GpuBufferUsage::CopyDst,
           std::span<const float[2]>(quadVertexData)),
       mUniformBuffer(),
       mUniformBindGroup(),
@@ -801,7 +801,7 @@ HybridRenderer::DebugPass::DebugPass(
         mUniformBuffer = GpuBuffer{
             gpuContext.device,
             "Uniform buffer",
-            WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
+            GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
             std::span<const float>(&uniformData.x, sizeof(Extent2<float>))};
     }
 
