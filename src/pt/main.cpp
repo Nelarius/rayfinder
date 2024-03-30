@@ -41,6 +41,7 @@ enum RendererType
 {
     RendererType_PathTracer,
     RendererType_Hybrid,
+    RendererType_Debug,
 };
 
 struct UiState
@@ -313,6 +314,8 @@ try
             ImGui::RadioButton("path tracer", &appState.ui.rendererType, RendererType_PathTracer);
             ImGui::SameLine();
             ImGui::RadioButton("hybrid", &appState.ui.rendererType, RendererType_Hybrid);
+            ImGui::SameLine();
+            ImGui::RadioButton("debug", &appState.ui.rendererType, RendererType_Debug);
             ImGui::Separator();
 
             ImGui::Text("Renderer stats");
@@ -437,6 +440,12 @@ try
                 appState.cameraController.position(),
                 sky,
                 textureBlitter.textureView());
+            break;
+        }
+        case RendererType_Debug:
+        {
+            const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
+            hybridRenderer.renderDebug(gpuContext, viewProjectionMat, textureBlitter.textureView());
             break;
         }
         }

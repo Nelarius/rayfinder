@@ -205,6 +205,41 @@ void HybridRenderer::render(
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
 }
 
+void HybridRenderer::renderDebug(
+    const GpuContext&     gpuContext,
+    const glm::mat4&      viewProjectionMat,
+    const WGPUTextureView textureView)
+{
+    wgpuDeviceTick(gpuContext.device);
+
+    const WGPUCommandEncoder encoder = [&gpuContext]() {
+        const WGPUCommandEncoderDescriptor cmdEncoderDesc{
+            .nextInChain = nullptr,
+            .label = "Command encoder",
+        };
+        return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
+    }();
+
+    mGbufferPass.render(
+        gpuContext,
+        viewProjectionMat,
+        encoder,
+        mDepthTextureView,
+        mAlbedoTextureView,
+        mNormalTextureView);
+
+    mDebugPass.render(mGbufferBindGroup, encoder, textureView);
+
+    const WGPUCommandBuffer cmdBuffer = [encoder]() {
+        const WGPUCommandBufferDescriptor cmdBufferDesc{
+            .nextInChain = nullptr,
+            .label = "HybridRenderer command buffer",
+        };
+        return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
+    }();
+    wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
+}
+
 void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSize)
 {
     NLRS_ASSERT(newSize.x > 0 && newSize.y > 0);

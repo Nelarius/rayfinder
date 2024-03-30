@@ -50,6 +50,7 @@ public:
         const glm::vec3&  cameraPosition,
         const Sky&        sky,
         WGPUTextureView   targetTextureView);
+    void renderDebug(const GpuContext&, const glm::mat4&, WGPUTextureView);
     void resize(const GpuContext&, const Extent2u&);
 
 private:
