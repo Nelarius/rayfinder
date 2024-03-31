@@ -12,7 +12,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
     let uv = 0.5 * in.position + vec2f(0.5);
     var out: VertexOutput;
     out.position = vec4f(in.position, 0.0, 1.0);
-    out.texCoord = vec2f(uv.x, 1.0 - uv.y); // flip y axis
+    out.texCoord = vec2f(uv.x, 1.0 - uv.y);
 
     return out;
 }

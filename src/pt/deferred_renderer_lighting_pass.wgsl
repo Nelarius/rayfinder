@@ -9,9 +9,10 @@ struct VertexOutput {
 
 @vertex
 fn vsMain(in: VertexInput) -> VertexOutput {
+    let uv = 0.5 * in.position + vec2f(0.5);
     var out: VertexOutput;
     out.position = vec4f(in.position, 0.0, 1.0);
-    out.texCoord = 0.5 * in.position + vec2f(0.5);
+    out.texCoord = vec2f(uv.x, 1.0 - uv.y);
 
     return out;
 }
@@ -44,8 +45,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     var color = vec3f(0.0, 0.0, 0.0);
 
     let uv = in.texCoord;
-    // NOTE: flip y-axis when sampling textures
-    let idx = vec2u(floor(vec2(uv.x, 1.0 - uv.y) * uniforms.framebufferSize));
+    let idx = vec2u(floor(uv * uniforms.framebufferSize));
     let d = textureLoad(gbufferDepth, idx, 0);
     if d == 1.0 {
         let world = worldFromUv(uv);
@@ -69,7 +69,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 }
 
 fn worldFromUv(uv: vec2f) -> vec4f {
-    let ndc = vec4(2.0 * uv - vec2(1.0), 0.0, 1.0);
+    let ndc = vec4(2.0 * vec2(uv.x, 1.0 - uv.y) - vec2(1.0), 0.0, 1.0);
     let worldInvW = uniforms.inverseViewProjectionMat * ndc;
     let world = worldInvW / worldInvW.w;
     return world;
