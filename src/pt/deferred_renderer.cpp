@@ -1,5 +1,5 @@
 #include "gpu_context.hpp"
-#include "hybrid_renderer.hpp"
+#include "deferred_renderer.hpp"
 #include "shader_source.hpp"
 #include "webgpu_utils.hpp"
 #include "window.hpp"
@@ -59,9 +59,9 @@ WGPUTextureView createGbufferTextureView(
 }
 } // namespace
 
-HybridRenderer::HybridRenderer(
-    const GpuContext&               gpuContext,
-    const HybridRendererDescriptor& rendererDesc)
+DeferredRenderer::DeferredRenderer(
+    const GpuContext&                 gpuContext,
+    const DeferredRendererDescriptor& rendererDesc)
     : mDepthTexture(nullptr),
       mDepthTextureView(nullptr),
       mAlbedoTexture(nullptr),
@@ -71,7 +71,8 @@ HybridRenderer::HybridRenderer(
       mGbufferBindGroupLayout(),
       mGbufferBindGroup(),
       mGbufferPass(gpuContext, rendererDesc),
-      mDebugPass()
+      mDebugPass(),
+      mLightingPass()
 {
     {
         const std::array<WGPUTextureFormat, 1> depthFormats{
@@ -149,9 +150,10 @@ HybridRenderer::HybridRenderer(
             textureBindGroupEntry(2, mDepthTextureView)}};
 
     mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
+    mLightingPass = LightingPass{gpuContext, mGbufferBindGroupLayout};
 }
 
-HybridRenderer::~HybridRenderer()
+DeferredRenderer::~DeferredRenderer()
 {
     textureViewSafeRelease(mNormalTextureView);
     mNormalTextureView = nullptr;
@@ -167,10 +169,13 @@ HybridRenderer::~HybridRenderer()
     mDepthTexture = nullptr;
 }
 
-void HybridRenderer::render(
+void DeferredRenderer::render(
     const GpuContext&     gpuContext,
-    const WGPUTextureView textureView,
-    const glm::mat4&      viewProjectionMat)
+    const glm::mat4&      viewProjectionMat,
+    const glm::vec3&      cameraPosition,
+    const Extent2f&       framebufferSize,
+    const Sky&            sky,
+    const WGPUTextureView textureView)
 {
     wgpuDeviceTick(gpuContext.device);
 
@@ -190,23 +195,65 @@ void HybridRenderer::render(
         mAlbedoTextureView,
         mNormalTextureView);
 
-    mDebugPass.render(mGbufferBindGroup, encoder, textureView);
+    mLightingPass.render(
+        gpuContext,
+        viewProjectionMat,
+        cameraPosition,
+        framebufferSize,
+        sky,
+        mGbufferBindGroup,
+        encoder,
+        textureView);
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
             .nextInChain = nullptr,
-            .label = "HybridRenderer command buffer",
+            .label = "DeferredRenderer command buffer",
         };
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
 }
 
-void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSize)
+void DeferredRenderer::renderDebug(
+    const GpuContext&     gpuContext,
+    const glm::mat4&      viewProjectionMat,
+    const Extent2f&       framebufferSize,
+    const WGPUTextureView textureView)
+{
+    wgpuDeviceTick(gpuContext.device);
+
+    const WGPUCommandEncoder encoder = [&gpuContext]() {
+        const WGPUCommandEncoderDescriptor cmdEncoderDesc{
+            .nextInChain = nullptr,
+            .label = "Command encoder",
+        };
+        return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
+    }();
+
+    mGbufferPass.render(
+        gpuContext,
+        viewProjectionMat,
+        encoder,
+        mDepthTextureView,
+        mAlbedoTextureView,
+        mNormalTextureView);
+
+    mDebugPass.render(gpuContext, mGbufferBindGroup, encoder, textureView, framebufferSize);
+
+    const WGPUCommandBuffer cmdBuffer = [encoder]() {
+        const WGPUCommandBufferDescriptor cmdBufferDesc{
+            .nextInChain = nullptr,
+            .label = "DeferredRenderer command buffer",
+        };
+        return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
+    }();
+    wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
+}
+
+void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSize)
 {
     NLRS_ASSERT(newSize.x > 0 && newSize.y > 0);
-
-    mDebugPass.resize(gpuContext, newSize);
 
     textureViewSafeRelease(mNormalTextureView);
     textureSafeRelease(mNormalTexture);
@@ -290,9 +337,9 @@ void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSiz
             textureBindGroupEntry(2, mDepthTextureView)}};
 }
 
-HybridRenderer::GbufferPass::GbufferPass(
-    const GpuContext&               gpuContext,
-    const HybridRendererDescriptor& rendererDesc)
+DeferredRenderer::GbufferPass::GbufferPass(
+    const GpuContext&                 gpuContext,
+    const DeferredRendererDescriptor& rendererDesc)
     : mPositionBuffers([&gpuContext, &rendererDesc]() -> std::vector<GpuBuffer> {
           std::vector<GpuBuffer> buffers;
           std::transform(
@@ -580,7 +627,7 @@ HybridRenderer::GbufferPass::GbufferPass(
                         .next = nullptr,
                         .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                     },
-                .code = HYBRID_RENDERER_GBUFFER_PASS_SOURCE,
+                .code = DEFERRED_RENDERER_GBUFFER_PASS_SOURCE,
             };
 
             const WGPUShaderModuleDescriptor shaderDesc{
@@ -674,7 +721,7 @@ HybridRenderer::GbufferPass::GbufferPass(
     NLRS_ASSERT(mPositionBuffers.size() == mBaseColorTextureIndices.size());
 }
 
-HybridRenderer::GbufferPass::~GbufferPass()
+DeferredRenderer::GbufferPass::~GbufferPass()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
@@ -688,7 +735,7 @@ HybridRenderer::GbufferPass::~GbufferPass()
     mBaseColorTextures.clear();
 }
 
-void HybridRenderer::GbufferPass::render(
+void DeferredRenderer::GbufferPass::render(
     const GpuContext&        gpuContext,
     const glm::mat4&         viewProjectionMat,
     const WGPUCommandEncoder cmdEncoder,
@@ -783,7 +830,7 @@ void HybridRenderer::GbufferPass::render(
     wgpuRenderPassEncoderEnd(renderPassEncoder);
 }
 
-HybridRenderer::DebugPass::DebugPass(
+DeferredRenderer::DebugPass::DebugPass(
     const GpuContext&         gpuContext,
     const GpuBindGroupLayout& gbufferBindGroupLayout,
     const Extent2u&           framebufferSize)
@@ -797,18 +844,18 @@ HybridRenderer::DebugPass::DebugPass(
       mPipeline(nullptr)
 {
     {
-        const auto uniformData = Extent2<float>{framebufferSize};
+        const auto uniformData = Extent2f{framebufferSize};
         mUniformBuffer = GpuBuffer{
             gpuContext.device,
             "Uniform buffer",
             GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
-            std::span<const float>(&uniformData.x, sizeof(Extent2<float>))};
+            std::span<const float>(&uniformData.x, sizeof(Extent2f))};
     }
 
     const GpuBindGroupLayout uniformBindGroupLayout{
         gpuContext.device,
         "Uniform bind group layout",
-        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Extent2<float>))};
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Extent2f))};
 
     mUniformBindGroup = GpuBindGroup{
         gpuContext.device,
@@ -856,7 +903,7 @@ HybridRenderer::DebugPass::DebugPass(
                         .next = nullptr,
                         .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                     },
-                .code = HYBRID_RENDERER_DEBUG_PASS_SOURCE,
+                .code = DEFERRED_RENDERER_DEBUG_PASS_SOURCE,
             };
 
             const WGPUShaderModuleDescriptor moduleDesc{
@@ -942,13 +989,13 @@ HybridRenderer::DebugPass::DebugPass(
     }
 }
 
-HybridRenderer::DebugPass::~DebugPass()
+DeferredRenderer::DebugPass::~DebugPass()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
 }
 
-HybridRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
+DeferredRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
 {
     if (this != &other)
     {
@@ -960,7 +1007,7 @@ HybridRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
     }
 }
 
-HybridRenderer::DebugPass& HybridRenderer::DebugPass::operator=(DebugPass&& other) noexcept
+DeferredRenderer::DebugPass& DeferredRenderer::DebugPass::operator=(DebugPass&& other) noexcept
 {
     if (this != &other)
     {
@@ -974,11 +1021,16 @@ HybridRenderer::DebugPass& HybridRenderer::DebugPass::operator=(DebugPass&& othe
     return *this;
 }
 
-void HybridRenderer::DebugPass::render(
+void DeferredRenderer::DebugPass::render(
+    const GpuContext&        gpuContext,
     const GpuBindGroup&      gbufferBindGroup,
     const WGPUCommandEncoder cmdEncoder,
-    const WGPUTextureView    textureView)
+    const WGPUTextureView    textureView,
+    const Extent2f&          framebufferSize)
 {
+    wgpuQueueWriteBuffer(
+        gpuContext.queue, mUniformBuffer.ptr(), 0, &framebufferSize.x, sizeof(Extent2f));
+
     const WGPURenderPassEncoder renderPass = [cmdEncoder, textureView]() -> WGPURenderPassEncoder {
         const WGPURenderPassColorAttachment colorAttachment{
             .nextInChain = nullptr,
@@ -1014,10 +1066,283 @@ void HybridRenderer::DebugPass::render(
     wgpuRenderPassEncoderEnd(renderPass);
 }
 
-void HybridRenderer::DebugPass::resize(const GpuContext& gpuContext, const Extent2u& newSize)
+DeferredRenderer::LightingPass::LightingPass(
+    const GpuContext&         gpuContext,
+    const GpuBindGroupLayout& gbufferBindGroupLayout)
+    : mCurrentSky{},
+      mVertexBuffer{
+          gpuContext.device,
+          "Sky vertex buffer",
+          GpuBufferUsage::Vertex | GpuBufferUsage::CopyDst,
+          std::span<const float[2]>(quadVertexData)},
+      mSkyStateBuffer{
+          gpuContext.device,
+          "Sky state buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          sizeof(AlignedSkyState)},
+      mSkyStateBindGroup{},
+      mUniformBuffer{
+          gpuContext.device,
+          "Sky uniform buffer",
+          GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
+          sizeof(Uniforms)},
+      mUniformBindGroup{},
+      mPipeline(nullptr)
 {
-    const auto uniformData = Extent2<float>{newSize};
-    wgpuQueueWriteBuffer(
-        gpuContext.queue, mUniformBuffer.ptr(), 0, &uniformData.x, sizeof(Extent2<float>));
+    {
+        const AlignedSkyState skyState{mCurrentSky};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
+    }
+
+    const GpuBindGroupLayout skyStateBindGroupLayout{
+        gpuContext.device,
+        "Lighting pass sky state bind group layout",
+        mSkyStateBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(AlignedSkyState))};
+
+    mSkyStateBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass sky state bind group",
+        skyStateBindGroupLayout.ptr(),
+        mSkyStateBuffer.bindGroupEntry(0)};
+
+    const GpuBindGroupLayout uniformBindGroupLayout{
+        gpuContext.device,
+        "Lighting passs uniform bind group layout",
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Uniforms))};
+
+    mUniformBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass uniform bind group",
+        uniformBindGroupLayout.ptr(),
+        mUniformBuffer.bindGroupEntry(0)};
+
+    {
+        // Pipeline layout
+
+        const WGPUBindGroupLayout bindGroupLayouts[] = {
+            skyStateBindGroupLayout.ptr(),
+            uniformBindGroupLayout.ptr(),
+            gbufferBindGroupLayout.ptr()};
+
+        const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "Lighting pass pipeline layout",
+            .bindGroupLayoutCount = std::size(bindGroupLayouts),
+            .bindGroupLayouts = bindGroupLayouts,
+        };
+
+        const WGPUPipelineLayout pipelineLayout =
+            wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
+
+        // Vertex layout
+
+        const WGPUVertexAttribute vertexAttributes[] = {WGPUVertexAttribute{
+            .format = WGPUVertexFormat_Float32x2,
+            .offset = 0,
+            .shaderLocation = 0,
+        }};
+
+        const WGPUVertexBufferLayout vertexBufferLayout{
+            .arrayStride = sizeof(float[2]),
+            .stepMode = WGPUVertexStepMode_Vertex,
+            .attributeCount = std::size(vertexAttributes),
+            .attributes = vertexAttributes,
+        };
+
+        // Shader module
+
+        const WGPUShaderModule shaderModule = [&gpuContext]() -> WGPUShaderModule {
+            const WGPUShaderModuleWGSLDescriptor wgslDesc = {
+                .chain =
+                    WGPUChainedStruct{
+                        .next = nullptr,
+                        .sType = WGPUSType_ShaderModuleWGSLDescriptor,
+                    },
+                .code = DEFERRED_RENDERER_LIGHTING_PASS_SOURCE,
+            };
+
+            const WGPUShaderModuleDescriptor moduleDesc{
+                .nextInChain = &wgslDesc.chain,
+                .label = "Lighting pass shader",
+            };
+
+            return wgpuDeviceCreateShaderModule(gpuContext.device, &moduleDesc);
+        }();
+        NLRS_ASSERT(shaderModule != nullptr);
+
+        // Fragment state
+
+        const WGPUBlendState blendState{
+            .color =
+                WGPUBlendComponent{
+                    .operation = WGPUBlendOperation_Add,
+                    .srcFactor = WGPUBlendFactor_One,
+                    .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
+                },
+            .alpha =
+                WGPUBlendComponent{
+                    .operation = WGPUBlendOperation_Add,
+                    .srcFactor = WGPUBlendFactor_Zero,
+                    .dstFactor = WGPUBlendFactor_One,
+                },
+        };
+
+        const WGPUColorTargetState colorTargets[] = {WGPUColorTargetState{
+            .nextInChain = nullptr,
+            .format = Window::SWAP_CHAIN_FORMAT,
+            .blend = &blendState,
+            .writeMask = WGPUColorWriteMask_All}};
+
+        const WGPUFragmentState fragmentState{
+            .nextInChain = nullptr,
+            .module = shaderModule,
+            .entryPoint = "fsMain",
+            .constantCount = 0,
+            .constants = nullptr,
+            .targetCount = std::size(colorTargets),
+            .targets = colorTargets,
+        };
+
+        // Pipeline
+
+        const WGPURenderPipelineDescriptor pipelineDesc{
+            .nextInChain = nullptr,
+            .label = "Lighting pass render pipeline",
+            .layout = pipelineLayout,
+            .vertex =
+                WGPUVertexState{
+                    .nextInChain = nullptr,
+                    .module = shaderModule,
+                    .entryPoint = "vsMain",
+                    .constantCount = 0,
+                    .constants = nullptr,
+                    .bufferCount = 1,
+                    .buffers = &vertexBufferLayout,
+                },
+            .primitive =
+                WGPUPrimitiveState{
+                    .nextInChain = nullptr,
+                    .topology = WGPUPrimitiveTopology_TriangleList,
+                    .stripIndexFormat = WGPUIndexFormat_Undefined,
+                    .frontFace = WGPUFrontFace_CCW,
+                    .cullMode = WGPUCullMode_Back,
+                },
+            .depthStencil = nullptr,
+            .multisample =
+                WGPUMultisampleState{
+                    .nextInChain = nullptr,
+                    .count = 1,
+                    .mask = ~0u,
+                    .alphaToCoverageEnabled = false,
+                },
+            .fragment = &fragmentState,
+        };
+
+        mPipeline = wgpuDeviceCreateRenderPipeline(gpuContext.device, &pipelineDesc);
+        wgpuPipelineLayoutRelease(pipelineLayout);
+    }
+}
+
+DeferredRenderer::LightingPass::~LightingPass()
+{
+    renderPipelineSafeRelease(mPipeline);
+    mPipeline = nullptr;
+}
+
+DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
+{
+    if (this != &other)
+    {
+        mCurrentSky = other.mCurrentSky;
+        mVertexBuffer = std::move(other.mVertexBuffer);
+        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
+        mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mPipeline = other.mPipeline;
+        other.mPipeline = nullptr;
+    }
+}
+
+DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
+    LightingPass&& other) noexcept
+{
+    if (this != &other)
+    {
+        mCurrentSky = other.mCurrentSky;
+        mVertexBuffer = std::move(other.mVertexBuffer);
+        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
+        mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
+        renderPipelineSafeRelease(mPipeline);
+        mPipeline = other.mPipeline;
+        other.mPipeline = nullptr;
+    }
+    return *this;
+}
+
+void DeferredRenderer::LightingPass::render(
+    const GpuContext&        gpuContext,
+    const glm::mat4&         viewProjectionMat,
+    const glm::vec3&         cameraPosition,
+    const Extent2f&          fbsize,
+    const Sky&               sky,
+    const GpuBindGroup&      gbufferBindGroup,
+    const WGPUCommandEncoder cmdEncoder,
+    const WGPUTextureView    textureView)
+{
+    if (mCurrentSky != sky)
+    {
+        mCurrentSky = sky;
+        const AlignedSkyState skyState{sky};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
+    }
+
+    {
+        const Uniforms uniforms{
+            glm::inverse(viewProjectionMat),
+            glm::vec4(cameraPosition, 1.f),
+            glm::vec2(fbsize.x, fbsize.y),
+            {0.f, 0.f}};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
+    }
+
+    const WGPURenderPassEncoder renderPass = [cmdEncoder, textureView]() -> WGPURenderPassEncoder {
+        const WGPURenderPassColorAttachment colorAttachment{
+            .nextInChain = nullptr,
+            .view = textureView,
+            .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+            .resolveTarget = nullptr,
+            .loadOp = WGPULoadOp_Clear,
+            .storeOp = WGPUStoreOp_Store,
+            .clearValue = WGPUColor{0.0, 0.0, 0.0, 1.0},
+        };
+
+        const WGPURenderPassDescriptor renderPassDesc{
+            .nextInChain = nullptr,
+            .label = "Lighting pass render pass",
+            .colorAttachmentCount = 1,
+            .colorAttachments = &colorAttachment,
+            .depthStencilAttachment = nullptr,
+            .occlusionQuerySet = nullptr,
+            .timestampWrites = nullptr,
+        };
+
+        return wgpuCommandEncoderBeginRenderPass(cmdEncoder, &renderPassDesc);
+    }();
+    NLRS_ASSERT(renderPass != nullptr);
+
+    wgpuRenderPassEncoderSetPipeline(renderPass, mPipeline);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mSkyStateBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mUniformBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 2, gbufferBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetVertexBuffer(
+        renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
+    wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
+    wgpuRenderPassEncoderEnd(renderPass);
 }
 } // namespace nlrs

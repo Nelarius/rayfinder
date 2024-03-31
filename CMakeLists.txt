@@ -74,8 +74,9 @@ target_link_libraries(pt-format-tool PRIVATE common fmt pt-format glm::glm)
 set(WGSL_SHADER_FILES
     reference_path_tracer.wgsl
     texture_blit.wgsl
-    hybrid_renderer_gbuffer_pass.wgsl
-    hybrid_renderer_debug_pass.wgsl)
+    deferred_renderer_gbuffer_pass.wgsl
+    deferred_renderer_debug_pass.wgsl
+    deferred_renderer_lighting_pass.wgsl)
 
 set(SHADER_SOURCE_HEADER_FILE src/pt/shader_source.hpp)
 
@@ -97,7 +98,7 @@ set(PT_SOURCE_FILES
     gpu_buffer.cpp
     gpu_context.cpp
     gui.cpp
-    hybrid_renderer.cpp
+    deferred_renderer.cpp
     reference_path_tracer.cpp
     texture_blit_renderer.cpp
     window.cpp)

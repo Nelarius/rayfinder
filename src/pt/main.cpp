@@ -1,7 +1,7 @@
 #include "fly_camera_controller.hpp"
 #include "gpu_context.hpp"
 #include "gui.hpp"
-#include "hybrid_renderer.hpp"
+#include "deferred_renderer.hpp"
 #include "reference_path_tracer.hpp"
 #include "texture_blit_renderer.hpp"
 #include "window.hpp"
@@ -40,12 +40,13 @@ void printHelp() { std::printf("Usage:\n\tpt <input_pt_file>\n"); }
 enum RendererType
 {
     RendererType_PathTracer,
-    RendererType_Hybrid,
+    RendererType_Deferred,
+    RendererType_Debug,
 };
 
 struct UiState
 {
-    int   rendererType = RendererType_Hybrid;
+    int   rendererType = RendererType_Deferred;
     float vfovDegrees = 70.0f;
     // sampling
     int numSamplesPerPixel = 128;
@@ -127,7 +128,8 @@ try
         nlrs::TextureBlitRendererDescriptor{
             .framebufferSize = nlrs::Extent2u(window.resolution())}};
 
-    nlrs::HybridRenderer hybridRenderer = [&gpuContext, &window, argv]() -> nlrs::HybridRenderer {
+    nlrs::DeferredRenderer deferredRenderer =
+        [&gpuContext, &window, argv]() -> nlrs::DeferredRenderer {
         fs::path path = argv[1];
         path.replace_extension(".glb");
         if (!fs::exists(path))
@@ -203,9 +205,9 @@ try
             baseColorTextureIndices.push_back(mesh.baseColorTextureIndex);
         }
 
-        return nlrs::HybridRenderer{
+        return nlrs::DeferredRenderer{
             gpuContext,
-            nlrs::HybridRendererDescriptor{
+            nlrs::DeferredRendererDescriptor{
                 .framebufferSize = nlrs::Extent2u(window.resolution()),
                 .modelPositions = modelVertices,
                 .modelNormals = modelNormals,
@@ -312,7 +314,9 @@ try
             ImGui::Text("Renderer");
             ImGui::RadioButton("path tracer", &appState.ui.rendererType, RendererType_PathTracer);
             ImGui::SameLine();
-            ImGui::RadioButton("hybrid", &appState.ui.rendererType, RendererType_Hybrid);
+            ImGui::RadioButton("deferred", &appState.ui.rendererType, RendererType_Deferred);
+            ImGui::SameLine();
+            ImGui::RadioButton("debug", &appState.ui.rendererType, RendererType_Debug);
             ImGui::Separator();
 
             ImGui::Text("Renderer stats");
@@ -391,7 +395,7 @@ try
         }
     };
 
-    auto onRender = [&appState, &gpuContext, &gui, &renderer, &hybridRenderer, &textureBlitter](
+    auto onRender = [&appState, &gpuContext, &gui, &renderer, &deferredRenderer, &textureBlitter](
                         GLFWwindow* windowPtr, WGPUSwapChain swapChain) -> void {
         nlrs::Extent2i windowResolution;
         glfwGetFramebufferSize(windowPtr, &windowResolution.x, &windowResolution.y);
@@ -422,18 +426,44 @@ try
         case RendererType_PathTracer:
             renderer.render(gpuContext, textureBlitter.textureView());
             break;
-        case RendererType_Hybrid:
+        case RendererType_Deferred:
+        {
             const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
-            hybridRenderer.render(gpuContext, textureBlitter.textureView(), viewProjectionMat);
+            const nlrs::Sky sky{
+                appState.ui.skyTurbidity,
+                appState.ui.skyAlbedo,
+                appState.ui.sunZenithDegrees,
+                appState.ui.sunAzimuthDegrees,
+            };
+            deferredRenderer.render(
+                gpuContext,
+                viewProjectionMat,
+                appState.cameraController.position(),
+                nlrs::Extent2f(windowResolution),
+                sky,
+                textureBlitter.textureView());
             break;
+        }
+        case RendererType_Debug:
+        {
+            const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
+            deferredRenderer.renderDebug(
+                gpuContext,
+                viewProjectionMat,
+                nlrs::Extent2f(windowResolution),
+                textureBlitter.textureView());
+            break;
+        }
         }
         textureBlitter.render(gpuContext, gui, swapChain);
     };
 
-    auto onResize = [&gpuContext, &hybridRenderer, &textureBlitter](
+    auto onResize = [&gpuContext, &deferredRenderer, &textureBlitter](
                         const nlrs::FramebufferSize newSize) -> void {
+        // TODO: this function is not really needed since I get the current framebuffer size on each
+        // render anyway.
         const auto sz = nlrs::Extent2u(newSize);
-        hybridRenderer.resize(gpuContext, sz);
+        deferredRenderer.resize(gpuContext, sz);
         textureBlitter.resize(gpuContext, sz);
     };
 

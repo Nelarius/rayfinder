@@ -7,8 +7,6 @@
 
 #include <common/bvh.hpp>
 #include <common/gltf_model.hpp>
-#include <common/platform.hpp>
-#include <hw-skymodel/hw_skymodel.h>
 
 #include <fmt/core.h>
 #include <glm/glm.hpp>
@@ -28,9 +26,6 @@
 
 namespace nlrs
 {
-inline constexpr float PI = std::numbers::pi_v<float>;
-inline constexpr float DEGREES_TO_RADIANS = PI / 180.0f;
-
 namespace
 {
 struct FrameDataLayout
@@ -97,47 +92,6 @@ struct SamplingStateLayout
     }
 };
 
-struct SkyStateLayout
-{
-    float     params[27];        // offset: 0
-    float     skyRadiances[3];   // offset: 27
-    float     solarRadiances[3]; // offset: 30
-    float     padding1[3];       // offset: 33
-    glm::vec3 sunDirection;      // offset: 36
-    float     padding2;          // offset: 39
-
-    SkyStateLayout(const Sky& sky)
-        : params{0},
-          skyRadiances{0},
-          solarRadiances{0},
-          padding1{0.f, 0.f, 0.f},
-          sunDirection(0.f),
-          padding2(0.0f)
-    {
-        const float sunZenith = sky.sunZenithDegrees * DEGREES_TO_RADIANS;
-        const float sunAzimuth = sky.sunAzimuthDegrees * DEGREES_TO_RADIANS;
-
-        sunDirection = glm::normalize(glm::vec3(
-            std::sin(sunZenith) * std::cos(sunAzimuth),
-            std::cos(sunZenith),
-            -std::sin(sunZenith) * std::sin(sunAzimuth)));
-
-        const sky_params skyParams{
-            .elevation = 0.5f * PI - sunZenith,
-            .turbidity = sky.turbidity,
-            .albedo = {sky.albedo[0], sky.albedo[1], sky.albedo[2]}};
-
-        sky_state                   skyState;
-        [[maybe_unused]] const auto r = sky_state_new(&skyParams, &skyState);
-        // TODO: exceptional error handling
-        assert(r == sky_state_result_success);
-
-        std::memcpy(params, skyState.params, sizeof(skyState.params));
-        std::memcpy(skyRadiances, skyState.sky_radiances, sizeof(skyState.sky_radiances));
-        std::memcpy(solarRadiances, skyState.solar_radiances, sizeof(skyState.solar_radiances));
-    }
-};
-
 struct RenderParamsLayout
 {
     FrameDataLayout     frameData;
@@ -188,7 +142,7 @@ ReferencePathTracer::ReferencePathTracer(
           gpuContext.device,
           "sky state buffer",
           GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
-          sizeof(SkyStateLayout)),
+          sizeof(AlignedSkyState)),
       mRenderParamsBindGroup(),
       mBvhNodeBuffer(
           gpuContext.device,
@@ -625,9 +579,9 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
             0,
             &mCurrentPostProcessingParams,
             sizeof(PostProcessingParameters));
-        const SkyStateLayout skyStateLayout{mCurrentRenderParams.sky};
+        const AlignedSkyState skyState{mCurrentRenderParams.sky};
         wgpuQueueWriteBuffer(
-            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyStateLayout, sizeof(SkyStateLayout));
+            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
     }
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {

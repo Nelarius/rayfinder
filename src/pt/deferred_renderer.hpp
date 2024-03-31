@@ -1,5 +1,6 @@
 #pragma once
 
+#include "aligned_sky_state.hpp"
 #include "gpu_bind_group.hpp"
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_buffer.hpp"
@@ -20,7 +21,7 @@ namespace nlrs
 {
 struct GpuContext;
 
-struct HybridRendererDescriptor
+struct DeferredRendererDescriptor
 {
     Extent2u                                  framebufferSize;
     std::span<std::span<const glm::vec4>>     modelPositions;
@@ -31,19 +32,26 @@ struct HybridRendererDescriptor
     std::span<Texture>                        baseColorTextures;
 };
 
-class HybridRenderer
+class DeferredRenderer
 {
 public:
-    HybridRenderer(const GpuContext&, const HybridRendererDescriptor&);
-    ~HybridRenderer();
+    DeferredRenderer(const GpuContext&, const DeferredRendererDescriptor&);
+    ~DeferredRenderer();
 
-    HybridRenderer(const HybridRenderer&) = delete;
-    HybridRenderer& operator=(const HybridRenderer&) = delete;
+    DeferredRenderer(const DeferredRenderer&) = delete;
+    DeferredRenderer& operator=(const DeferredRenderer&) = delete;
 
-    HybridRenderer(HybridRenderer&&) = delete;
-    HybridRenderer& operator=(HybridRenderer&&) = delete;
+    DeferredRenderer(DeferredRenderer&&) = delete;
+    DeferredRenderer& operator=(DeferredRenderer&&) = delete;
 
-    void render(const GpuContext&, WGPUTextureView, const glm::mat4& viewProjectionMatrix);
+    void render(
+        const GpuContext& gpuContext,
+        const glm::mat4&  viewProjectionMatrix,
+        const glm::vec3&  cameraPosition,
+        const Extent2f&   framebufferSize,
+        const Sky&        sky,
+        WGPUTextureView   targetTextureView);
+    void renderDebug(const GpuContext&, const glm::mat4&, const Extent2f&, WGPUTextureView);
     void resize(const GpuContext&, const Extent2u&);
 
 private:
@@ -77,7 +85,7 @@ private:
         WGPURenderPipeline        mPipeline;
 
     public:
-        GbufferPass(const GpuContext&, const HybridRendererDescriptor&);
+        GbufferPass(const GpuContext&, const DeferredRendererDescriptor&);
         ~GbufferPass();
 
         GbufferPass(const GbufferPass&) = delete;
@@ -118,10 +126,54 @@ private:
         DebugPass& operator=(DebugPass&&) noexcept;
 
         void render(
+            const GpuContext&   gpuContext,
             const GpuBindGroup& gbufferBindGroup,
             WGPUCommandEncoder  encoder,
+            WGPUTextureView     textureView,
+            const Extent2f&     framebufferSize);
+    };
+
+    struct LightingPass
+    {
+    private:
+        Sky                mCurrentSky = Sky{};
+        GpuBuffer          mVertexBuffer = GpuBuffer{};
+        GpuBuffer          mSkyStateBuffer = GpuBuffer{};
+        GpuBindGroup       mSkyStateBindGroup = GpuBindGroup{};
+        GpuBuffer          mUniformBuffer = GpuBuffer{};
+        GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
+        WGPURenderPipeline mPipeline = nullptr;
+
+        struct Uniforms
+        {
+            glm::mat4 inverseViewProjection;
+            glm::vec4 cameraPosition;
+            glm::vec2 framebufferSize;
+            float     padding[2];
+        };
+
+    public:
+        LightingPass() = default;
+        LightingPass(
+            const GpuContext&         gpuContext,
+            const GpuBindGroupLayout& gbufferBindGroupLayout);
+        ~LightingPass();
+
+        LightingPass(const LightingPass&) = delete;
+        LightingPass& operator=(const LightingPass&) = delete;
+
+        LightingPass(LightingPass&&) noexcept;
+        LightingPass& operator=(LightingPass&&) noexcept;
+
+        void render(
+            const GpuContext&   gpuContext,
+            const glm::mat4&    viewProjectionMatrix,
+            const glm::vec3&    cameraPosition,
+            const Extent2f&     framebufferSize,
+            const Sky&          sky,
+            const GpuBindGroup& gbufferBindGroup,
+            WGPUCommandEncoder  cmdEncoder,
             WGPUTextureView     textureView);
-        void resize(const GpuContext&, const Extent2u&);
     };
 
     WGPUTexture        mDepthTexture;
@@ -134,5 +186,6 @@ private:
     GpuBindGroup       mGbufferBindGroup;
     GbufferPass        mGbufferPass;
     DebugPass          mDebugPass;
+    LightingPass       mLightingPass;
 };
 } // namespace nlrs
