@@ -439,6 +439,7 @@ try
                 gpuContext,
                 viewProjectionMat,
                 appState.cameraController.position(),
+                nlrs::Extent2f(windowResolution),
                 sky,
                 textureBlitter.textureView());
             break;
@@ -447,7 +448,10 @@ try
         {
             const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
             deferredRenderer.renderDebug(
-                gpuContext, viewProjectionMat, textureBlitter.textureView());
+                gpuContext,
+                viewProjectionMat,
+                nlrs::Extent2f(windowResolution),
+                textureBlitter.textureView());
             break;
         }
         }
@@ -456,6 +460,8 @@ try
 
     auto onResize = [&gpuContext, &deferredRenderer, &textureBlitter](
                         const nlrs::FramebufferSize newSize) -> void {
+        // TODO: this function is not really needed since I get the current framebuffer size on each
+        // render anyway.
         const auto sz = nlrs::Extent2u(newSize);
         deferredRenderer.resize(gpuContext, sz);
         textureBlitter.resize(gpuContext, sz);

@@ -48,9 +48,10 @@ public:
         const GpuContext& gpuContext,
         const glm::mat4&  viewProjectionMatrix,
         const glm::vec3&  cameraPosition,
+        const Extent2f&   framebufferSize,
         const Sky&        sky,
         WGPUTextureView   targetTextureView);
-    void renderDebug(const GpuContext&, const glm::mat4&, WGPUTextureView);
+    void renderDebug(const GpuContext&, const glm::mat4&, const Extent2f&, WGPUTextureView);
     void resize(const GpuContext&, const Extent2u&);
 
 private:
@@ -125,46 +126,54 @@ private:
         DebugPass& operator=(DebugPass&&) noexcept;
 
         void render(
+            const GpuContext&   gpuContext,
             const GpuBindGroup& gbufferBindGroup,
             WGPUCommandEncoder  encoder,
-            WGPUTextureView     textureView);
-        void resize(const GpuContext&, const Extent2u&);
+            WGPUTextureView     textureView,
+            const Extent2f&     framebufferSize);
     };
 
     struct LightingPass
     {
     private:
-        Sky                mCurrentSky;
-        GpuBuffer          mVertexBuffer;
-        GpuBuffer          mSkyStateBuffer;
-        GpuBindGroup       mSkyStateBindGroup;
-        GpuBuffer          mUniformBuffer;
-        GpuBindGroup       mUniformBindGroup;
-        WGPURenderPipeline mPipeline;
+        Sky                mCurrentSky = Sky{};
+        GpuBuffer          mVertexBuffer = GpuBuffer{};
+        GpuBuffer          mSkyStateBuffer = GpuBuffer{};
+        GpuBindGroup       mSkyStateBindGroup = GpuBindGroup{};
+        GpuBuffer          mUniformBuffer = GpuBuffer{};
+        GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
+        WGPURenderPipeline mPipeline = nullptr;
 
         struct Uniforms
         {
             glm::mat4 inverseViewProjection;
             glm::vec4 cameraPosition;
+            glm::vec2 framebufferSize;
+            float     padding[2];
         };
 
     public:
-        LightingPass(const GpuContext&);
+        LightingPass() = default;
+        LightingPass(
+            const GpuContext&         gpuContext,
+            const GpuBindGroupLayout& gbufferBindGroupLayout);
         ~LightingPass();
 
         LightingPass(const LightingPass&) = delete;
         LightingPass& operator=(const LightingPass&) = delete;
 
-        LightingPass(LightingPass&&) = delete;
-        LightingPass& operator=(LightingPass&&) = delete;
+        LightingPass(LightingPass&&) noexcept;
+        LightingPass& operator=(LightingPass&&) noexcept;
 
         void render(
-            const GpuContext&  gpuContext,
-            const glm::mat4&   viewProjectionMatrix,
-            const glm::vec3&   cameraPosition,
-            const Sky&         sky,
-            WGPUCommandEncoder cmdEncoder,
-            WGPUTextureView    textureView);
+            const GpuContext&   gpuContext,
+            const glm::mat4&    viewProjectionMatrix,
+            const glm::vec3&    cameraPosition,
+            const Extent2f&     framebufferSize,
+            const Sky&          sky,
+            const GpuBindGroup& gbufferBindGroup,
+            WGPUCommandEncoder  cmdEncoder,
+            WGPUTextureView     textureView);
     };
 
     WGPUTexture        mDepthTexture;

@@ -25,11 +25,15 @@ struct SkyState {
 
 struct Uniforms {
     inverseViewProjectionMat: mat4x4f,
-    cameraEye: vec4f
+    cameraEye: vec4f,
+    framebufferSize: vec2f,
 }
 
 @group(0) @binding(0) var<storage, read> skyState: SkyState;
 @group(1) @binding(0) var<uniform> uniforms: Uniforms;
+@group(2) @binding(0) var gbufferAlbedo: texture_2d<f32>;
+@group(2) @binding(1) var gbufferNormal: texture_2d<f32>;
+@group(2) @binding(2) var gbufferDepth: texture_depth_2d;
 
 const CHANNEL_R = 0u;
 const CHANNEL_G = 1u;
@@ -37,20 +41,30 @@ const CHANNEL_B = 2u;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
+    var color = vec3f(0.0, 0.0, 0.0);
+
     let uv = in.texCoord;
-    let world = worldFromUv(uv);
-    let v = normalize((world - uniforms.cameraEye).xyz);
-    let s = skyState.sunDirection;
+    // NOTE: flip y-axis when sampling textures
+    let idx = vec2u(floor(vec2(uv.x, 1.0 - uv.y) * uniforms.framebufferSize));
+    let d = textureLoad(gbufferDepth, idx, 0);
+    if d == 1.0 {
+        let world = worldFromUv(uv);
+        let v = normalize((world - uniforms.cameraEye).xyz);
+        let s = skyState.sunDirection;
 
-    let theta = acos(v.y);
-    let gamma = acos(clamp(dot(v, s), -1f, 1f));
-    let color = vec3f(
-        skyRadiance(theta, gamma, CHANNEL_R),
-        skyRadiance(theta, gamma, CHANNEL_G),
-        skyRadiance(theta, gamma, CHANNEL_B)
-    );
+        let theta = acos(v.y);
+        let gamma = acos(clamp(dot(v, s), -1f, 1f));
+        color = vec3f(
+            skyRadiance(theta, gamma, CHANNEL_R),
+            skyRadiance(theta, gamma, CHANNEL_G),
+            skyRadiance(theta, gamma, CHANNEL_B)
+        );
+    } else {
+        let albedo = textureLoad(gbufferAlbedo, idx, 0).rgb;
+        color = albedo;
+    }
 
-    let exposure = 1f / pow(2f, 4);
+    let exposure = 1f / pow(2f, 5);
     return vec4(acesFilmic(exposure * color), 1.0);
 }
 
