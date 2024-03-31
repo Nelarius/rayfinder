@@ -1305,7 +1305,8 @@ void DeferredRenderer::LightingPass::render(
         const Uniforms uniforms{
             glm::inverse(viewProjectionMat),
             glm::vec4(cameraPosition, 1.f),
-            glm::vec2(fbsize.x, fbsize.y)};
+            glm::vec2(fbsize.x, fbsize.y),
+            {0.f, 0.f}};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
     }
