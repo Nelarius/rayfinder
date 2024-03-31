@@ -76,7 +76,7 @@ set(WGSL_SHADER_FILES
     texture_blit.wgsl
     deferred_renderer_gbuffer_pass.wgsl
     deferred_renderer_debug_pass.wgsl
-    deferred_renderer_sky_pass.wgsl)
+    deferred_renderer_lighting_pass.wgsl)
 
 set(SHADER_SOURCE_HEADER_FILE src/pt/shader_source.hpp)
 

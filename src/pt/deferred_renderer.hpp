@@ -131,7 +131,7 @@ private:
         void resize(const GpuContext&, const Extent2u&);
     };
 
-    struct SkyPass
+    struct LightingPass
     {
     private:
         Sky                mCurrentSky;
@@ -149,14 +149,14 @@ private:
         };
 
     public:
-        SkyPass(const GpuContext&);
-        ~SkyPass();
+        LightingPass(const GpuContext&);
+        ~LightingPass();
 
-        SkyPass(const SkyPass&) = delete;
-        SkyPass& operator=(const SkyPass&) = delete;
+        LightingPass(const LightingPass&) = delete;
+        LightingPass& operator=(const LightingPass&) = delete;
 
-        SkyPass(SkyPass&&) = delete;
-        SkyPass& operator=(SkyPass&&) = delete;
+        LightingPass(LightingPass&&) = delete;
+        LightingPass& operator=(LightingPass&&) = delete;
 
         void render(
             const GpuContext&  gpuContext,
@@ -177,6 +177,6 @@ private:
     GpuBindGroup       mGbufferBindGroup;
     GbufferPass        mGbufferPass;
     DebugPass          mDebugPass;
-    SkyPass            mSkyPass;
+    LightingPass       mLightingPass;
 };
 } // namespace nlrs

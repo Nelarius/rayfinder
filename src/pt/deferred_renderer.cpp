@@ -72,7 +72,7 @@ DeferredRenderer::DeferredRenderer(
       mGbufferBindGroup(),
       mGbufferPass(gpuContext, rendererDesc),
       mDebugPass(),
-      mSkyPass(gpuContext)
+      mLightingPass(gpuContext)
 {
     {
         const std::array<WGPUTextureFormat, 1> depthFormats{
@@ -193,7 +193,7 @@ void DeferredRenderer::render(
         mAlbedoTextureView,
         mNormalTextureView);
 
-    mSkyPass.render(gpuContext, viewProjectionMat, cameraPosition, sky, encoder, textureView);
+    mLightingPass.render(gpuContext, viewProjectionMat, cameraPosition, sky, encoder, textureView);
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -1059,7 +1059,7 @@ void DeferredRenderer::DebugPass::resize(const GpuContext& gpuContext, const Ext
         gpuContext.queue, mUniformBuffer.ptr(), 0, &uniformData.x, sizeof(Extent2<float>));
 }
 
-DeferredRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
+DeferredRenderer::LightingPass::LightingPass(const GpuContext& gpuContext)
     : mCurrentSky{},
       mVertexBuffer{
           gpuContext.device,
@@ -1088,23 +1088,23 @@ DeferredRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
 
     const GpuBindGroupLayout skyStateBindGroupLayout{
         gpuContext.device,
-        "Sky pass sky state bind group layout",
+        "Lighting pass sky state bind group layout",
         mSkyStateBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(AlignedSkyState))};
 
     mSkyStateBindGroup = GpuBindGroup{
         gpuContext.device,
-        "Sky pass sky state bind group",
+        "Lighting pass sky state bind group",
         skyStateBindGroupLayout.ptr(),
         mSkyStateBuffer.bindGroupEntry(0)};
 
     const GpuBindGroupLayout uniformBindGroupLayout{
         gpuContext.device,
-        "Sky passs uniform bind group layout",
+        "Lighting passs uniform bind group layout",
         mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Uniforms))};
 
     mUniformBindGroup = GpuBindGroup{
         gpuContext.device,
-        "Sky pass uniform bind group",
+        "Lighting pass uniform bind group",
         uniformBindGroupLayout.ptr(),
         mUniformBuffer.bindGroupEntry(0)};
 
@@ -1116,7 +1116,7 @@ DeferredRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
-            .label = "Sky pass pipeline layout",
+            .label = "Lighting pass pipeline layout",
             .bindGroupLayoutCount = std::size(bindGroupLayouts),
             .bindGroupLayouts = bindGroupLayouts,
         };
@@ -1148,12 +1148,12 @@ DeferredRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
                         .next = nullptr,
                         .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                     },
-                .code = DEFERRED_RENDERER_SKY_PASS_SOURCE,
+                .code = DEFERRED_RENDERER_LIGHTING_PASS_SOURCE,
             };
 
             const WGPUShaderModuleDescriptor moduleDesc{
                 .nextInChain = &wgslDesc.chain,
-                .label = "Sky pass shader",
+                .label = "Lighting pass shader",
             };
 
             return wgpuDeviceCreateShaderModule(gpuContext.device, &moduleDesc);
@@ -1197,7 +1197,7 @@ DeferredRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
 
         const WGPURenderPipelineDescriptor pipelineDesc{
             .nextInChain = nullptr,
-            .label = "Sky pass render pipeline",
+            .label = "Lighting pass render pipeline",
             .layout = pipelineLayout,
             .vertex =
                 WGPUVertexState{
@@ -1233,13 +1233,13 @@ DeferredRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
     }
 }
 
-DeferredRenderer::SkyPass::~SkyPass()
+DeferredRenderer::LightingPass::~LightingPass()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
 }
 
-void DeferredRenderer::SkyPass::render(
+void DeferredRenderer::LightingPass::render(
     const GpuContext&        gpuContext,
     const glm::mat4&         viewProjectionMat,
     const glm::vec3&         cameraPosition,
@@ -1274,7 +1274,7 @@ void DeferredRenderer::SkyPass::render(
 
         const WGPURenderPassDescriptor renderPassDesc{
             .nextInChain = nullptr,
-            .label = "Sky pass render pass",
+            .label = "Lighting pass render pass",
             .colorAttachmentCount = 1,
             .colorAttachments = &colorAttachment,
             .depthStencilAttachment = nullptr,

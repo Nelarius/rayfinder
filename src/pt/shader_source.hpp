@@ -775,7 +775,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 }
 )";
 
-const char* const DEFERRED_RENDERER_SKY_PASS_SOURCE = R"(struct VertexInput {
+const char* const DEFERRED_RENDERER_LIGHTING_PASS_SOURCE = R"(struct VertexInput {
     @location(0) position: vec2f,
 }
 
