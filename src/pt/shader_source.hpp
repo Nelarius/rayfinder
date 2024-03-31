@@ -695,7 +695,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 }
 )";
 
-const char* const HYBRID_RENDERER_GBUFFER_PASS_SOURCE = R"(@group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
+const char* const DEFERRED_RENDERER_GBUFFER_PASS_SOURCE = R"(@group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
 
 struct VertexInput {
     @location(0) position: vec4f,
@@ -733,7 +733,7 @@ fn fsMain(in: VertexOutput) -> GbufferOutput {
 }
 )";
 
-const char* const HYBRID_RENDERER_DEBUG_PASS_SOURCE = R"(struct VertexInput {
+const char* const DEFERRED_RENDERER_DEBUG_PASS_SOURCE = R"(struct VertexInput {
     @location(0) position: vec2f,
 }
 
@@ -775,7 +775,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 }
 )";
 
-const char* const HYBRID_RENDERER_SKY_PASS_SOURCE = R"(struct VertexInput {
+const char* const DEFERRED_RENDERER_SKY_PASS_SOURCE = R"(struct VertexInput {
     @location(0) position: vec2f,
 }
 

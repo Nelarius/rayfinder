@@ -21,7 +21,7 @@ namespace nlrs
 {
 struct GpuContext;
 
-struct HybridRendererDescriptor
+struct DeferredRendererDescriptor
 {
     Extent2u                                  framebufferSize;
     std::span<std::span<const glm::vec4>>     modelPositions;
@@ -32,17 +32,17 @@ struct HybridRendererDescriptor
     std::span<Texture>                        baseColorTextures;
 };
 
-class HybridRenderer
+class DeferredRenderer
 {
 public:
-    HybridRenderer(const GpuContext&, const HybridRendererDescriptor&);
-    ~HybridRenderer();
+    DeferredRenderer(const GpuContext&, const DeferredRendererDescriptor&);
+    ~DeferredRenderer();
 
-    HybridRenderer(const HybridRenderer&) = delete;
-    HybridRenderer& operator=(const HybridRenderer&) = delete;
+    DeferredRenderer(const DeferredRenderer&) = delete;
+    DeferredRenderer& operator=(const DeferredRenderer&) = delete;
 
-    HybridRenderer(HybridRenderer&&) = delete;
-    HybridRenderer& operator=(HybridRenderer&&) = delete;
+    DeferredRenderer(DeferredRenderer&&) = delete;
+    DeferredRenderer& operator=(DeferredRenderer&&) = delete;
 
     void render(
         const GpuContext& gpuContext,
@@ -84,7 +84,7 @@ private:
         WGPURenderPipeline        mPipeline;
 
     public:
-        GbufferPass(const GpuContext&, const HybridRendererDescriptor&);
+        GbufferPass(const GpuContext&, const DeferredRendererDescriptor&);
         ~GbufferPass();
 
         GbufferPass(const GbufferPass&) = delete;

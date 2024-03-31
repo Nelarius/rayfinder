@@ -1,5 +1,5 @@
 #include "gpu_context.hpp"
-#include "hybrid_renderer.hpp"
+#include "deferred_renderer.hpp"
 #include "shader_source.hpp"
 #include "webgpu_utils.hpp"
 #include "window.hpp"
@@ -59,9 +59,9 @@ WGPUTextureView createGbufferTextureView(
 }
 } // namespace
 
-HybridRenderer::HybridRenderer(
-    const GpuContext&               gpuContext,
-    const HybridRendererDescriptor& rendererDesc)
+DeferredRenderer::DeferredRenderer(
+    const GpuContext&                 gpuContext,
+    const DeferredRendererDescriptor& rendererDesc)
     : mDepthTexture(nullptr),
       mDepthTextureView(nullptr),
       mAlbedoTexture(nullptr),
@@ -152,7 +152,7 @@ HybridRenderer::HybridRenderer(
     mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
 }
 
-HybridRenderer::~HybridRenderer()
+DeferredRenderer::~DeferredRenderer()
 {
     textureViewSafeRelease(mNormalTextureView);
     mNormalTextureView = nullptr;
@@ -168,7 +168,7 @@ HybridRenderer::~HybridRenderer()
     mDepthTexture = nullptr;
 }
 
-void HybridRenderer::render(
+void DeferredRenderer::render(
     const GpuContext&     gpuContext,
     const glm::mat4&      viewProjectionMat,
     const glm::vec3&      cameraPosition,
@@ -198,14 +198,14 @@ void HybridRenderer::render(
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
             .nextInChain = nullptr,
-            .label = "HybridRenderer command buffer",
+            .label = "DeferredRenderer command buffer",
         };
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
 }
 
-void HybridRenderer::renderDebug(
+void DeferredRenderer::renderDebug(
     const GpuContext&     gpuContext,
     const glm::mat4&      viewProjectionMat,
     const WGPUTextureView textureView)
@@ -233,14 +233,14 @@ void HybridRenderer::renderDebug(
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
             .nextInChain = nullptr,
-            .label = "HybridRenderer command buffer",
+            .label = "DeferredRenderer command buffer",
         };
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
 }
 
-void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSize)
+void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSize)
 {
     NLRS_ASSERT(newSize.x > 0 && newSize.y > 0);
 
@@ -328,9 +328,9 @@ void HybridRenderer::resize(const GpuContext& gpuContext, const Extent2u& newSiz
             textureBindGroupEntry(2, mDepthTextureView)}};
 }
 
-HybridRenderer::GbufferPass::GbufferPass(
-    const GpuContext&               gpuContext,
-    const HybridRendererDescriptor& rendererDesc)
+DeferredRenderer::GbufferPass::GbufferPass(
+    const GpuContext&                 gpuContext,
+    const DeferredRendererDescriptor& rendererDesc)
     : mPositionBuffers([&gpuContext, &rendererDesc]() -> std::vector<GpuBuffer> {
           std::vector<GpuBuffer> buffers;
           std::transform(
@@ -618,7 +618,7 @@ HybridRenderer::GbufferPass::GbufferPass(
                         .next = nullptr,
                         .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                     },
-                .code = HYBRID_RENDERER_GBUFFER_PASS_SOURCE,
+                .code = DEFERRED_RENDERER_GBUFFER_PASS_SOURCE,
             };
 
             const WGPUShaderModuleDescriptor shaderDesc{
@@ -712,7 +712,7 @@ HybridRenderer::GbufferPass::GbufferPass(
     NLRS_ASSERT(mPositionBuffers.size() == mBaseColorTextureIndices.size());
 }
 
-HybridRenderer::GbufferPass::~GbufferPass()
+DeferredRenderer::GbufferPass::~GbufferPass()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
@@ -726,7 +726,7 @@ HybridRenderer::GbufferPass::~GbufferPass()
     mBaseColorTextures.clear();
 }
 
-void HybridRenderer::GbufferPass::render(
+void DeferredRenderer::GbufferPass::render(
     const GpuContext&        gpuContext,
     const glm::mat4&         viewProjectionMat,
     const WGPUCommandEncoder cmdEncoder,
@@ -821,7 +821,7 @@ void HybridRenderer::GbufferPass::render(
     wgpuRenderPassEncoderEnd(renderPassEncoder);
 }
 
-HybridRenderer::DebugPass::DebugPass(
+DeferredRenderer::DebugPass::DebugPass(
     const GpuContext&         gpuContext,
     const GpuBindGroupLayout& gbufferBindGroupLayout,
     const Extent2u&           framebufferSize)
@@ -894,7 +894,7 @@ HybridRenderer::DebugPass::DebugPass(
                         .next = nullptr,
                         .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                     },
-                .code = HYBRID_RENDERER_DEBUG_PASS_SOURCE,
+                .code = DEFERRED_RENDERER_DEBUG_PASS_SOURCE,
             };
 
             const WGPUShaderModuleDescriptor moduleDesc{
@@ -980,13 +980,13 @@ HybridRenderer::DebugPass::DebugPass(
     }
 }
 
-HybridRenderer::DebugPass::~DebugPass()
+DeferredRenderer::DebugPass::~DebugPass()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
 }
 
-HybridRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
+DeferredRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
 {
     if (this != &other)
     {
@@ -998,7 +998,7 @@ HybridRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
     }
 }
 
-HybridRenderer::DebugPass& HybridRenderer::DebugPass::operator=(DebugPass&& other) noexcept
+DeferredRenderer::DebugPass& DeferredRenderer::DebugPass::operator=(DebugPass&& other) noexcept
 {
     if (this != &other)
     {
@@ -1012,7 +1012,7 @@ HybridRenderer::DebugPass& HybridRenderer::DebugPass::operator=(DebugPass&& othe
     return *this;
 }
 
-void HybridRenderer::DebugPass::render(
+void DeferredRenderer::DebugPass::render(
     const GpuBindGroup&      gbufferBindGroup,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    textureView)
@@ -1052,14 +1052,14 @@ void HybridRenderer::DebugPass::render(
     wgpuRenderPassEncoderEnd(renderPass);
 }
 
-void HybridRenderer::DebugPass::resize(const GpuContext& gpuContext, const Extent2u& newSize)
+void DeferredRenderer::DebugPass::resize(const GpuContext& gpuContext, const Extent2u& newSize)
 {
     const auto uniformData = Extent2<float>{newSize};
     wgpuQueueWriteBuffer(
         gpuContext.queue, mUniformBuffer.ptr(), 0, &uniformData.x, sizeof(Extent2<float>));
 }
 
-HybridRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
+DeferredRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
     : mCurrentSky{},
       mVertexBuffer{
           gpuContext.device,
@@ -1148,7 +1148,7 @@ HybridRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
                         .next = nullptr,
                         .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                     },
-                .code = HYBRID_RENDERER_SKY_PASS_SOURCE,
+                .code = DEFERRED_RENDERER_SKY_PASS_SOURCE,
             };
 
             const WGPUShaderModuleDescriptor moduleDesc{
@@ -1233,13 +1233,13 @@ HybridRenderer::SkyPass::SkyPass(const GpuContext& gpuContext)
     }
 }
 
-HybridRenderer::SkyPass::~SkyPass()
+DeferredRenderer::SkyPass::~SkyPass()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
 }
 
-void HybridRenderer::SkyPass::render(
+void DeferredRenderer::SkyPass::render(
     const GpuContext&        gpuContext,
     const glm::mat4&         viewProjectionMat,
     const glm::vec3&         cameraPosition,
