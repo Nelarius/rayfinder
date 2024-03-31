@@ -835,18 +835,18 @@ DeferredRenderer::DebugPass::DebugPass(
       mPipeline(nullptr)
 {
     {
-        const auto uniformData = Extent2<float>{framebufferSize};
+        const auto uniformData = Extent2f{framebufferSize};
         mUniformBuffer = GpuBuffer{
             gpuContext.device,
             "Uniform buffer",
             GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
-            std::span<const float>(&uniformData.x, sizeof(Extent2<float>))};
+            std::span<const float>(&uniformData.x, sizeof(Extent2f))};
     }
 
     const GpuBindGroupLayout uniformBindGroupLayout{
         gpuContext.device,
         "Uniform bind group layout",
-        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Extent2<float>))};
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Extent2f))};
 
     mUniformBindGroup = GpuBindGroup{
         gpuContext.device,
@@ -1054,9 +1054,9 @@ void DeferredRenderer::DebugPass::render(
 
 void DeferredRenderer::DebugPass::resize(const GpuContext& gpuContext, const Extent2u& newSize)
 {
-    const auto uniformData = Extent2<float>{newSize};
+    const auto uniformData = Extent2f{newSize};
     wgpuQueueWriteBuffer(
-        gpuContext.queue, mUniformBuffer.ptr(), 0, &uniformData.x, sizeof(Extent2<float>));
+        gpuContext.queue, mUniformBuffer.ptr(), 0, &uniformData.x, sizeof(Extent2f));
 }
 
 DeferredRenderer::LightingPass::LightingPass(const GpuContext& gpuContext)

@@ -30,6 +30,7 @@ struct Extent2
 
 using Extent2i = Extent2<std::int32_t>;
 using Extent2u = Extent2<std::uint32_t>;
+using Extent2f = Extent2<float>;
 
 template<typename T>
 constexpr float aspectRatio(const Extent2<T>& extent) noexcept
