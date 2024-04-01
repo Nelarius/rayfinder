@@ -59,7 +59,6 @@ struct UiState
     std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
     // tonemapping
     int exposureStops = 2;
-    int tonemapFn = 1;
 };
 
 struct AppState
@@ -238,7 +237,8 @@ try
                 nlrs::Extent2u(window.resolution()),
                 nlrs::FlyCameraController{}.getCamera(),
                 nlrs::SamplingParams(),
-                nlrs::Sky()},
+                nlrs::Sky(),
+                1.0f},
             largestMonitorResolution(),
         };
 
@@ -370,16 +370,7 @@ try
                 ImGuiSliderFlags_Logarithmic);
             ImGui::SliderFloat(
                 "camera lens radius", &appState.cameraController.aperture(), 0.0f, 0.5f, "%.2f");
-
-            ImGui::Separator();
-            ImGui::Text("Post processing");
-
             ImGui::SliderInt("exposure stops", &appState.ui.exposureStops, 0, 8);
-            ImGui::Text("tonemap fn");
-            ImGui::SameLine();
-            ImGui::RadioButton("linear", &appState.ui.tonemapFn, 0);
-            ImGui::SameLine();
-            ImGui::RadioButton("filmic", &appState.ui.tonemapFn, 1);
 
             ImGui::Separator();
             ImGui::Text("Camera");
@@ -400,6 +391,7 @@ try
                         GLFWwindow* windowPtr, WGPUSwapChain swapChain) -> void {
         nlrs::Extent2i windowResolution;
         glfwGetFramebufferSize(windowPtr, &windowResolution.x, &windowResolution.y);
+        NLRS_ASSERT(appState.ui.exposureStops >= 0);
         const nlrs::RenderParameters renderParams{
             nlrs::Extent2u(windowResolution),
             appState.cameraController.getCamera(),
@@ -413,14 +405,14 @@ try
                 appState.ui.sunZenithDegrees,
                 appState.ui.sunAzimuthDegrees,
             },
-        };
+            1.0f / std::exp2(static_cast<float>(appState.ui.exposureStops))};
         renderer.setRenderParameters(renderParams);
 
-        const nlrs::PostProcessingParameters postProcessingParams{
-            static_cast<std::uint32_t>(appState.ui.exposureStops),
-            static_cast<nlrs::Tonemapping>(appState.ui.tonemapFn),
-        };
-        renderer.setPostProcessingParameters(postProcessingParams);
+        // const nlrs::PostProcessingParameters postProcessingParams{
+        //     static_cast<std::uint32_t>(appState.ui.exposureStops),
+        //     static_cast<nlrs::Tonemapping>(appState.ui.tonemapFn),
+        // };
+        // renderer.setPostProcessingParameters(postProcessingParams);
 
         switch (appState.ui.rendererType)
         {

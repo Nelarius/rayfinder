@@ -23,8 +23,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 
 // render params bind group
 @group(0) @binding(0) var<uniform> renderParams: RenderParams;
-@group(0) @binding(1) var<uniform> postProcessingParams: PostProcessingParams;
-@group(0) @binding(2) var<storage, read> skyState: SkyState;
+@group(0) @binding(1) var<storage, read> skyState: SkyState;
 
 // scene bind group
 @group(1) @binding(0) var<storage, read> bvhNodes: array<BvhNode>;
@@ -65,11 +64,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
 
-    let stops = f32(postProcessingParams.stops);
-    let exposure = 1f / pow(2f, stops);
-
-    let tonemapFn = postProcessingParams.tonemapFn;
-    let rgb = expose(tonemapFn, exposure * estimator);
+    let rgb = acesFilmic(renderParams.exposure * estimator);
     return vec4f(rgb, 1f);
 }
 
@@ -96,6 +91,7 @@ struct RenderParams {
   frameData: FrameData,
   camera: Camera,
   samplingState: SamplingState,
+  @align(16) exposure: f32,
 }
 
 struct FrameData {
@@ -117,11 +113,6 @@ struct SamplingState {
     numSamplesPerPixel: u32,
     numBounces: u32,
     accumulatedSampleCount: u32,
-}
-
-struct PostProcessingParams {
-    stops: u32,
-    tonemapFn: u32,
 }
 
 struct SkyState {
@@ -280,19 +271,6 @@ fn skyRadiance(theta: f32, gamma: f32, channel: u32) -> f32 {
     let radianceRhs = p2 + p3 * expM + p5 * rayM + p6 * mieM + p7 * zenith;
     let radianceDist = radianceLhs * radianceRhs;
     return r * radianceDist;
-}
-
-@must_use
-fn expose(tonemapFn: u32, x: vec3f) -> vec3f {
-    switch tonemapFn {
-        case 1u: {
-            return acesFilmic(x);
-        }
-
-        default: {
-            return x;
-        }
-    }
 }
 
 @must_use
@@ -550,8 +528,7 @@ fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
     // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
     // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
-   )"
-R"( // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
+    // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
     let po = vec3f(
         bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
         bitcast<f32>(bitcast<i32>(p.y) + select(offset.y, -offset.y, (p.y < 0))),
@@ -560,7 +537,8 @@ R"( // except for when close to the origin, where we use FLOAT_SCALE as a small 
 
     return vec3f(
         select(po.x, p.x + FLOAT_SCALE * n.x, (abs(p.x) < ORIGIN)),
-        select(po.y, p.y + FLOAT_SCALE * n.y, (abs(p.y) < ORIGIN)),
+        select()"
+R"(po.y, p.y + FLOAT_SCALE * n.y, (abs(p.y) < ORIGIN)),
         select(po.z, p.z + FLOAT_SCALE * n.z, (abs(p.z) < ORIGIN))
     );
 }

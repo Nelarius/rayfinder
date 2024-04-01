@@ -17,8 +17,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 
 // render params bind group
 @group(0) @binding(0) var<uniform> renderParams: RenderParams;
-@group(0) @binding(1) var<uniform> postProcessingParams: PostProcessingParams;
-@group(0) @binding(2) var<storage, read> skyState: SkyState;
+@group(0) @binding(1) var<storage, read> skyState: SkyState;
 
 // scene bind group
 @group(1) @binding(0) var<storage, read> bvhNodes: array<BvhNode>;
@@ -59,11 +58,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
 
-    let stops = f32(postProcessingParams.stops);
-    let exposure = 1f / pow(2f, stops);
-
-    let tonemapFn = postProcessingParams.tonemapFn;
-    let rgb = expose(tonemapFn, exposure * estimator);
+    let rgb = acesFilmic(renderParams.exposure * estimator);
     return vec4f(rgb, 1f);
 }
 
@@ -90,6 +85,7 @@ struct RenderParams {
   frameData: FrameData,
   camera: Camera,
   samplingState: SamplingState,
+  @align(16) exposure: f32,
 }
 
 struct FrameData {
@@ -111,11 +107,6 @@ struct SamplingState {
     numSamplesPerPixel: u32,
     numBounces: u32,
     accumulatedSampleCount: u32,
-}
-
-struct PostProcessingParams {
-    stops: u32,
-    tonemapFn: u32,
 }
 
 struct SkyState {
@@ -274,19 +265,6 @@ fn skyRadiance(theta: f32, gamma: f32, channel: u32) -> f32 {
     let radianceRhs = p2 + p3 * expM + p5 * rayM + p6 * mieM + p7 * zenith;
     let radianceDist = radianceLhs * radianceRhs;
     return r * radianceDist;
-}
-
-@must_use
-fn expose(tonemapFn: u32, x: vec3f) -> vec3f {
-    switch tonemapFn {
-        case 1u: {
-            return acesFilmic(x);
-        }
-
-        default: {
-            return x;
-        }
-    }
 }
 
 @must_use

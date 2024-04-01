@@ -97,15 +97,20 @@ struct RenderParamsLayout
     FrameDataLayout     frameData;
     CameraLayout        camera;
     SamplingStateLayout samplingState;
+    float               exposure;
+    float               padding[3];
 
     RenderParamsLayout(
         const Extent2u&         dimensions,
         const std::uint32_t     frameCount,
         const RenderParameters& renderParams,
-        const std::uint32_t     accumulatedSampleCount)
+        const std::uint32_t     accumulatedSampleCount,
+        const float             exposure)
         : frameData(dimensions, frameCount),
           camera(renderParams.camera),
-          samplingState(renderParams.samplingParams, accumulatedSampleCount)
+          samplingState(renderParams.samplingParams, accumulatedSampleCount),
+          exposure(exposure),
+          padding{0.0f, 0.0f, 0.0f}
     {
     }
 };
@@ -133,11 +138,6 @@ ReferencePathTracer::ReferencePathTracer(
           "render params buffer",
           GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
           sizeof(RenderParamsLayout)),
-      mPostProcessingParamsBuffer(
-          gpuContext.device,
-          "post processing params buffer",
-          GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
-          sizeof(PostProcessingParameters)),
       mSkyStateBuffer(
           gpuContext.device,
           "sky state buffer",
@@ -181,7 +181,6 @@ ReferencePathTracer::ReferencePathTracer(
           sizeof(TimestampsLayout)),
       mRenderPipeline(nullptr),
       mCurrentRenderParams(rendererDesc.renderParams),
-      mCurrentPostProcessingParams(),
       mFrameCount(0),
       mAccumulatedSampleCount(0),
       mRenderPassDurationsNs()
@@ -324,10 +323,9 @@ ReferencePathTracer::ReferencePathTracer(
 
         // renderParams group layout
 
-        const std::array<WGPUBindGroupLayoutEntry, 3> renderParamsBindGroupLayoutEntries{
+        const std::array<WGPUBindGroupLayoutEntry, 2> renderParamsBindGroupLayoutEntries{
             mRenderParamsBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            mPostProcessingParamsBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
-            mSkyStateBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
+            mSkyStateBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
         };
         const GpuBindGroupLayout renderParamsBindGroupLayout{
             gpuContext.device,
@@ -372,10 +370,9 @@ ReferencePathTracer::ReferencePathTracer(
 
         // renderParams bind group
 
-        const std::array<WGPUBindGroupEntry, 3> renderParamsBindGroupEntries{
+        const std::array<WGPUBindGroupEntry, 2> renderParamsBindGroupEntries{
             mRenderParamsBuffer.bindGroupEntry(0),
-            mPostProcessingParamsBuffer.bindGroupEntry(1),
-            mSkyStateBuffer.bindGroupEntry(2),
+            mSkyStateBuffer.bindGroupEntry(1),
         };
         mRenderParamsBindGroup = GpuBindGroup{
             gpuContext.device,
@@ -466,7 +463,6 @@ ReferencePathTracer::ReferencePathTracer(ReferencePathTracer&& other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
         mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
-        mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
         mSkyStateBuffer = std::move(other.mSkyStateBuffer);
         mRenderParamsBindGroup = std::move(other.mRenderParamsBindGroup);
         mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
@@ -485,7 +481,6 @@ ReferencePathTracer::ReferencePathTracer(ReferencePathTracer&& other)
         other.mRenderPipeline = nullptr;
 
         mCurrentRenderParams = other.mCurrentRenderParams;
-        mCurrentPostProcessingParams = other.mCurrentPostProcessingParams;
         mFrameCount = other.mFrameCount;
         mAccumulatedSampleCount = other.mAccumulatedSampleCount;
 
@@ -499,7 +494,6 @@ ReferencePathTracer& ReferencePathTracer::operator=(ReferencePathTracer&& other)
     {
         mVertexBuffer = std::move(other.mVertexBuffer);
         mRenderParamsBuffer = std::move(other.mRenderParamsBuffer);
-        mPostProcessingParamsBuffer = std::move(other.mPostProcessingParamsBuffer);
         mSkyStateBuffer = std::move(other.mSkyStateBuffer);
         mRenderParamsBindGroup = std::move(other.mRenderParamsBindGroup);
         mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
@@ -518,7 +512,6 @@ ReferencePathTracer& ReferencePathTracer::operator=(ReferencePathTracer&& other)
         other.mRenderPipeline = nullptr;
 
         mCurrentRenderParams = other.mCurrentRenderParams;
-        mCurrentPostProcessingParams = other.mCurrentPostProcessingParams;
         mFrameCount = other.mFrameCount;
         mAccumulatedSampleCount = other.mAccumulatedSampleCount;
 
@@ -544,12 +537,6 @@ void ReferencePathTracer::setRenderParameters(const RenderParameters& renderPara
     }
 }
 
-void ReferencePathTracer::setPostProcessingParameters(
-    const PostProcessingParameters& postProcessingParameters)
-{
-    mCurrentPostProcessingParams = postProcessingParameters;
-}
-
 void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView textureView)
 {
     // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
@@ -564,7 +551,8 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
             mCurrentRenderParams.framebufferSize,
             mFrameCount++,
             mCurrentRenderParams,
-            mAccumulatedSampleCount};
+            mAccumulatedSampleCount,
+            mCurrentRenderParams.exposure};
         wgpuQueueWriteBuffer(
             gpuContext.queue,
             mRenderParamsBuffer.ptr(),
@@ -573,12 +561,6 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
             sizeof(RenderParamsLayout));
         mAccumulatedSampleCount = std::min(
             mAccumulatedSampleCount + 1, mCurrentRenderParams.samplingParams.numSamplesPerPixel);
-        wgpuQueueWriteBuffer(
-            gpuContext.queue,
-            mPostProcessingParamsBuffer.ptr(),
-            0,
-            &mCurrentPostProcessingParams,
-            sizeof(PostProcessingParameters));
         const AlignedSkyState skyState{mCurrentRenderParams.sky};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));

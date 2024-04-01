@@ -36,22 +36,9 @@ struct RenderParameters
     Camera         camera;
     SamplingParams samplingParams;
     Sky            sky;
+    float          exposure;
 
     bool operator==(const RenderParameters&) const noexcept = default;
-};
-
-enum class Tonemapping : std::uint32_t
-{
-    Linear = 0,
-    Filmic,
-};
-
-struct PostProcessingParameters
-{
-    // Exposure is calculated as 1 / (2 ^ stops), stops >= 0. Increasing a stop by one halves the
-    // exposure.
-    std::uint32_t stops = 0;
-    Tonemapping   tonemapping = Tonemapping::Filmic;
 };
 
 struct Scene
@@ -82,7 +69,6 @@ public:
     ~ReferencePathTracer();
 
     void setRenderParameters(const RenderParameters&);
-    void setPostProcessingParameters(const PostProcessingParameters&);
     void render(const GpuContext&, WGPUTextureView);
 
     float averageRenderpassDurationMs() const;
@@ -130,7 +116,6 @@ public:
 private:
     GpuBuffer          mVertexBuffer;
     GpuBuffer          mRenderParamsBuffer;
-    GpuBuffer          mPostProcessingParamsBuffer;
     GpuBuffer          mSkyStateBuffer;
     GpuBindGroup       mRenderParamsBindGroup;
     GpuBuffer          mBvhNodeBuffer;
@@ -146,10 +131,9 @@ private:
     GpuBuffer          mTimestampBuffer;
     WGPURenderPipeline mRenderPipeline;
 
-    RenderParameters         mCurrentRenderParams;
-    PostProcessingParameters mCurrentPostProcessingParams;
-    std::uint32_t            mFrameCount;
-    std::uint32_t            mAccumulatedSampleCount;
+    RenderParameters mCurrentRenderParams;
+    std::uint32_t    mFrameCount;
+    std::uint32_t    mAccumulatedSampleCount;
 
     std::deque<std::uint64_t> mRenderPassDurationsNs;
 };
