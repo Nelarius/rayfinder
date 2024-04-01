@@ -169,13 +169,7 @@ DeferredRenderer::~DeferredRenderer()
     mDepthTexture = nullptr;
 }
 
-void DeferredRenderer::render(
-    const GpuContext&     gpuContext,
-    const glm::mat4&      viewProjectionMat,
-    const glm::vec3&      cameraPosition,
-    const Extent2f&       framebufferSize,
-    const Sky&            sky,
-    const WGPUTextureView textureView)
+void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescriptor& renderDesc)
 {
     wgpuDeviceTick(gpuContext.device);
 
@@ -189,21 +183,26 @@ void DeferredRenderer::render(
 
     mGbufferPass.render(
         gpuContext,
-        viewProjectionMat,
+        renderDesc.viewProjectionMatrix,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
         mNormalTextureView);
 
-    mLightingPass.render(
-        gpuContext,
-        viewProjectionMat,
-        cameraPosition,
-        framebufferSize,
-        sky,
-        mGbufferBindGroup,
-        encoder,
-        textureView);
+    {
+        const glm::mat4 inverseViewProjectionMat = glm::inverse(renderDesc.viewProjectionMatrix);
+        const Extent2f  framebufferSize = Extent2f(renderDesc.framebufferSize);
+        mLightingPass.render(
+            gpuContext,
+            mGbufferBindGroup,
+            encoder,
+            renderDesc.targetTextureView,
+            inverseViewProjectionMat,
+            renderDesc.cameraPosition,
+            framebufferSize,
+            renderDesc.sky,
+            renderDesc.exposure);
+    }
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -1285,13 +1284,14 @@ DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
 
 void DeferredRenderer::LightingPass::render(
     const GpuContext&        gpuContext,
-    const glm::mat4&         viewProjectionMat,
+    const GpuBindGroup&      gbufferBindGroup,
+    const WGPUCommandEncoder cmdEncoder,
+    const WGPUTextureView    targetTextureView,
+    const glm::mat4&         inverseViewProjectionMat,
     const glm::vec3&         cameraPosition,
     const Extent2f&          fbsize,
     const Sky&               sky,
-    const GpuBindGroup&      gbufferBindGroup,
-    const WGPUCommandEncoder cmdEncoder,
-    const WGPUTextureView    textureView)
+    const float              exposure)
 {
     if (mCurrentSky != sky)
     {
@@ -1303,18 +1303,20 @@ void DeferredRenderer::LightingPass::render(
 
     {
         const Uniforms uniforms{
-            glm::inverse(viewProjectionMat),
+            inverseViewProjectionMat,
             glm::vec4(cameraPosition, 1.f),
             glm::vec2(fbsize.x, fbsize.y),
-            {0.f, 0.f}};
+            exposure,
+            0.f};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
     }
 
-    const WGPURenderPassEncoder renderPass = [cmdEncoder, textureView]() -> WGPURenderPassEncoder {
+    const WGPURenderPassEncoder renderPass = [cmdEncoder,
+                                              targetTextureView]() -> WGPURenderPassEncoder {
         const WGPURenderPassColorAttachment colorAttachment{
             .nextInChain = nullptr,
-            .view = textureView,
+            .view = targetTextureView,
             .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
             .resolveTarget = nullptr,
             .loadOp = WGPULoadOp_Clear,

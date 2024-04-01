@@ -22,6 +22,7 @@
 #include <webgpu/webgpu.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -373,7 +374,7 @@ try
             ImGui::Separator();
             ImGui::Text("Post processing");
 
-            ImGui::SliderInt("exposure stops", &appState.ui.exposureStops, 0, 10);
+            ImGui::SliderInt("exposure stops", &appState.ui.exposureStops, 0, 8);
             ImGui::Text("tonemap fn");
             ImGui::SameLine();
             ImGui::RadioButton("linear", &appState.ui.tonemapFn, 0);
@@ -429,19 +430,21 @@ try
         case RendererType_Deferred:
         {
             const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
-            const nlrs::Sky sky{
-                appState.ui.skyTurbidity,
-                appState.ui.skyAlbedo,
-                appState.ui.sunZenithDegrees,
-                appState.ui.sunAzimuthDegrees,
-            };
-            deferredRenderer.render(
-                gpuContext,
+            NLRS_ASSERT(appState.ui.exposureStops >= 0);
+            const nlrs::RenderDescriptor renderDesc{
                 viewProjectionMat,
                 appState.cameraController.position(),
-                nlrs::Extent2f(windowResolution),
-                sky,
-                textureBlitter.textureView());
+                nlrs::Sky{
+                    appState.ui.skyTurbidity,
+                    appState.ui.skyAlbedo,
+                    appState.ui.sunZenithDegrees,
+                    appState.ui.sunAzimuthDegrees,
+                },
+                nlrs::Extent2u(windowResolution),
+                1.0f / std::exp2(static_cast<float>(appState.ui.exposureStops)),
+                textureBlitter.textureView(),
+            };
+            deferredRenderer.render(gpuContext, renderDesc);
             break;
         }
         case RendererType_Debug:

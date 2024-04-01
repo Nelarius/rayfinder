@@ -32,6 +32,16 @@ struct DeferredRendererDescriptor
     std::span<Texture>                        baseColorTextures;
 };
 
+struct RenderDescriptor
+{
+    glm::mat4       viewProjectionMatrix;
+    glm::vec3       cameraPosition;
+    Sky             sky;
+    Extent2u        framebufferSize;
+    float           exposure;
+    WGPUTextureView targetTextureView;
+};
+
 class DeferredRenderer
 {
 public:
@@ -44,13 +54,7 @@ public:
     DeferredRenderer(DeferredRenderer&&) = delete;
     DeferredRenderer& operator=(DeferredRenderer&&) = delete;
 
-    void render(
-        const GpuContext& gpuContext,
-        const glm::mat4&  viewProjectionMatrix,
-        const glm::vec3&  cameraPosition,
-        const Extent2f&   framebufferSize,
-        const Sky&        sky,
-        WGPUTextureView   targetTextureView);
+    void render(const GpuContext& gpuContext, const RenderDescriptor& renderDescriptor);
     void renderDebug(const GpuContext&, const glm::mat4&, const Extent2f&, WGPUTextureView);
     void resize(const GpuContext&, const Extent2u&);
 
@@ -149,7 +153,8 @@ private:
             glm::mat4 inverseViewProjection;
             glm::vec4 cameraPosition;
             glm::vec2 framebufferSize;
-            float     padding[2];
+            float     exposure;
+            float     padding;
         };
 
     public:
@@ -167,13 +172,14 @@ private:
 
         void render(
             const GpuContext&   gpuContext,
-            const glm::mat4&    viewProjectionMatrix,
+            const GpuBindGroup& gbufferBindGroup,
+            WGPUCommandEncoder  cmdEncoder,
+            WGPUTextureView     targetTextureView,
+            const glm::mat4&    inverseViewProjection,
             const glm::vec3&    cameraPosition,
             const Extent2f&     framebufferSize,
             const Sky&          sky,
-            const GpuBindGroup& gbufferBindGroup,
-            WGPUCommandEncoder  cmdEncoder,
-            WGPUTextureView     textureView);
+            float               exposure);
     };
 
     WGPUTexture        mDepthTexture;

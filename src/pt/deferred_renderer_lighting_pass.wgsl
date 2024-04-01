@@ -28,6 +28,7 @@ struct Uniforms {
     inverseViewProjectionMat: mat4x4f,
     cameraEye: vec4f,
     framebufferSize: vec2f,
+    exposure: f32,
 }
 
 @group(0) @binding(0) var<storage, read> skyState: SkyState;
@@ -64,8 +65,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
         color = albedo;
     }
 
-    let exposure = 1f / pow(2f, 5);
-    return vec4(acesFilmic(exposure * color), 1.0);
+    return vec4(acesFilmic(uniforms.exposure * color), 1.0);
 }
 
 fn worldFromUv(uv: vec2f) -> vec4f {
