@@ -798,6 +798,7 @@ void DeferredRenderer::GbufferPass::render(
     wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 0, mUniformBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetBindGroup(renderPassEncoder, 1, mSamplerBindGroup.ptr(), 0, nullptr);
 
+    std::size_t currentTextureIdx = ~static_cast<std::size_t>(0);
     for (std::size_t idx = 0; idx < mPositionBuffers.size(); ++idx)
     {
         const GpuBuffer& positionBuffer = mPositionBuffers[idx];
@@ -818,10 +819,14 @@ void DeferredRenderer::GbufferPass::render(
             0,
             indexBuffer.buffer.byteSize());
 
-        const std::size_t   textureIdx = mBaseColorTextureIndices[idx];
-        const GpuBindGroup& baseColorBindGroup = mBaseColorTextureBindGroups[textureIdx];
-        wgpuRenderPassEncoderSetBindGroup(
-            renderPassEncoder, 2, baseColorBindGroup.ptr(), 0, nullptr);
+        const std::size_t textureIdx = mBaseColorTextureIndices[idx];
+        if (textureIdx != currentTextureIdx)
+        {
+            currentTextureIdx = textureIdx;
+            const GpuBindGroup& baseColorBindGroup = mBaseColorTextureBindGroups[textureIdx];
+            wgpuRenderPassEncoderSetBindGroup(
+                renderPassEncoder, 2, baseColorBindGroup.ptr(), 0, nullptr);
+        }
 
         wgpuRenderPassEncoderDrawIndexed(renderPassEncoder, indexBuffer.count, 1, 0, 0, 0);
     }

@@ -351,6 +351,10 @@ GltfModel::GltfModel(const fs::path gltfPath)
     }
 
     cgltf_free(data);
+
+    std::sort(meshes.begin(), meshes.end(), [](const GltfMesh& a, const GltfMesh& b) -> bool {
+        return a.baseColorTextureIndex < b.baseColorTextureIndex;
+    });
 }
 
 GltfModel::GltfModel(std::vector<GltfMesh> meshes, std::vector<Texture> baseColorTextures)
