@@ -264,7 +264,8 @@ try
 
     auto onNewFrame = [&gui]() -> void { gui.beginFrame(); };
 
-    auto onUpdate = [&appState, &renderer](GLFWwindow* windowPtr, float deltaTime) -> void {
+    auto onUpdate =
+        [&appState, &renderer, &deferredRenderer](GLFWwindow* windowPtr, float deltaTime) -> void {
         {
             // Skip input if ImGui captured input
             if (!ImGui::GetIO().WantCaptureMouse)
@@ -320,14 +321,39 @@ try
             ImGui::RadioButton("debug", &appState.ui.rendererType, RendererType_Debug);
             ImGui::Separator();
 
-            ImGui::Text("Renderer stats");
+            ImGui::Text("Perf stats");
             {
-                const float renderAverageMs = renderer.averageRenderpassDurationMs();
-                const float progressPercentage = renderer.renderProgressPercentage();
-                ImGui::Text(
-                    "render pass: %.2f ms (%.1f FPS)", renderAverageMs, 1000.0f / renderAverageMs);
-                ImGui::Text("render progress: %.2f %%", progressPercentage);
+                switch (appState.ui.rendererType)
+                {
+                case RendererType_PathTracer:
+                {
+                    const float renderAverageMs = renderer.averageRenderpassDurationMs();
+                    const float progressPercentage = renderer.renderProgressPercentage();
+                    ImGui::Text(
+                        "render pass: %.2f ms (%.1f FPS)",
+                        renderAverageMs,
+                        1000.0f / renderAverageMs);
+                    ImGui::Text("render progress: %.2f %%", progressPercentage);
+                    break;
+                }
+                case RendererType_Deferred:
+                {
+                    const auto perfStats = deferredRenderer.getPerfStats();
+                    ImGui::Text(
+                        "gbuffer pass: %.2f ms (%.1f FPS)",
+                        perfStats.averageGbufferPassDurationsMs,
+                        1000.0f / perfStats.averageGbufferPassDurationsMs);
+                    ImGui::Text(
+                        "lighting pass: %.2f ms (%.1f FPS)",
+                        perfStats.averageLightingPassDurationsMs,
+                        1000.0f / perfStats.averageLightingPassDurationsMs);
+                    break;
+                }
+                default:
+                    ImGui::Text("no perf stats available");
+                }
             }
+
             ImGui::Separator();
 
             ImGui::Text("Parameters");
@@ -455,8 +481,8 @@ try
 
     auto onResize = [&gpuContext, &deferredRenderer, &textureBlitter](
                         const nlrs::FramebufferSize newSize) -> void {
-        // TODO: this function is not really needed since I get the current framebuffer size on each
-        // render anyway.
+        // TODO: this function is not really needed since I get the current framebuffer size on
+        // each render anyway.
         const auto sz = nlrs::Extent2u(newSize);
         deferredRenderer.resize(gpuContext, sz);
         textureBlitter.resize(gpuContext, sz);

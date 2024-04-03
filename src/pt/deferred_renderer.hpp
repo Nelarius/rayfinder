@@ -14,6 +14,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <span>
 #include <vector>
 
@@ -45,6 +46,12 @@ struct RenderDescriptor
 class DeferredRenderer
 {
 public:
+    struct PerfStats
+    {
+        float averageGbufferPassDurationsMs = 0.0f;
+        float averageLightingPassDurationsMs = 0.0f;
+    };
+
     DeferredRenderer(const GpuContext&, const DeferredRendererDescriptor&);
     ~DeferredRenderer();
 
@@ -57,6 +64,8 @@ public:
     void render(const GpuContext& gpuContext, const RenderDescriptor& renderDescriptor);
     void renderDebug(const GpuContext&, const glm::mat4&, const Extent2f&, WGPUTextureView);
     void resize(const GpuContext&, const Extent2u&);
+
+    PerfStats getPerfStats() const;
 
 private:
     struct IndexBuffer
@@ -182,16 +191,21 @@ private:
             float               exposure);
     };
 
-    WGPUTexture        mDepthTexture;
-    WGPUTextureView    mDepthTextureView;
-    WGPUTexture        mAlbedoTexture;
-    WGPUTextureView    mAlbedoTextureView;
-    WGPUTexture        mNormalTexture;
-    WGPUTextureView    mNormalTextureView;
-    GpuBindGroupLayout mGbufferBindGroupLayout;
-    GpuBindGroup       mGbufferBindGroup;
-    GbufferPass        mGbufferPass;
-    DebugPass          mDebugPass;
-    LightingPass       mLightingPass;
+    WGPUTexture               mDepthTexture;
+    WGPUTextureView           mDepthTextureView;
+    WGPUTexture               mAlbedoTexture;
+    WGPUTextureView           mAlbedoTextureView;
+    WGPUTexture               mNormalTexture;
+    WGPUTextureView           mNormalTextureView;
+    GpuBindGroupLayout        mGbufferBindGroupLayout;
+    GpuBindGroup              mGbufferBindGroup;
+    WGPUQuerySet              mQuerySet;
+    GpuBuffer                 mQueryBuffer;
+    GpuBuffer                 mTimestampsBuffer;
+    GbufferPass               mGbufferPass;
+    DebugPass                 mDebugPass;
+    LightingPass              mLightingPass;
+    std::deque<std::uint64_t> mGbufferPassDurationsNs;
+    std::deque<std::uint64_t> mLightingPassDurationsNs;
 };
 } // namespace nlrs

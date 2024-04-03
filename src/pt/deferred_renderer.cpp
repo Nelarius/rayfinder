@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <numeric>
 
 namespace nlrs
 {
@@ -16,6 +17,17 @@ namespace
 const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth24Plus;
 const WGPUTextureFormat ALBEDO_TEXTURE_FORMAT = WGPUTextureFormat_BGRA8Unorm;
 const WGPUTextureFormat NORMAL_TEXTURE_FORMAT = WGPUTextureFormat_RGBA16Float;
+
+struct TimestampsLayout
+{
+    std::uint64_t gbufferPassStart;
+    std::uint64_t gbufferPassEnd;
+    std::uint64_t lightingPassStart;
+    std::uint64_t lightingPassEnd;
+
+    static constexpr std::uint32_t QUERY_COUNT = 4;
+    static constexpr std::size_t   MEMBER_SIZE = sizeof(std::uint64_t);
+};
 
 WGPUTexture createGbufferTexture(
     const WGPUDevice            device,
@@ -70,9 +82,22 @@ DeferredRenderer::DeferredRenderer(
       mNormalTextureView(nullptr),
       mGbufferBindGroupLayout(),
       mGbufferBindGroup(),
+      mQuerySet(nullptr),
+      mQueryBuffer(
+          gpuContext.device,
+          "Deferred renderer query buffer",
+          GpuBufferUsage::QueryResolve | GpuBufferUsage::CopySrc,
+          sizeof(TimestampsLayout)),
+      mTimestampsBuffer(
+          gpuContext.device,
+          "Deferred renderer timestamp buffer",
+          GpuBufferUsage::CopyDst | GpuBufferUsage::MapRead,
+          sizeof(TimestampsLayout)),
       mGbufferPass(gpuContext, rendererDesc),
       mDebugPass(),
-      mLightingPass()
+      mLightingPass(),
+      mGbufferPassDurationsNs(),
+      mLightingPassDurationsNs()
 {
     {
         const std::array<WGPUTextureFormat, 1> depthFormats{
@@ -149,12 +174,23 @@ DeferredRenderer::DeferredRenderer(
             textureBindGroupEntry(1, mNormalTextureView),
             textureBindGroupEntry(2, mDepthTextureView)}};
 
+    {
+        const WGPUQuerySetDescriptor querySetDesc{
+            .nextInChain = nullptr,
+            .label = "Deferred renderer query set",
+            .type = WGPUQueryType_Timestamp,
+            .count = TimestampsLayout::QUERY_COUNT};
+        mQuerySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
+    }
+
     mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
     mLightingPass = LightingPass{gpuContext, mGbufferBindGroupLayout};
 }
 
 DeferredRenderer::~DeferredRenderer()
 {
+    querySetSafeRelease(mQuerySet);
+    mQuerySet = nullptr;
     textureViewSafeRelease(mNormalTextureView);
     mNormalTextureView = nullptr;
     textureSafeRelease(mNormalTexture);
@@ -171,7 +207,11 @@ DeferredRenderer::~DeferredRenderer()
 
 void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescriptor& renderDesc)
 {
-    wgpuDeviceTick(gpuContext.device);
+    // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
+    do
+    {
+        wgpuDeviceTick(gpuContext.device);
+    } while (wgpuBufferGetMapState(mTimestampsBuffer.ptr()) != WGPUBufferMapState_Unmapped);
 
     const WGPUCommandEncoder encoder = [&gpuContext]() {
         const WGPUCommandEncoderDescriptor cmdEncoderDesc{
@@ -181,6 +221,10 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
         return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
     }();
 
+    wgpuCommandEncoderWriteTimestamp(
+        encoder,
+        mQuerySet,
+        offsetof(TimestampsLayout, gbufferPassStart) / TimestampsLayout::MEMBER_SIZE);
     mGbufferPass.render(
         gpuContext,
         renderDesc.viewProjectionMatrix,
@@ -188,7 +232,15 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
         mDepthTextureView,
         mAlbedoTextureView,
         mNormalTextureView);
+    wgpuCommandEncoderWriteTimestamp(
+        encoder,
+        mQuerySet,
+        offsetof(TimestampsLayout, gbufferPassEnd) / TimestampsLayout::MEMBER_SIZE);
 
+    wgpuCommandEncoderWriteTimestamp(
+        encoder,
+        mQuerySet,
+        offsetof(TimestampsLayout, lightingPassStart) / TimestampsLayout::MEMBER_SIZE);
     {
         const glm::mat4 inverseViewProjectionMat = glm::inverse(renderDesc.viewProjectionMatrix);
         const Extent2f  framebufferSize = Extent2f(renderDesc.framebufferSize);
@@ -203,6 +255,15 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
             renderDesc.sky,
             renderDesc.exposure);
     }
+    wgpuCommandEncoderWriteTimestamp(
+        encoder,
+        mQuerySet,
+        offsetof(TimestampsLayout, lightingPassEnd) / TimestampsLayout::MEMBER_SIZE);
+
+    wgpuCommandEncoderResolveQuerySet(
+        encoder, mQuerySet, 0, TimestampsLayout::QUERY_COUNT, mQueryBuffer.ptr(), 0);
+    wgpuCommandEncoderCopyBufferToBuffer(
+        encoder, mQueryBuffer.ptr(), 0, mTimestampsBuffer.ptr(), 0, sizeof(TimestampsLayout));
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -212,6 +273,51 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
         return wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
     }();
     wgpuQueueSubmit(gpuContext.queue, 1, &cmdBuffer);
+
+    wgpuBufferMapAsync(
+        mTimestampsBuffer.ptr(),
+        WGPUMapMode_Read,
+        0,
+        sizeof(TimestampsLayout),
+        [](const WGPUBufferMapAsyncStatus status, void* const userdata) -> void {
+            if (status == WGPUBufferMapAsyncStatus_Success)
+            {
+                NLRS_ASSERT(userdata != nullptr);
+                DeferredRenderer& renderer = *static_cast<DeferredRenderer*>(userdata);
+                GpuBuffer&        timestampBuffer = renderer.mTimestampsBuffer;
+                const void* const bufferData = wgpuBufferGetConstMappedRange(
+                    timestampBuffer.ptr(), 0, sizeof(TimestampsLayout));
+                NLRS_ASSERT(bufferData != nullptr);
+
+                const TimestampsLayout& timestamps =
+                    *static_cast<const TimestampsLayout*>(bufferData);
+
+                auto&      gbufferDurations = renderer.mGbufferPassDurationsNs;
+                const auto gbufferDuration =
+                    timestamps.gbufferPassEnd - timestamps.gbufferPassStart;
+                gbufferDurations.push_back(gbufferDuration);
+                if (gbufferDurations.size() > 30)
+                {
+                    gbufferDurations.pop_front();
+                }
+
+                auto&      lightingDurations = renderer.mLightingPassDurationsNs;
+                const auto lightingDuration =
+                    timestamps.lightingPassEnd - timestamps.lightingPassStart;
+                lightingDurations.push_back(lightingDuration);
+                if (lightingDurations.size() > 30)
+                {
+                    lightingDurations.pop_front();
+                }
+
+                wgpuBufferUnmap(timestampBuffer.ptr());
+            }
+            else
+            {
+                std::fprintf(stderr, "Failed to map timestamps buffer\n");
+            }
+        },
+        this);
 }
 
 void DeferredRenderer::renderDebug(
@@ -1351,5 +1457,25 @@ void DeferredRenderer::LightingPass::render(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
     wgpuRenderPassEncoderEnd(renderPass);
+}
+
+DeferredRenderer::PerfStats DeferredRenderer::getPerfStats() const
+{
+    NLRS_ASSERT(mGbufferPassDurationsNs.size() == mLightingPassDurationsNs.size());
+
+    if (mGbufferPassDurationsNs.empty())
+    {
+        return {};
+    }
+
+    return {
+        0.000001f *
+            static_cast<float>(std::accumulate(
+                mGbufferPassDurationsNs.begin(), mGbufferPassDurationsNs.end(), 0ll)) /
+            mGbufferPassDurationsNs.size(),
+        0.000001f *
+            static_cast<float>(std::accumulate(
+                mLightingPassDurationsNs.begin(), mLightingPassDurationsNs.end(), 0ll)) /
+            mLightingPassDurationsNs.size()};
 }
 } // namespace nlrs
