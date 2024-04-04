@@ -45,14 +45,20 @@ An interactive experimental pathtracer, implemented using WebGPU via the [Dawn](
 A C++20 compiler is required.
 
 ```sh
-$ cmake -B build-debug -S . -DCMAKE_BUILD_TYPE=Debug
-$ cmake --build build-debug --target pt -- -j 32
+$ cmake -B build -DCMAKE_BUILD_TYPE=Debug
+$ cmake --build build --target pt -- -j 32
+```
+
+On Windows, the platform name (`x64`, `Win32`, `ARM64`) should be provided during configuration. CMake defaults to `Win32` otherwise.
+
+```sh
+$ cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Debug
 ```
 
 The shaders are appended to a header file as raw strings during the `pt` build step. Updating the header file can also be invoked manually:
 
 ```sh
-$ cmake --build build-debug --target bake-wgsl
+$ cmake --build build --target bake-wgsl
 ```
 
 It's recommendable to build using ccache in case Dawn ever needs to be rebuilt. See [ccache.md](notes/ccache.md) for instructions.
