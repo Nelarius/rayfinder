@@ -52,4 +52,15 @@ Texture Texture::fromMemory(std::span<const std::uint8_t> data)
         std::move(pixels),
         Dimensions{static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)});
 }
+
+Texture Texture::fromPixel(float r, float g, float b, float a)
+{
+    const std::uint32_t r8 = static_cast<std::uint32_t>(r * 255.0f);
+    const std::uint32_t g8 = static_cast<std::uint32_t>(g * 255.0f);
+    const std::uint32_t b8 = static_cast<std::uint32_t>(b * 255.0f);
+    const std::uint32_t a8 = static_cast<std::uint32_t>(a * 255.0f);
+
+    return Texture(
+        std::vector<BgraPixel>{b8 | (g8 << 8) | (r8 << 16) | (a8 << 24)}, Dimensions{1, 1});
+}
 } // namespace nlrs

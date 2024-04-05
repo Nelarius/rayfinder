@@ -39,6 +39,7 @@ public:
 
     // `data` is expected to be in RGBA or RGB format, with each component 8 bits.
     static Texture fromMemory(std::span<const std::uint8_t> data);
+    static Texture fromPixel(float r, float g, float b, float a);
 
 private:
     std::vector<BgraPixel> mPixels;
