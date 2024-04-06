@@ -61,7 +61,7 @@ glm::mat4 generateViewProjectionMatrix(
     const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
     const glm::vec3 up = glm::cross(right, forward);
 
-    return glm::perspective(vfov.asRadians(), aspectRatio, 0.1f, 100.0f) *
+    return glm::perspective(vfov.asRadians(), aspectRatio, 0.1f, 1000.0f) *
            glm::lookAt(origin, lookAt, up);
 }
 } // namespace nlrs
