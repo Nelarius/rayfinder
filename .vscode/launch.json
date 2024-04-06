@@ -43,7 +43,7 @@
             "name": "(Windows) pt",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/pt.exe",
+            "program": "${workspaceFolder}/build/x64/Debug/pt.exe",
             "args": [
                 "assets/Duck.pt"
             ],
@@ -56,10 +56,10 @@
             "name": "(Windows) tests",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/Debug/tests.exe",
+            "program": "${workspaceFolder}/build/x64/Debug/tests.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build/Debug",
+            "cwd": "${workspaceFolder}/build/x64/Debug",
             "environment": [],
             "console": "externalTerminal"
         }
