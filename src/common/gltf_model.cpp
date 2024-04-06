@@ -6,6 +6,7 @@
 #include <cgltf.h>
 #include <fmt/core.h>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <stb_image.h>
@@ -50,7 +51,7 @@ void traverseNodeHierarchy(
     }();
 
     const glm::mat4 transformMatrix = parentTransform * local;
-    const glm::mat4 normalMatrix = glm::transpose(glm::inverse(transformMatrix));
+    const glm::mat4 normalMatrix = glm::inverseTranspose(transformMatrix);
 
     if (node->mesh != nullptr)
     {
@@ -250,7 +251,7 @@ GltfModel::GltfModel(const fs::path gltfPath)
                     localNormals.end(),
                     std::back_inserter(normals),
                     [&matrices = meshTransforms[meshIdx]](const glm::vec3& n) -> glm::vec3 {
-                        return std::get<1>(matrices) * glm::vec4(n, 0.0f);
+                        return glm::normalize(std::get<1>(matrices) * glm::vec4(n, 0.0f));
                     });
                 meshNormals.emplace_back(std::move(normals));
 
