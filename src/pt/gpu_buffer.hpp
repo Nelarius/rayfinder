@@ -167,7 +167,7 @@ GpuBuffer::GpuBuffer(
 
     if (!mBuffer)
     {
-        throw std::runtime_error(fmt::format("Failed to create buffer: {}.", label));
+        throw std::runtime_error(fmt::format("Failed to create buffer \"{}\".", label));
     }
 
     // It's legal to set mappedAtCreation = true and use the mapped range even if the usage doesn't
@@ -175,7 +175,11 @@ GpuBuffer::GpuBuffer(
     // https://www.w3.org/TR/webgpu/#dom-gpubufferdescriptor-mappedatcreation
 
     void* const mappedData = wgpuBufferGetMappedRange(mBuffer, 0, mByteSize);
-    NLRS_ASSERT(mappedData);
+    if (!mappedData)
+    {
+        throw std::runtime_error(
+            fmt::format("Failed to map buffer \"{}\", bytesize: {}.", label, mByteSize));
+    }
     std::memcpy(mappedData, data.data(), mByteSize);
     wgpuBufferUnmap(mBuffer);
 }
