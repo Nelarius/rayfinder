@@ -49,7 +49,7 @@ $ cmake -B build -DCMAKE_BUILD_TYPE=Debug
 $ cmake --build build --target pt -- -j 32
 ```
 
-On Windows, the platform name (`x64`, `Win32`, `ARM64`) should be provided during configuration. CMake defaults to `Win32` otherwise. For CMake Tools, creating a Cmake Preset from the compiler toolchain is required to set the correct architecture at configure.
+On Windows, the platform name (`x64`, `Win32`, `ARM64`) should be provided during configuration. CMake defaults to `Win32` -- see [cmake-preset-x64-arch.md](notes/cmake-presets-x64-arch.md) for instructions on setting up a CMake Preset to force `-A x64`.
 
 ```sh
 $ cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Debug
