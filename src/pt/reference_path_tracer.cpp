@@ -1,5 +1,6 @@
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_context.hpp"
+#include "gpu_limits.hpp"
 #include "reference_path_tracer.hpp"
 #include "shader_source.hpp"
 #include "webgpu_utils.hpp"
@@ -231,7 +232,7 @@ ReferencePathTracer::ReferencePathTracer(
 
         const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::BgraPixel);
         const std::size_t maxStorageBufferBindingSize =
-            static_cast<std::size_t>(wgpuRequiredLimits.limits.maxStorageBufferBindingSize);
+            static_cast<std::size_t>(REQUIRED_LIMITS.maxStorageBufferBindingSize);
         if (textureDataNumBytes > maxStorageBufferBindingSize)
         {
             throw std::runtime_error(fmt::format(

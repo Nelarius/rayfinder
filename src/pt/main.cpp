@@ -1,5 +1,6 @@
 #include "fly_camera_controller.hpp"
 #include "gpu_context.hpp"
+#include "gpu_limits.hpp"
 #include "gui.hpp"
 #include "deferred_renderer.hpp"
 #include "reference_path_tracer.hpp"
@@ -112,11 +113,12 @@ try
         return 0;
     }
 
-    nlrs::GpuContext gpuContext{nlrs::ReferencePathTracer::wgpuRequiredLimits};
-    nlrs::Window     window = [&gpuContext]() -> nlrs::Window {
+    nlrs::GpuContext gpuContext{
+        WGPURequiredLimits{.nextInChain = nullptr, .limits = nlrs::REQUIRED_LIMITS}};
+    nlrs::Window window = [&gpuContext]() -> nlrs::Window {
         const nlrs::WindowDescriptor windowDesc{
-                .windowSize = nlrs::Extent2i{defaultWindowWidth, defaultWindowHeight},
-                .title = "pt-playground 🛝",
+            .windowSize = nlrs::Extent2i{defaultWindowWidth, defaultWindowHeight},
+            .title = "pt-playground 🛝",
         };
         return nlrs::Window{windowDesc, gpuContext};
     }();

@@ -1,5 +1,13 @@
 # `.maxStorageBufferBindingSize`
 
+_Amended: 2024-04-07_
+
+> Dawn's internal storage buffer limit is 256 MiB, or `1 << 28` bytes.
+
+The default max buffer size is 256 MiB. Increasing the max storage buffer binding size alone has not effect, as it is constrained by the max buffer size. Setting `maxBufferSize` > $2^{28}$ bytes unconstrains the storage buffer limit again. At the time of writing, the `maxBufferSize` was 10 GiB on both macOS and Windows.
+
+The storage buffer binding size limit is the one which validation triggers when creating buffers larger than the limit, hence the initial focus on this particular value.
+
 _Written: 2023-11-10_
 
 _Context: when doing texture lookup on the GPU for the first time, it was observed that a single texture buffer can exceed Dawn's internal storage buffer size limit._
