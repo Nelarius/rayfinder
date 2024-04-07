@@ -75,6 +75,7 @@ GpuBuffer::GpuBuffer(
       mUsage(usage)
 {
     NLRS_ASSERT(device != nullptr);
+    NLRS_ASSERT((mUsage & GpuBufferUsage::Uniform) == GpuBufferUsage::None || mByteSize % 16 == 0);
 
     const WGPUBufferDescriptor bufferDesc{
         .nextInChain = nullptr,
