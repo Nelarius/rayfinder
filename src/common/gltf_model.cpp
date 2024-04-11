@@ -185,6 +185,8 @@ public:
                 // GL_CLAMP_TO_BORDER: 33069
                 NLRS_ASSERT(baseColorTexture.sampler->wrap_s == 10497);
                 NLRS_ASSERT(baseColorTexture.sampler->wrap_t == 10497);
+                NLRS_ASSERT(baseColorTexture.has_basisu == false);
+                NLRS_ASSERT(baseColorTexture.basisu_image == nullptr);
                 NLRS_ASSERT(baseColorTexture.image);
 
                 const cgltf_image* const baseColorImage = baseColorTexture.image;
