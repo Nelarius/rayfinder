@@ -792,6 +792,49 @@ struct Uniforms {
 @group(2) @binding(1) var gbufferNormal: texture_2d<f32>;
 @group(2) @binding(2) var gbufferDepth: texture_depth_2d;
 
+@group(3) @binding(0) var<storage, read> bvhNodes: array<BvhNode>;
+@group(3) @binding(1) var<storage, read> positionAttributes: array<Positions>;
+@group(3) @binding(2) var<storage, read> vertexAttributes: array<VertexAttributes>;
+@group(3) @binding(3) var<storage, read> textureDescriptors: array<TextureDescriptor>;
+@group(3) @binding(4) var<storage, read> textures: array<u32>;
+
+struct Aabb {
+    min: vec3f,
+    max: vec3f,
+}
+
+struct BvhNode {
+    aabb: Aabb,
+    trianglesOffset: u32,
+    secondChildOffset: u32,
+    triangleCount: u32,
+    splitAxis: u32,
+}
+
+struct Positions {
+    p0: vec3f,
+    p1: vec3f,
+    p2: vec3f,
+}
+
+struct VertexAttributes {
+    n0: vec3f,
+    n1: vec3f,
+    n2: vec3f,
+
+    uv0: vec2f,
+    uv1: vec2f,
+    uv2: vec2f,
+
+    textureDescriptorIdx: u32,
+}
+
+struct TextureDescriptor {
+    width: u32,
+    height: u32,
+    offset: u32,
+}
+
 const CHANNEL_R = 0u;
 const CHANNEL_G = 1u;
 const CHANNEL_B = 2u;

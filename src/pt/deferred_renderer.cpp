@@ -1,4 +1,5 @@
 #include "gpu_context.hpp"
+#include "gpu_limits.hpp"
 #include "deferred_renderer.hpp"
 #include "shader_source.hpp"
 #include "webgpu_utils.hpp"
@@ -184,7 +185,13 @@ DeferredRenderer::DeferredRenderer(
     }
 
     mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
-    mLightingPass = LightingPass{gpuContext, mGbufferBindGroupLayout};
+    mLightingPass = LightingPass{
+        gpuContext,
+        mGbufferBindGroupLayout,
+        rendererDesc.sceneBvhNodes,
+        rendererDesc.scenePositionAttributes,
+        rendererDesc.sceneVertexAttributes,
+        rendererDesc.sceneBaseColorTextures};
 }
 
 DeferredRenderer::~DeferredRenderer()
@@ -498,13 +505,13 @@ DeferredRenderer::GbufferPass::GbufferPass(
           return buffers;
       }()),
       mBaseColorTextureIndices(
-          rendererDesc.baseColorTextureIndices.begin(),
-          rendererDesc.baseColorTextureIndices.end()),
+          rendererDesc.modelBaseColorTextureIndices.begin(),
+          rendererDesc.modelBaseColorTextureIndices.end()),
       mBaseColorTextures([&gpuContext, &rendererDesc]() -> std::vector<GpuTexture> {
           std::vector<GpuTexture> textures;
           std::transform(
-              rendererDesc.baseColorTextures.begin(),
-              rendererDesc.baseColorTextures.end(),
+              rendererDesc.sceneBaseColorTextures.begin(),
+              rendererDesc.sceneBaseColorTextures.end(),
               std::back_inserter(textures),
               [&gpuContext](const Texture& texture) -> GpuTexture {
                   const auto                  dimensions = texture.dimensions();
@@ -1177,8 +1184,12 @@ void DeferredRenderer::DebugPass::render(
 }
 
 DeferredRenderer::LightingPass::LightingPass(
-    const GpuContext&         gpuContext,
-    const GpuBindGroupLayout& gbufferBindGroupLayout)
+    const GpuContext&                  gpuContext,
+    const GpuBindGroupLayout&          gbufferBindGroupLayout,
+    std::span<const BvhNode>           sceneBvhNodes,
+    std::span<const PositionAttribute> scenePositionAttributes,
+    std::span<const VertexAttributes>  sceneVertexAttributes,
+    std::span<const Texture>           sceneBaseColorTextures)
     : mCurrentSky{},
       mVertexBuffer{
           gpuContext.device,
@@ -1197,6 +1208,24 @@ DeferredRenderer::LightingPass::LightingPass(
           GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
           sizeof(Uniforms)},
       mUniformBindGroup{},
+      mBvhNodeBuffer{
+          gpuContext.device,
+          "BVH node buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          std::span<const BvhNode>(sceneBvhNodes)},
+      mPositionAttributesBuffer{
+          gpuContext.device,
+          "Position attribute buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          std::span<const PositionAttribute>(scenePositionAttributes)},
+      mVertexAttributesBuffer{
+          gpuContext.device,
+          "Vertex attribute buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          std::span<const VertexAttributes>(sceneVertexAttributes)},
+      mTextureDescriptorBuffer{},
+      mTextureBuffer{},
+      mBvhBindGroup{},
       mPipeline(nullptr)
 {
     {
@@ -1226,6 +1255,88 @@ DeferredRenderer::LightingPass::LightingPass(
         "Lighting pass uniform bind group",
         uniformBindGroupLayout.ptr(),
         mUniformBuffer.bindGroupEntry(0)};
+
+    {
+        struct TextureDescriptor
+        {
+            std::uint32_t width, height, offset;
+        };
+        // Ensure matches layout of `TextureDescriptor` definition in shader.
+        std::vector<TextureDescriptor> textureDescriptors;
+        textureDescriptors.reserve(sceneBaseColorTextures.size());
+
+        std::vector<Texture::BgraPixel> textureData;
+        textureData.reserve((2 << 28) / sizeof(Texture::BgraPixel));
+
+        // Texture descriptors and texture data need to appended in the order of
+        // sceneBaseColorTextures. The vertex attribute's `textureIdx` indexes into that array, and
+        // we want to use the same indices to index into the texture descriptor array.
+
+        for (const Texture& baseColorTexture : sceneBaseColorTextures)
+        {
+            const auto dimensions = baseColorTexture.dimensions();
+            const auto pixels = baseColorTexture.pixels();
+
+            const std::uint32_t width = dimensions.width;
+            const std::uint32_t height = dimensions.height;
+            const std::uint32_t offset = static_cast<std::uint32_t>(textureData.size());
+
+            textureData.resize(textureData.size() + pixels.size());
+            std::memcpy(
+                textureData.data() + offset,
+                pixels.data(),
+                pixels.size() * sizeof(Texture::BgraPixel));
+
+            textureDescriptors.push_back({width, height, offset});
+        }
+
+        mTextureDescriptorBuffer = GpuBuffer(
+            gpuContext.device,
+            "texture descriptor buffer",
+            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            std::span<const TextureDescriptor>(textureDescriptors));
+
+        const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::BgraPixel);
+        const std::size_t maxStorageBufferBindingSize =
+            static_cast<std::size_t>(REQUIRED_LIMITS.maxStorageBufferBindingSize);
+        if (textureDataNumBytes > maxStorageBufferBindingSize)
+        {
+            throw std::runtime_error(fmt::format(
+                "Texture buffer size ({}) exceeds "
+                "maxStorageBufferBindingSize ({}).",
+                textureDataNumBytes,
+                maxStorageBufferBindingSize));
+        }
+
+        mTextureBuffer = GpuBuffer(
+            gpuContext.device,
+            "texture buffer",
+            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            std::span<const Texture::BgraPixel>(textureData));
+    }
+
+    const GpuBindGroupLayout bvhBindGroupLayout{
+        gpuContext.device,
+        "Scene bind group layout",
+        std::array<WGPUBindGroupLayoutEntry, 5>{
+            mBvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            mPositionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            mVertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
+            mTextureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
+            mTextureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
+        }};
+
+    mBvhBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass BVH bind group",
+        bvhBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 5>{
+            mBvhNodeBuffer.bindGroupEntry(0),
+            mPositionAttributesBuffer.bindGroupEntry(1),
+            mVertexAttributesBuffer.bindGroupEntry(2),
+            mTextureDescriptorBuffer.bindGroupEntry(3),
+            mTextureBuffer.bindGroupEntry(4),
+        }};
 
     {
         // Pipeline layout

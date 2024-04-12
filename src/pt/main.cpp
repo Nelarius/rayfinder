@@ -132,6 +132,18 @@ try
 
     nlrs::DeferredRenderer deferredRenderer =
         [&gpuContext, &window, argv]() -> nlrs::DeferredRenderer {
+        nlrs::PtFormat ptFormat;
+        {
+            const fs::path path = argv[1];
+            if (!fs::exists(path))
+            {
+                fmt::print(stderr, "File {} does not exist\n", path.string());
+                std::exit(1);
+            }
+            nlrs::InputFileStream file(argv[1]);
+            nlrs::deserialize(file, ptFormat);
+        }
+
         fs::path path = argv[1];
         path.replace_extension(".glb");
         if (!fs::exists(path))
@@ -215,9 +227,11 @@ try
                 .modelNormals = modelNormals,
                 .modelTexCoords = modelTexCoords,
                 .modelIndices = modelIndices,
-                .baseColorTextureIndices = baseColorTextureIndices,
-                .baseColorTextures = gltf.baseColorTextures,
-            }};
+                .modelBaseColorTextureIndices = baseColorTextureIndices,
+                .sceneBaseColorTextures = gltf.baseColorTextures,
+                .sceneBvhNodes = ptFormat.bvhNodes,
+                .scenePositionAttributes = ptFormat.gpuPositionAttributes,
+                .sceneVertexAttributes = ptFormat.gpuVertexAttributes}};
     }();
 
     auto [appState, renderer] =

@@ -5,8 +5,10 @@
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_buffer.hpp"
 
+#include <common/bvh.hpp>
 #include <common/extent.hpp>
 #include <common/texture.hpp>
+#include <pt-format/vertex_attributes.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -22,6 +24,7 @@ namespace nlrs
 {
 struct GpuContext;
 
+// TODO: the naming could be considered inconsistent here. What about modelBvhNodes, etc. and meshPositions, meshNormals, etc.?
 struct DeferredRendererDescriptor
 {
     Extent2u                                  framebufferSize;
@@ -29,8 +32,12 @@ struct DeferredRendererDescriptor
     std::span<std::span<const glm::vec4>>     modelNormals;
     std::span<std::span<const glm::vec2>>     modelTexCoords;
     std::span<std::span<const std::uint32_t>> modelIndices;
-    std::span<std::size_t>                    baseColorTextureIndices;
-    std::span<Texture>                        baseColorTextures;
+    std::span<std::size_t>                    modelBaseColorTextureIndices;
+    std::span<Texture>                        sceneBaseColorTextures;
+
+    std::span<const BvhNode>           sceneBvhNodes;
+    std::span<const PositionAttribute> scenePositionAttributes;
+    std::span<const VertexAttributes>  sceneVertexAttributes;
 };
 
 struct RenderDescriptor
@@ -155,6 +162,12 @@ private:
         GpuBindGroup       mSkyStateBindGroup = GpuBindGroup{};
         GpuBuffer          mUniformBuffer = GpuBuffer{};
         GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
+        GpuBuffer          mBvhNodeBuffer;
+        GpuBuffer          mPositionAttributesBuffer;
+        GpuBuffer          mVertexAttributesBuffer;
+        GpuBuffer          mTextureDescriptorBuffer;
+        GpuBuffer          mTextureBuffer;
+        GpuBindGroup       mBvhBindGroup;
         WGPURenderPipeline mPipeline = nullptr;
 
         struct Uniforms
@@ -169,8 +182,12 @@ private:
     public:
         LightingPass() = default;
         LightingPass(
-            const GpuContext&         gpuContext,
-            const GpuBindGroupLayout& gbufferBindGroupLayout);
+            const GpuContext&                  gpuContext,
+            const GpuBindGroupLayout&          gbufferBindGroupLayout,
+            std::span<const BvhNode>           bvhNodes,
+            std::span<const PositionAttribute> positionAttributes,
+            std::span<const VertexAttributes>  vertexAttributes,
+            std::span<const Texture>           baseColorTextures);
         ~LightingPass();
 
         LightingPass(const LightingPass&) = delete;
