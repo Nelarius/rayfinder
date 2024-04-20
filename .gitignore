@@ -4,7 +4,10 @@ build-debug
 build-release
 clangd
 *.pt
+*.glb
 imgui.ini
+CMakePresets.json
+.vscode/settings.json
 
 ### CMake ###
 CMakeLists.txt.user
