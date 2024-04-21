@@ -31,6 +31,7 @@ struct GbufferOutput {
 
 @fragment
 fn fsMain(in: VertexOutput) -> GbufferOutput {
-    var c = pow(textureSample(texture, textureSampler, in.texCoord).xyz, vec3(2.2f));
-    return GbufferOutput(vec4(c, 1f), vec4(normalize(in.normal.xyz), 1f));
+    let linearAlbedo = pow(textureSample(texture, textureSampler, in.texCoord).xyz, vec3(2.2f));
+    let encodedNormal = 0.5f * in.normal.xyz + vec3f(0.5f);
+    return GbufferOutput(vec4(linearAlbedo, 1f), vec4(encodedNormal, 1f));
 }

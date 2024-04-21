@@ -24,7 +24,8 @@ namespace nlrs
 {
 struct GpuContext;
 
-// TODO: the naming could be considered inconsistent here. What about modelBvhNodes, etc. and meshPositions, meshNormals, etc.?
+// TODO: the naming could be considered inconsistent here. What about modelBvhNodes, etc. and
+// meshPositions, meshNormals, etc.?
 struct DeferredRendererDescriptor
 {
     Extent2u                                  framebufferSize;
@@ -162,21 +163,23 @@ private:
         GpuBindGroup       mSkyStateBindGroup = GpuBindGroup{};
         GpuBuffer          mUniformBuffer = GpuBuffer{};
         GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
-        GpuBuffer          mBvhNodeBuffer;
-        GpuBuffer          mPositionAttributesBuffer;
-        GpuBuffer          mVertexAttributesBuffer;
-        GpuBuffer          mTextureDescriptorBuffer;
-        GpuBuffer          mTextureBuffer;
-        GpuBindGroup       mBvhBindGroup;
+        GpuBuffer          mBvhNodeBuffer = GpuBuffer{};
+        GpuBuffer          mPositionAttributesBuffer = GpuBuffer{};
+        GpuBuffer          mVertexAttributesBuffer = GpuBuffer{};
+        GpuBuffer          mTextureDescriptorBuffer = GpuBuffer{};
+        GpuBuffer          mTextureBuffer = GpuBuffer{};
+        GpuBindGroup       mBvhBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
+
+        std::uint32_t mFrameCount = 0;
 
         struct Uniforms
         {
-            glm::mat4 inverseViewProjection;
-            glm::vec4 cameraPosition;
-            glm::vec2 framebufferSize;
-            float     exposure;
-            float     padding;
+            glm::mat4     inverseViewProjection;
+            glm::vec4     cameraPosition;
+            glm::vec2     framebufferSize;
+            float         exposure;
+            std::uint32_t frameCount;
         };
 
     public:

@@ -1344,7 +1344,8 @@ DeferredRenderer::LightingPass::LightingPass(
         const WGPUBindGroupLayout bindGroupLayouts[] = {
             skyStateBindGroupLayout.ptr(),
             uniformBindGroupLayout.ptr(),
-            gbufferBindGroupLayout.ptr()};
+            gbufferBindGroupLayout.ptr(),
+            bvhBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -1481,8 +1482,15 @@ DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
         mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mBvhBindGroup = std::move(other.mBvhBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mFrameCount = other.mFrameCount;
     }
 }
 
@@ -1497,9 +1505,16 @@ DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
         mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mBvhBindGroup = std::move(other.mBvhBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mFrameCount = other.mFrameCount;
     }
     return *this;
 }
@@ -1529,7 +1544,7 @@ void DeferredRenderer::LightingPass::render(
             glm::vec4(cameraPosition, 1.f),
             glm::vec2(fbsize.x, fbsize.y),
             exposure,
-            0.f};
+            mFrameCount++};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
     }
@@ -1564,6 +1579,7 @@ void DeferredRenderer::LightingPass::render(
     wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mSkyStateBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mUniformBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetBindGroup(renderPass, 2, gbufferBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 3, mBvhBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
