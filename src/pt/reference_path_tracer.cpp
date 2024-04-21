@@ -196,7 +196,7 @@ ReferencePathTracer::ReferencePathTracer(
         textureDescriptors.reserve(scene.baseColorTextures.size());
 
         std::vector<Texture::BgraPixel> textureData;
-        textureData.reserve(67108864);
+        textureData.reserve((2 << 28) / sizeof(Texture::BgraPixel));
 
         // Texture descriptors and texture data need to appended in the order of the model's
         // baseColorTextures. The model's baseColorTextureIndices index into that array, and we want
