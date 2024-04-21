@@ -436,12 +436,6 @@ try
             1.0f / std::exp2(static_cast<float>(appState.ui.exposureStops))};
         renderer.setRenderParameters(renderParams);
 
-        // const nlrs::PostProcessingParameters postProcessingParams{
-        //     static_cast<std::uint32_t>(appState.ui.exposureStops),
-        //     static_cast<nlrs::Tonemapping>(appState.ui.tonemapFn),
-        // };
-        // renderer.setPostProcessingParameters(postProcessingParams);
-
         switch (appState.ui.rendererType)
         {
         case RendererType_PathTracer:
