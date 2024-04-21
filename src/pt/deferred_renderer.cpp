@@ -15,7 +15,7 @@ namespace nlrs
 {
 namespace
 {
-const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth24Plus;
+const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth32Float;
 const WGPUTextureFormat ALBEDO_TEXTURE_FORMAT = WGPUTextureFormat_BGRA8Unorm;
 const WGPUTextureFormat NORMAL_TEXTURE_FORMAT = WGPUTextureFormat_RGBA16Float;
 
