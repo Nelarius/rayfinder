@@ -34,8 +34,8 @@
 
 namespace fs = std::filesystem;
 
-inline constexpr int defaultWindowWidth = 640;
-inline constexpr int defaultWindowHeight = 480;
+inline constexpr int defaultWindowWidth = 1491;
+inline constexpr int defaultWindowHeight = 876;
 
 void printHelp() { std::printf("Usage:\n\tpt <input_pt_file>\n"); }
 
