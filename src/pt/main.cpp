@@ -457,10 +457,9 @@ try
             break;
         case RendererType_Deferred:
         {
-            const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
             NLRS_ASSERT(appState.ui.exposureStops >= 0);
             const nlrs::RenderDescriptor renderDesc{
-                viewProjectionMat,
+                appState.cameraController.viewReverseZProjectionMatrix(),
                 appState.cameraController.position(),
                 nlrs::Sky{
                     appState.ui.skyTurbidity,
@@ -477,10 +476,9 @@ try
         }
         case RendererType_Debug:
         {
-            const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
             deferredRenderer.renderDebug(
                 gpuContext,
-                viewProjectionMat,
+                appState.cameraController.viewReverseZProjectionMatrix(),
                 nlrs::Extent2f(windowResolution),
                 textureBlitter.textureView());
             break;

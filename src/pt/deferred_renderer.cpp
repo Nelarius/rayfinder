@@ -234,7 +234,7 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
         offsetof(TimestampsLayout, gbufferPassStart) / TimestampsLayout::MEMBER_SIZE);
     mGbufferPass.render(
         gpuContext,
-        renderDesc.viewProjectionMatrix,
+        renderDesc.viewReverseZProjectionMatrix,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
@@ -249,8 +249,9 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
         mQuerySet,
         offsetof(TimestampsLayout, lightingPassStart) / TimestampsLayout::MEMBER_SIZE);
     {
-        const glm::mat4 inverseViewProjectionMat = glm::inverse(renderDesc.viewProjectionMatrix);
-        const Extent2f  framebufferSize = Extent2f(renderDesc.framebufferSize);
+        const glm::mat4 inverseViewProjectionMat =
+            glm::inverse(renderDesc.viewReverseZProjectionMatrix);
+        const Extent2f framebufferSize = Extent2f(renderDesc.framebufferSize);
         mLightingPass.render(
             gpuContext,
             mGbufferBindGroup,
@@ -720,7 +721,7 @@ DeferredRenderer::GbufferPass::GbufferPass(
             .nextInChain = nullptr,
             .format = DEPTH_TEXTURE_FORMAT,
             .depthWriteEnabled = true,
-            .depthCompare = WGPUCompareFunction_Less,
+            .depthCompare = WGPUCompareFunction_Greater,
             .stencilFront = DEFAULT_STENCIL_FACE_STATE,
             .stencilBack = DEFAULT_STENCIL_FACE_STATE,
             .stencilReadMask = 0, // stencil masks deactivated by setting to zero
@@ -849,14 +850,18 @@ DeferredRenderer::GbufferPass::~GbufferPass()
 
 void DeferredRenderer::GbufferPass::render(
     const GpuContext&        gpuContext,
-    const glm::mat4&         viewProjectionMat,
+    const glm::mat4&         viewReverseZProjectionMatrix,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    depthTextureView,
     const WGPUTextureView    albedoTextureView,
     const WGPUTextureView    normalTextureView)
 {
     wgpuQueueWriteBuffer(
-        gpuContext.queue, mUniformBuffer.ptr(), 0, &viewProjectionMat[0][0], sizeof(glm::mat4));
+        gpuContext.queue,
+        mUniformBuffer.ptr(),
+        0,
+        &viewReverseZProjectionMatrix[0][0],
+        sizeof(glm::mat4));
 
     const WGPURenderPassEncoder renderPassEncoder = [cmdEncoder,
                                                      depthTextureView,
@@ -886,9 +891,9 @@ void DeferredRenderer::GbufferPass::render(
             .view = depthTextureView,
             .depthLoadOp = WGPULoadOp_Clear,
             .depthStoreOp = WGPUStoreOp_Store,
-            .depthClearValue = 1.0f,
+            .depthClearValue = 0.0f,
             .depthReadOnly = false,
-            .stencilLoadOp = WGPULoadOp_Undefined, // ops must not be set if no stencil aspect
+            .stencilLoadOp = WGPULoadOp_Undefined,
             .stencilStoreOp = WGPUStoreOp_Undefined,
             .stencilClearValue = 0,
             .stencilReadOnly = true,
@@ -1524,7 +1529,7 @@ void DeferredRenderer::LightingPass::render(
     const GpuBindGroup&      gbufferBindGroup,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    targetTextureView,
-    const glm::mat4&         inverseViewProjectionMat,
+    const glm::mat4&         inverseViewReverseZProjectionMatrix,
     const glm::vec3&         cameraPosition,
     const Extent2f&          fbsize,
     const Sky&               sky,
@@ -1540,7 +1545,7 @@ void DeferredRenderer::LightingPass::render(
 
     {
         const Uniforms uniforms{
-            inverseViewProjectionMat,
+            inverseViewReverseZProjectionMatrix,
             glm::vec4(cameraPosition, 1.f),
             glm::vec2(fbsize.x, fbsize.y),
             exposure,

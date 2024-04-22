@@ -745,7 +745,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     } else if c.x < 0.666 {
         return textureLoad(gbufferNormal, idx, 0);
     } else {
-        let d = vec3(1.0) - textureLoad(gbufferDepth, idx, 0);
+        let d = textureLoad(gbufferDepth, idx, 0);
         let x = d;
         let a = 0.1;
         return vec4((1.0 + a) * x / (x + vec3(a)), 1.0);
@@ -780,7 +780,7 @@ struct SkyState {
 };
 
 struct Uniforms {
-    inverseViewProjectionMat: mat4x4f,
+    inverseViewReverseZProjectionMat: mat4x4f,
     cameraEye: vec4f,
     framebufferSize: vec2f,
     exposure: f32,
@@ -867,7 +867,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let textureIdx = vec2u(floor(uv * uniforms.framebufferSize));
     var rng = initRng(textureIdx, vec2u(uniforms.framebufferSize), uniforms.frameCount);
     let depthSample = textureLoad(gbufferDepth, textureIdx, 0);
-    if depthSample == 1.0 {
+    if depthSample == 0.0 {
         let world = worldFromUv(uv, depthSample);
         let v = normalize(world - uniforms.cameraEye.xyz);
         let s = skyState.sunDirection;
@@ -893,7 +893,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 @must_use
 fn worldFromUv(uv: vec2f, depthSample: f32) -> vec3f {
     let ndc = vec4(2.0 * vec2(uv.x, 1.0 - uv.y) - vec2(1.0), depthSample, 1.0);
-    let worldInvW = uniforms.inverseViewProjectionMat * ndc;
+    let worldInvW = uniforms.inverseViewReverseZProjectionMat * ndc;
     let world = worldInvW / worldInvW.w;
     return world.xyz;
 }

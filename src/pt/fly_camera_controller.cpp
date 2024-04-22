@@ -1,6 +1,7 @@
 #include "fly_camera_controller.hpp"
 
 #include <GLFW/glfw3.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -20,14 +21,33 @@ Camera FlyCameraController::getCamera() const
         aspectRatio(mWindowSize));
 }
 
-glm::mat4 FlyCameraController::viewProjectionMatrix() const
+glm::mat4 FlyCameraController::viewReverseZProjectionMatrix() const
 {
-    const auto orientation = cameraOrientation();
-    return generateViewProjectionMatrix(
-        mPosition,
-        mPosition + mFocusDistance * orientation.forward,
-        mVfov,
-        aspectRatio(mWindowSize));
+    const auto      orientation = cameraOrientation();
+    const glm::vec3 origin = mPosition;
+    const glm::vec3 lookAt = mPosition + mFocusDistance * orientation.forward;
+
+    const glm::vec3 forward = glm::normalize(lookAt - origin);
+    const glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    const glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
+    const glm::vec3 up = glm::cross(right, forward);
+
+    // clang-format off
+    const glm::mat4 reverseZ = glm::mat4(
+                                    1.0f, 0.0f,  0.0f, 0.0f,
+                                    0.0f, 1.0f,  0.0f, 0.0f,
+                                    0.0f, 0.0f, -1.0f, 0.0f,
+                                    0.0f, 0.0f,  1.0f, 1.0f);
+    // clang-format on
+
+    const float     near = 0.1f;
+    const float     far = 1000.0f;
+    const glm::mat4 project =
+        glm::perspective(mVfov.asRadians(), aspectRatio(mWindowSize), near, far);
+
+    const glm::mat4 view = glm::lookAt(origin, lookAt, up);
+
+    return reverseZ * project * view;
 }
 
 void FlyCameraController::lookAt(const glm::vec3& p)

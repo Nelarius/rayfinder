@@ -43,7 +43,7 @@ struct DeferredRendererDescriptor
 
 struct RenderDescriptor
 {
-    glm::mat4       viewProjectionMatrix;
+    glm::mat4       viewReverseZProjectionMatrix;
     glm::vec3       cameraPosition;
     Sky             sky;
     Extent2u        framebufferSize;
@@ -175,7 +175,7 @@ private:
 
         struct Uniforms
         {
-            glm::mat4     inverseViewProjection;
+            glm::mat4     inverseViewReverseZProjectionMat;
             glm::vec4     cameraPosition;
             glm::vec2     framebufferSize;
             float         exposure;

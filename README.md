@@ -39,6 +39,9 @@ An interactive experimental pathtracer, implemented using WebGPU via the [Dawn](
 - [Sky Dome Appearance Project](https://cgg.mff.cuni.cz/projects/SkylightModelling/)
   - The original source of the sky and solar disk model
   - The following [Rust implementation](https://github.com/phoekz/hw-skymodel) serves as the basis of the much simplified C code used in this project.
+- Depth precision and reverse Z projection
+  - [Depth Precision Visualized](https://www.reedbeta.com/blog/depth-precision-visualized/)
+  - [Reverse Z (and why it's so awesome)](https://tomhultonharrop.com/mathematics/graphics/2023/08/06/reverse-z.html)
 
 ## Build
 
