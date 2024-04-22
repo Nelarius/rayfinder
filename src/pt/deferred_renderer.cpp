@@ -1,4 +1,5 @@
 #include "gpu_context.hpp"
+#include "gpu_limits.hpp"
 #include "deferred_renderer.hpp"
 #include "shader_source.hpp"
 #include "webgpu_utils.hpp"
@@ -14,7 +15,7 @@ namespace nlrs
 {
 namespace
 {
-const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth24Plus;
+const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth32Float;
 const WGPUTextureFormat ALBEDO_TEXTURE_FORMAT = WGPUTextureFormat_BGRA8Unorm;
 const WGPUTextureFormat NORMAL_TEXTURE_FORMAT = WGPUTextureFormat_RGBA16Float;
 
@@ -184,7 +185,13 @@ DeferredRenderer::DeferredRenderer(
     }
 
     mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
-    mLightingPass = LightingPass{gpuContext, mGbufferBindGroupLayout};
+    mLightingPass = LightingPass{
+        gpuContext,
+        mGbufferBindGroupLayout,
+        rendererDesc.sceneBvhNodes,
+        rendererDesc.scenePositionAttributes,
+        rendererDesc.sceneVertexAttributes,
+        rendererDesc.sceneBaseColorTextures};
 }
 
 DeferredRenderer::~DeferredRenderer()
@@ -227,7 +234,7 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
         offsetof(TimestampsLayout, gbufferPassStart) / TimestampsLayout::MEMBER_SIZE);
     mGbufferPass.render(
         gpuContext,
-        renderDesc.viewProjectionMatrix,
+        renderDesc.viewReverseZProjectionMatrix,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
@@ -242,8 +249,9 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
         mQuerySet,
         offsetof(TimestampsLayout, lightingPassStart) / TimestampsLayout::MEMBER_SIZE);
     {
-        const glm::mat4 inverseViewProjectionMat = glm::inverse(renderDesc.viewProjectionMatrix);
-        const Extent2f  framebufferSize = Extent2f(renderDesc.framebufferSize);
+        const glm::mat4 inverseViewProjectionMat =
+            glm::inverse(renderDesc.viewReverseZProjectionMatrix);
+        const Extent2f framebufferSize = Extent2f(renderDesc.framebufferSize);
         mLightingPass.render(
             gpuContext,
             mGbufferBindGroup,
@@ -498,13 +506,13 @@ DeferredRenderer::GbufferPass::GbufferPass(
           return buffers;
       }()),
       mBaseColorTextureIndices(
-          rendererDesc.baseColorTextureIndices.begin(),
-          rendererDesc.baseColorTextureIndices.end()),
+          rendererDesc.modelBaseColorTextureIndices.begin(),
+          rendererDesc.modelBaseColorTextureIndices.end()),
       mBaseColorTextures([&gpuContext, &rendererDesc]() -> std::vector<GpuTexture> {
           std::vector<GpuTexture> textures;
           std::transform(
-              rendererDesc.baseColorTextures.begin(),
-              rendererDesc.baseColorTextures.end(),
+              rendererDesc.sceneBaseColorTextures.begin(),
+              rendererDesc.sceneBaseColorTextures.end(),
               std::back_inserter(textures),
               [&gpuContext](const Texture& texture) -> GpuTexture {
                   const auto                  dimensions = texture.dimensions();
@@ -713,7 +721,7 @@ DeferredRenderer::GbufferPass::GbufferPass(
             .nextInChain = nullptr,
             .format = DEPTH_TEXTURE_FORMAT,
             .depthWriteEnabled = true,
-            .depthCompare = WGPUCompareFunction_Less,
+            .depthCompare = WGPUCompareFunction_Greater,
             .stencilFront = DEFAULT_STENCIL_FACE_STATE,
             .stencilBack = DEFAULT_STENCIL_FACE_STATE,
             .stencilReadMask = 0, // stencil masks deactivated by setting to zero
@@ -842,14 +850,18 @@ DeferredRenderer::GbufferPass::~GbufferPass()
 
 void DeferredRenderer::GbufferPass::render(
     const GpuContext&        gpuContext,
-    const glm::mat4&         viewProjectionMat,
+    const glm::mat4&         viewReverseZProjectionMatrix,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    depthTextureView,
     const WGPUTextureView    albedoTextureView,
     const WGPUTextureView    normalTextureView)
 {
     wgpuQueueWriteBuffer(
-        gpuContext.queue, mUniformBuffer.ptr(), 0, &viewProjectionMat[0][0], sizeof(glm::mat4));
+        gpuContext.queue,
+        mUniformBuffer.ptr(),
+        0,
+        &viewReverseZProjectionMatrix[0][0],
+        sizeof(glm::mat4));
 
     const WGPURenderPassEncoder renderPassEncoder = [cmdEncoder,
                                                      depthTextureView,
@@ -879,9 +891,9 @@ void DeferredRenderer::GbufferPass::render(
             .view = depthTextureView,
             .depthLoadOp = WGPULoadOp_Clear,
             .depthStoreOp = WGPUStoreOp_Store,
-            .depthClearValue = 1.0f,
+            .depthClearValue = 0.0f,
             .depthReadOnly = false,
-            .stencilLoadOp = WGPULoadOp_Undefined, // ops must not be set if no stencil aspect
+            .stencilLoadOp = WGPULoadOp_Undefined,
             .stencilStoreOp = WGPUStoreOp_Undefined,
             .stencilClearValue = 0,
             .stencilReadOnly = true,
@@ -1177,8 +1189,12 @@ void DeferredRenderer::DebugPass::render(
 }
 
 DeferredRenderer::LightingPass::LightingPass(
-    const GpuContext&         gpuContext,
-    const GpuBindGroupLayout& gbufferBindGroupLayout)
+    const GpuContext&                  gpuContext,
+    const GpuBindGroupLayout&          gbufferBindGroupLayout,
+    std::span<const BvhNode>           sceneBvhNodes,
+    std::span<const PositionAttribute> scenePositionAttributes,
+    std::span<const VertexAttributes>  sceneVertexAttributes,
+    std::span<const Texture>           sceneBaseColorTextures)
     : mCurrentSky{},
       mVertexBuffer{
           gpuContext.device,
@@ -1197,6 +1213,24 @@ DeferredRenderer::LightingPass::LightingPass(
           GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
           sizeof(Uniforms)},
       mUniformBindGroup{},
+      mBvhNodeBuffer{
+          gpuContext.device,
+          "BVH node buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          std::span<const BvhNode>(sceneBvhNodes)},
+      mPositionAttributesBuffer{
+          gpuContext.device,
+          "Position attribute buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          std::span<const PositionAttribute>(scenePositionAttributes)},
+      mVertexAttributesBuffer{
+          gpuContext.device,
+          "Vertex attribute buffer",
+          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          std::span<const VertexAttributes>(sceneVertexAttributes)},
+      mTextureDescriptorBuffer{},
+      mTextureBuffer{},
+      mBvhBindGroup{},
       mPipeline(nullptr)
 {
     {
@@ -1228,12 +1262,95 @@ DeferredRenderer::LightingPass::LightingPass(
         mUniformBuffer.bindGroupEntry(0)};
 
     {
+        struct TextureDescriptor
+        {
+            std::uint32_t width, height, offset;
+        };
+        // Ensure matches layout of `TextureDescriptor` definition in shader.
+        std::vector<TextureDescriptor> textureDescriptors;
+        textureDescriptors.reserve(sceneBaseColorTextures.size());
+
+        std::vector<Texture::BgraPixel> textureData;
+        textureData.reserve((2 << 28) / sizeof(Texture::BgraPixel));
+
+        // Texture descriptors and texture data need to appended in the order of
+        // sceneBaseColorTextures. The vertex attribute's `textureIdx` indexes into that array, and
+        // we want to use the same indices to index into the texture descriptor array.
+
+        for (const Texture& baseColorTexture : sceneBaseColorTextures)
+        {
+            const auto dimensions = baseColorTexture.dimensions();
+            const auto pixels = baseColorTexture.pixels();
+
+            const std::uint32_t width = dimensions.width;
+            const std::uint32_t height = dimensions.height;
+            const std::uint32_t offset = static_cast<std::uint32_t>(textureData.size());
+
+            textureData.resize(textureData.size() + pixels.size());
+            std::memcpy(
+                textureData.data() + offset,
+                pixels.data(),
+                pixels.size() * sizeof(Texture::BgraPixel));
+
+            textureDescriptors.push_back({width, height, offset});
+        }
+
+        mTextureDescriptorBuffer = GpuBuffer(
+            gpuContext.device,
+            "texture descriptor buffer",
+            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            std::span<const TextureDescriptor>(textureDescriptors));
+
+        const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::BgraPixel);
+        const std::size_t maxStorageBufferBindingSize =
+            static_cast<std::size_t>(REQUIRED_LIMITS.maxStorageBufferBindingSize);
+        if (textureDataNumBytes > maxStorageBufferBindingSize)
+        {
+            throw std::runtime_error(fmt::format(
+                "Texture buffer size ({}) exceeds "
+                "maxStorageBufferBindingSize ({}).",
+                textureDataNumBytes,
+                maxStorageBufferBindingSize));
+        }
+
+        mTextureBuffer = GpuBuffer(
+            gpuContext.device,
+            "texture buffer",
+            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            std::span<const Texture::BgraPixel>(textureData));
+    }
+
+    const GpuBindGroupLayout bvhBindGroupLayout{
+        gpuContext.device,
+        "Scene bind group layout",
+        std::array<WGPUBindGroupLayoutEntry, 5>{
+            mBvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            mPositionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            mVertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
+            mTextureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
+            mTextureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
+        }};
+
+    mBvhBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass BVH bind group",
+        bvhBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 5>{
+            mBvhNodeBuffer.bindGroupEntry(0),
+            mPositionAttributesBuffer.bindGroupEntry(1),
+            mVertexAttributesBuffer.bindGroupEntry(2),
+            mTextureDescriptorBuffer.bindGroupEntry(3),
+            mTextureBuffer.bindGroupEntry(4),
+        }};
+
+    {
         // Pipeline layout
 
         const WGPUBindGroupLayout bindGroupLayouts[] = {
             skyStateBindGroupLayout.ptr(),
             uniformBindGroupLayout.ptr(),
-            gbufferBindGroupLayout.ptr()};
+            gbufferBindGroupLayout.ptr(),
+            bvhBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -1370,8 +1487,15 @@ DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
         mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mBvhBindGroup = std::move(other.mBvhBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mFrameCount = other.mFrameCount;
     }
 }
 
@@ -1386,9 +1510,16 @@ DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
         mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mBvhBindGroup = std::move(other.mBvhBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mFrameCount = other.mFrameCount;
     }
     return *this;
 }
@@ -1398,7 +1529,7 @@ void DeferredRenderer::LightingPass::render(
     const GpuBindGroup&      gbufferBindGroup,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    targetTextureView,
-    const glm::mat4&         inverseViewProjectionMat,
+    const glm::mat4&         inverseViewReverseZProjectionMatrix,
     const glm::vec3&         cameraPosition,
     const Extent2f&          fbsize,
     const Sky&               sky,
@@ -1414,11 +1545,11 @@ void DeferredRenderer::LightingPass::render(
 
     {
         const Uniforms uniforms{
-            inverseViewProjectionMat,
+            inverseViewReverseZProjectionMatrix,
             glm::vec4(cameraPosition, 1.f),
             glm::vec2(fbsize.x, fbsize.y),
             exposure,
-            0.f};
+            mFrameCount++};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
     }
@@ -1453,6 +1584,7 @@ void DeferredRenderer::LightingPass::render(
     wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mSkyStateBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mUniformBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetBindGroup(renderPass, 2, gbufferBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 3, mBvhBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);

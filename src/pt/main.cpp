@@ -132,6 +132,18 @@ try
 
     nlrs::DeferredRenderer deferredRenderer =
         [&gpuContext, &window, argv]() -> nlrs::DeferredRenderer {
+        nlrs::PtFormat ptFormat;
+        {
+            const fs::path path = argv[1];
+            if (!fs::exists(path))
+            {
+                fmt::print(stderr, "File {} does not exist\n", path.string());
+                std::exit(1);
+            }
+            nlrs::InputFileStream file(argv[1]);
+            nlrs::deserialize(file, ptFormat);
+        }
+
         fs::path path = argv[1];
         path.replace_extension(".glb");
         if (!fs::exists(path))
@@ -215,9 +227,11 @@ try
                 .modelNormals = modelNormals,
                 .modelTexCoords = modelTexCoords,
                 .modelIndices = modelIndices,
-                .baseColorTextureIndices = baseColorTextureIndices,
-                .baseColorTextures = gltf.baseColorTextures,
-            }};
+                .modelBaseColorTextureIndices = baseColorTextureIndices,
+                .sceneBaseColorTextures = gltf.baseColorTextures,
+                .sceneBvhNodes = ptFormat.bvhNodes,
+                .scenePositionAttributes = ptFormat.gpuPositionAttributes,
+                .sceneVertexAttributes = ptFormat.gpuVertexAttributes}};
     }();
 
     auto [appState, renderer] =
@@ -443,10 +457,9 @@ try
             break;
         case RendererType_Deferred:
         {
-            const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
             NLRS_ASSERT(appState.ui.exposureStops >= 0);
             const nlrs::RenderDescriptor renderDesc{
-                viewProjectionMat,
+                appState.cameraController.viewReverseZProjectionMatrix(),
                 appState.cameraController.position(),
                 nlrs::Sky{
                     appState.ui.skyTurbidity,
@@ -463,10 +476,9 @@ try
         }
         case RendererType_Debug:
         {
-            const glm::mat4 viewProjectionMat = appState.cameraController.viewProjectionMatrix();
             deferredRenderer.renderDebug(
                 gpuContext,
-                viewProjectionMat,
+                appState.cameraController.viewReverseZProjectionMatrix(),
                 nlrs::Extent2f(windowResolution),
                 textureBlitter.textureView());
             break;
