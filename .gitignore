@@ -1,7 +1,5 @@
 ### Project ###
-build
-build-debug
-build-release
+build*
 clangd
 *.pt
 *.glb
