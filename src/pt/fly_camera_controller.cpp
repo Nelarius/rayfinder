@@ -40,7 +40,7 @@ glm::mat4 FlyCameraController::viewReverseZProjectionMatrix() const
                                     0.0f, 0.0f,  1.0f, 1.0f);
     // clang-format on
 
-    const float     near = 0.1f;
+    const float     near = 0.2f;
     const float     far = 1000.0f;
     const glm::mat4 project =
         glm::perspective(mVfov.asRadians(), aspectRatio(mWindowSize), near, far);
