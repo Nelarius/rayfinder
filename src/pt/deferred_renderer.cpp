@@ -87,12 +87,12 @@ DeferredRenderer::DeferredRenderer(
       mQueryBuffer(
           gpuContext.device,
           "Deferred renderer query buffer",
-          GpuBufferUsage::QueryResolve | GpuBufferUsage::CopySrc,
+          {GpuBufferUsage::QueryResolve, GpuBufferUsage::CopySrc},
           sizeof(TimestampsLayout)),
       mTimestampsBuffer(
           gpuContext.device,
           "Deferred renderer timestamp buffer",
-          GpuBufferUsage::CopyDst | GpuBufferUsage::MapRead,
+          {GpuBufferUsage::CopyDst, GpuBufferUsage::MapRead},
           sizeof(TimestampsLayout)),
       mGbufferPass(gpuContext, rendererDesc),
       mDebugPass(),
@@ -585,7 +585,7 @@ DeferredRenderer::GbufferPass::GbufferPass(
       mUniformBuffer(
           gpuContext.device,
           "Uniform buffer",
-          GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::Uniform, GpuBufferUsage::CopyDst},
           sizeof(glm::mat4)),
       mUniformBindGroup(),
       mSamplerBindGroup(),
@@ -959,7 +959,7 @@ DeferredRenderer::DebugPass::DebugPass(
     : mVertexBuffer(
           gpuContext.device,
           "Vertex buffer",
-          GpuBufferUsage::Vertex | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst},
           std::span<const float[2]>(quadVertexData)),
       mUniformBuffer(),
       mUniformBindGroup(),
@@ -970,7 +970,7 @@ DeferredRenderer::DebugPass::DebugPass(
         mUniformBuffer = GpuBuffer{
             gpuContext.device,
             "Uniform buffer",
-            GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
+            {GpuBufferUsage::Uniform, GpuBufferUsage::CopyDst},
             std::span<const float>(&uniformData.x, sizeof(Extent2f))};
     }
 
@@ -1199,34 +1199,34 @@ DeferredRenderer::LightingPass::LightingPass(
       mVertexBuffer{
           gpuContext.device,
           "Sky vertex buffer",
-          GpuBufferUsage::Vertex | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst},
           std::span<const float[2]>(quadVertexData)},
       mSkyStateBuffer{
           gpuContext.device,
           "Sky state buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           sizeof(AlignedSkyState)},
       mSkyStateBindGroup{},
       mUniformBuffer{
           gpuContext.device,
           "Sky uniform buffer",
-          GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::Uniform, GpuBufferUsage::CopyDst},
           sizeof(Uniforms)},
       mUniformBindGroup{},
       mBvhNodeBuffer{
           gpuContext.device,
           "BVH node buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           std::span<const BvhNode>(sceneBvhNodes)},
       mPositionAttributesBuffer{
           gpuContext.device,
           "Position attribute buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           std::span<const PositionAttribute>(scenePositionAttributes)},
       mVertexAttributesBuffer{
           gpuContext.device,
           "Vertex attribute buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           std::span<const VertexAttributes>(sceneVertexAttributes)},
       mTextureDescriptorBuffer{},
       mTextureBuffer{},
@@ -1298,7 +1298,7 @@ DeferredRenderer::LightingPass::LightingPass(
         mTextureDescriptorBuffer = GpuBuffer(
             gpuContext.device,
             "texture descriptor buffer",
-            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
             std::span<const TextureDescriptor>(textureDescriptors));
 
         const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::BgraPixel);
@@ -1316,7 +1316,7 @@ DeferredRenderer::LightingPass::LightingPass(
         mTextureBuffer = GpuBuffer(
             gpuContext.device,
             "texture buffer",
-            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
             std::span<const Texture::BgraPixel>(textureData));
     }
 

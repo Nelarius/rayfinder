@@ -124,6 +124,7 @@ add_custom_command(
 set(TESTS_SOURCE_FILES
     aabb.cpp
     angle.cpp
+    bit_flags.cpp
     bvh.cpp
     gltf.cpp
     intersection.cpp

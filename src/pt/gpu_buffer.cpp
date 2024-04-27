@@ -13,17 +13,17 @@ void bufferSafeRelease(WGPUBuffer buffer)
     }
 }
 
-inline WGPUBufferBindingType gpuBufferUsageToWGPUBufferBindingType(const GpuBufferUsage usage)
+inline WGPUBufferBindingType gpuBufferUsageToWGPUBufferBindingType(const GpuBufferUsages usages)
 {
-    if ((usage & GpuBufferUsage::Storage) == GpuBufferUsage::Storage)
+    if (usages.has(GpuBufferUsage::Storage))
     {
         return WGPUBufferBindingType_Storage;
     }
-    else if ((usage & GpuBufferUsage::ReadOnlyStorage) == GpuBufferUsage::ReadOnlyStorage)
+    else if (usages.has(GpuBufferUsage::ReadOnlyStorage))
     {
         return WGPUBufferBindingType_ReadOnlyStorage;
     }
-    else if ((usage & GpuBufferUsage::Uniform) == GpuBufferUsage::Uniform)
+    else if (usages.has(GpuBufferUsage::Uniform))
     {
         return WGPUBufferBindingType_Uniform;
     }
@@ -66,21 +66,21 @@ GpuBuffer& GpuBuffer::operator=(GpuBuffer&& other) noexcept
 }
 
 GpuBuffer::GpuBuffer(
-    const WGPUDevice     device,
-    const char* const    label,
-    const GpuBufferUsage usage,
-    const std::size_t    byteSize)
+    const WGPUDevice      device,
+    const char* const     label,
+    const GpuBufferUsages usages,
+    const std::size_t     byteSize)
     : mBuffer(nullptr),
       mByteSize(byteSize),
-      mUsage(usage)
+      mUsage(usages)
 {
     NLRS_ASSERT(device != nullptr);
-    NLRS_ASSERT((mUsage & GpuBufferUsage::Uniform) == GpuBufferUsage::None || mByteSize % 16 == 0);
+    NLRS_ASSERT(mByteSize % 16 == 0 || !mUsage.has(GpuBufferUsage::Uniform));
 
     const WGPUBufferDescriptor bufferDesc{
         .nextInChain = nullptr,
         .label = label,
-        .usage = gpuBufferUsageToWGPUBufferUsage(usage),
+        .usage = gpuBufferUsageToWGPUBufferUsage(usages),
         .size = mByteSize,
         .mappedAtCreation = false,
     };

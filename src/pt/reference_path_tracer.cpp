@@ -132,33 +132,33 @@ ReferencePathTracer::ReferencePathTracer(
     : mVertexBuffer(
           gpuContext.device,
           "Vertex buffer",
-          GpuBufferUsage::Vertex | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst},
           std::span<const float[2]>(quadVertexData)),
       mRenderParamsBuffer(
           gpuContext.device,
           "render params buffer",
-          GpuBufferUsage::Uniform | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::Uniform, GpuBufferUsage::CopyDst},
           sizeof(RenderParamsLayout)),
       mSkyStateBuffer(
           gpuContext.device,
           "sky state buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           sizeof(AlignedSkyState)),
       mRenderParamsBindGroup(),
       mBvhNodeBuffer(
           gpuContext.device,
           "bvh nodes buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           std::span<const BvhNode>(scene.bvhNodes)),
       mPositionAttributesBuffer(
           gpuContext.device,
           "position attributes buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           std::span<const PositionAttribute>(scene.positionAttributes)),
       mVertexAttributesBuffer(
           gpuContext.device,
           "vertex attributes buffer",
-          GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+          {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           std::span<const VertexAttributes>(scene.vertexAttributes)),
       mTextureDescriptorBuffer(),
       mTextureBuffer(),
@@ -173,12 +173,12 @@ ReferencePathTracer::ReferencePathTracer(
       mQueryBuffer(
           gpuContext.device,
           "render pass query buffer",
-          GpuBufferUsage::QueryResolve | GpuBufferUsage::CopySrc,
+          {GpuBufferUsage::QueryResolve, GpuBufferUsage::CopySrc},
           sizeof(TimestampsLayout)),
       mTimestampBuffer(
           gpuContext.device,
           "render pass timestamp buffer",
-          GpuBufferUsage::CopyDst | GpuBufferUsage::MapRead,
+          {GpuBufferUsage::CopyDst, GpuBufferUsage::MapRead},
           sizeof(TimestampsLayout)),
       mRenderPipeline(nullptr),
       mCurrentRenderParams(rendererDesc.renderParams),
@@ -227,7 +227,7 @@ ReferencePathTracer::ReferencePathTracer(
         mTextureDescriptorBuffer = GpuBuffer(
             gpuContext.device,
             "texture descriptor buffer",
-            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
             std::span<const TextureDescriptor>(textureDescriptors));
 
         const std::size_t textureDataNumBytes = textureData.size() * sizeof(Texture::BgraPixel);
@@ -245,7 +245,7 @@ ReferencePathTracer::ReferencePathTracer(
         mTextureBuffer = GpuBuffer(
             gpuContext.device,
             "texture buffer",
-            GpuBufferUsage::ReadOnlyStorage | GpuBufferUsage::CopyDst,
+            {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
             std::span<const Texture::BgraPixel>(textureData));
     }
 

@@ -3,6 +3,7 @@
 #include "webgpu_utils.hpp"
 
 #include <common/assert.hpp>
+#include <common/bit_flags.hpp>
 
 #include <fmt/core.h>
 #include <webgpu/webgpu.h>
@@ -31,6 +32,8 @@ enum class GpuBufferUsage : uint32_t
     QueryResolve = 1 << 10,
 };
 
+using GpuBufferUsages = BitFlags<GpuBufferUsage>;
+
 // A wrapper around WGPUBuffer with unique ownership semantics.
 class GpuBuffer
 {
@@ -43,10 +46,10 @@ public:
     GpuBuffer(GpuBuffer&&) noexcept;
     GpuBuffer& operator=(GpuBuffer&&) noexcept;
 
-    GpuBuffer(WGPUDevice device, const char* label, GpuBufferUsage usage, std::size_t byteSize);
+    GpuBuffer(WGPUDevice device, const char* label, GpuBufferUsages usage, std::size_t byteSize);
 
     template<typename T>
-    GpuBuffer(WGPUDevice device, const char* label, GpuBufferUsage usage, std::span<const T> data);
+    GpuBuffer(WGPUDevice device, const char* label, GpuBufferUsages usage, std::span<const T> data);
 
     ~GpuBuffer();
 
@@ -72,71 +75,56 @@ public:
     WGPUBindGroupEntry bindGroupEntry(std::uint32_t bindingIndex) const;
 
 private:
-    WGPUBuffer     mBuffer = nullptr;
-    std::size_t    mByteSize = 0;
-    GpuBufferUsage mUsage = GpuBufferUsage::None;
+    WGPUBuffer      mBuffer = nullptr;
+    std::size_t     mByteSize = 0;
+    GpuBufferUsages mUsage = GpuBufferUsages::none();
 };
 
-inline GpuBufferUsage operator|(GpuBufferUsage lhs, GpuBufferUsage rhs) noexcept
-{
-    return static_cast<GpuBufferUsage>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
-}
-
-inline GpuBufferUsage operator|=(GpuBufferUsage& lhs, GpuBufferUsage rhs) noexcept
-{
-    return lhs = lhs | rhs;
-}
-
-inline GpuBufferUsage operator&(GpuBufferUsage lhs, GpuBufferUsage rhs) noexcept
-{
-    return static_cast<GpuBufferUsage>(static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs));
-}
-
-inline WGPUBufferUsageFlags gpuBufferUsageToWGPUBufferUsage(const GpuBufferUsage usage) noexcept
+inline WGPUBufferUsageFlags gpuBufferUsageToWGPUBufferUsage(const GpuBufferUsages usages) noexcept
 {
     WGPUBufferUsageFlags wgpuUsage = WGPUBufferUsage_None;
 
-    if ((usage & GpuBufferUsage::CopySrc) == GpuBufferUsage::CopySrc)
+    if (usages.has(GpuBufferUsage::CopySrc))
     {
         wgpuUsage |= WGPUBufferUsage_CopySrc;
     }
-    if ((usage & GpuBufferUsage::CopyDst) == GpuBufferUsage::CopyDst)
+    if (usages.has(GpuBufferUsage::CopyDst))
     {
         wgpuUsage |= WGPUBufferUsage_CopyDst;
     }
-    if ((usage & GpuBufferUsage::MapRead) == GpuBufferUsage::MapRead)
+    if (usages.has(GpuBufferUsage::MapRead))
     {
         wgpuUsage |= WGPUBufferUsage_MapRead;
     }
-    if ((usage & GpuBufferUsage::MapWrite) == GpuBufferUsage::MapWrite)
+    if (usages.has(GpuBufferUsage::MapWrite))
     {
         wgpuUsage |= WGPUBufferUsage_MapWrite;
     }
-    if ((usage & GpuBufferUsage::Index) == GpuBufferUsage::Index)
+    if (usages.has(GpuBufferUsage::Index))
     {
         wgpuUsage |= WGPUBufferUsage_Index;
     }
-    if ((usage & GpuBufferUsage::Vertex) == GpuBufferUsage::Vertex)
+    if (usages.has(GpuBufferUsage::Vertex))
     {
         wgpuUsage |= WGPUBufferUsage_Vertex;
     }
-    if ((usage & GpuBufferUsage::Uniform) == GpuBufferUsage::Uniform)
+    if (usages.has(GpuBufferUsage::Uniform))
     {
         wgpuUsage |= WGPUBufferUsage_Uniform;
     }
-    if ((usage & GpuBufferUsage::Storage) == GpuBufferUsage::Storage)
+    if (usages.has(GpuBufferUsage::Storage))
     {
         wgpuUsage |= WGPUBufferUsage_Storage;
     }
-    if ((usage & GpuBufferUsage::ReadOnlyStorage) == GpuBufferUsage::ReadOnlyStorage)
+    if (usages.has(GpuBufferUsage::ReadOnlyStorage))
     {
         wgpuUsage |= WGPUBufferUsage_Storage;
     }
-    if ((usage & GpuBufferUsage::Indirect) == GpuBufferUsage::Indirect)
+    if (usages.has(GpuBufferUsage::Indirect))
     {
         wgpuUsage |= WGPUBufferUsage_Indirect;
     }
-    if ((usage & GpuBufferUsage::QueryResolve) == GpuBufferUsage::QueryResolve)
+    if (usages.has(GpuBufferUsage::QueryResolve))
     {
         wgpuUsage |= WGPUBufferUsage_QueryResolve;
     }
@@ -148,19 +136,19 @@ template<typename T>
 GpuBuffer::GpuBuffer(
     const WGPUDevice         device,
     const char* const        label,
-    const GpuBufferUsage     usage,
+    const GpuBufferUsages    usages,
     const std::span<const T> data)
     : mBuffer(nullptr),
       mByteSize(sizeof(T) * data.size()),
-      mUsage(usage)
+      mUsage(usages)
 {
     NLRS_ASSERT(device != nullptr);
-    NLRS_ASSERT((mUsage & GpuBufferUsage::Uniform) == GpuBufferUsage::None || mByteSize % 16 == 0);
+    NLRS_ASSERT(mByteSize % 16 == 0 || !mUsage.has(GpuBufferUsage::Uniform));
 
     const WGPUBufferDescriptor bufferDesc{
         .nextInChain = nullptr,
         .label = label,
-        .usage = gpuBufferUsageToWGPUBufferUsage(usage),
+        .usage = gpuBufferUsageToWGPUBufferUsage(usages),
         .size = mByteSize,
         .mappedAtCreation = true,
     };
