@@ -386,8 +386,8 @@ fn rayIntersectTriangle(ray: Ray, tri: Positions, tmax: f32, hit: ptr<function, 
 }
 
 const ORIGIN = 1f / 32f;
-const FLOAT_SCALE = 1f / 65536f;
-const INT_SCALE = 256f;
+const FLOAT_SCALE = 1f / 16384f;
+const INT_SCALE = 1024;
 
 @must_use
 fn offsetPosition(p: vec3f, n: vec3f) -> vec3f {
