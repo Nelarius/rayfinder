@@ -841,7 +841,6 @@ struct Ray {
     direction: vec3f
 }
 
-
 const CHANNEL_R = 0u;
 const CHANNEL_G = 1u;
 const CHANNEL_B = 2u;
@@ -898,8 +897,55 @@ fn worldFromUv(uv: vec2f, depthSample: f32) -> vec3f {
     return world.xyz;
 }
 
+const NUM_BOUNCES = 2;
+
 @must_use
-fn surfaceColor(rng: ptr<function, u32>, pos: vec3f, normal: vec3f, albedo: vec3f) -> vec3f {
+fn surfaceColor(rng: ptr<function, u32>, primaryPos: vec3f, primaryNormal: vec3f, primaryAlbedo: vec3f) -> vec3f {
+    var position = primaryPos;
+    var normal = primaryNormal;
+    var albedo = primaryAlbedo;
+    var radiance = vec3(0f);
+    var throughput = vec3(1f);
+
+    radiance += throughput * lightSample(rng, position, normal, albedo);
+
+    for (var bounce = 1; bounce < NUM_BOUNCES; bounce += 1) {
+        let wi = evalImplicitLambertian(normal, rng);
+        let ray = Ray(position, wi);
+        throughput *= albedo;
+
+        var hit: Intersection;
+        if rayIntersectBvh(ray, T_MAX, &hit) {
+            position = hit.p;
+            normal = hit.n;
+            let uv = hit.uv;
+            let textureDescriptorIdx = hit.textureDescriptorIdx;
+            albedo = evalTexture(textureDescriptorIdx, uv);
+        } else {
+            let v = ray.direction;
+            let s = skyState.sunDirection;
+
+            let theta = acos(v.y);
+            let gamma = acos(clamp(dot(v, s), -1f, 1f));
+
+            let skyRadiance = vec3f(
+                skyRadiance(theta, gamma, CHANNEL_R),
+                skyRadiance(theta, gamma, CHANNEL_G),
+                skyRadiance(theta, gamma, CHANNEL_B)
+            );
+
+            radiance += throughput * skyRadiance;
+            break;
+        }
+
+        radiance += throughput * lightSample(rng, position, normal, albedo);
+    }
+
+    return radiance;
+}
+
+@must_use
+fn lightSample(rng: ptr<function, u32>, position: vec3f, normal: vec3f, albedo: vec3f) -> vec3f {
     let lightDirection = sampleSolarDiskDirection(SOLAR_COS_THETA_MAX, skyState.sunDirection, rng);
     let lightIntensity = vec3(
         skyState.solarRadiances[CHANNEL_R],
@@ -908,7 +954,7 @@ fn surfaceColor(rng: ptr<function, u32>, pos: vec3f, normal: vec3f, albedo: vec3
     );
     let brdf = albedo * FRAC_1_PI;
     let reflectance = brdf * dot(normal, lightDirection);
-    let lightVisibility = shadowRay(Ray(pos, lightDirection), T_MAX);
+    let lightVisibility = shadowRay(Ray(position, lightDirection), T_MAX);
     return lightIntensity * reflectance * lightVisibility * SOLAR_INV_PDF;
 }
 
@@ -966,6 +1012,34 @@ fn sampleSolarDiskDirection(cosThetaMax: f32, direction: vec3f, state: ptr<funct
 }
 
 @must_use
+fn evalImplicitLambertian(n: vec3f, rngState: ptr<function, u32>) -> vec3f {
+    let v = rngNextInCosineWeightedHemisphere(rngState);
+    let onb = pixarOnb(n);
+    return onb * v;
+}
+
+@must_use
+fn evalTexture(textureDescriptorIdx: u32, uv: vec2f) -> vec3f {
+    let textureDesc = textureDescriptors[textureDescriptorIdx];
+    return textureLookup(textureDesc, uv);
+}
+
+@must_use
+fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
+    let u = fract(uv.x);
+    let v = fract(uv.y);
+
+    let j = u32(u * f32(desc.width));
+    let i = u32(v * f32(desc.height));
+    let idx = i * desc.width + j;
+
+    let bgra = textures[desc.offset + idx];
+    let srgb = vec3(f32((bgra >> 16u) & 0xffu), f32((bgra >> 8u) & 0xffu), f32(bgra & 0xffu)) / 255f;
+    let linearRgb = pow(srgb, vec3(2.2f));
+    return linearRgb;
+}
+
+@must_use
 fn pixarOnb(n: vec3f) -> mat3x3f {
     // https://www.jcgt.org/published/0006/01/01/paper-lowres.pdf
     let s = select(-1f, 1f, n.z >= 0f);
@@ -977,20 +1051,72 @@ fn pixarOnb(n: vec3f) -> mat3x3f {
     return mat3x3(u, v, n);
 }
 
+struct Intersection {
+    p: vec3f,
+    n: vec3f,
+    uv: vec2f,
+    textureDescriptorIdx: u32,
+}
+
 @must_use
-fn rngNextInCone(state: ptr<function, u32>, cosThetaMax: f32) -> vec3f {
-    let u1 = rngNextFloat(state);
-    let u2 = rngNextFloat(state);
+fn rayIntersectBvh(ray: Ray, rayTMax: f32, hit: ptr<function, Intersection>) -> bool {
+    let intersector = rayAabbIntersector(ray);
+    var toVisitOffset = 0u;
+    var currentNodeIdx = 0u;
+    var nodesToVisit: array<u32, 32u>;
+    var didIntersect: bool = false;
+    var tmax = rayTMax;
 
-    let cosTheta = 1f - u1 * (1f - cosThetaMax);
-    let sinTheta = sqrt(1f - cosTheta * cosTheta);
-    let phi = 2f * PI * u2;
+    loop {
+        let node: BvhNode = bvhNodes[currentNodeIdx];
 
-    let x = cos(phi) * sinTheta;
-    let y = sin(phi) * sinTheta;
-    let z = cosTheta;
+        if rayIntersectAabb(intersector, node.aabb, tmax) {
+            if node.triangleCount > 0u {
+                for (var idx = 0u; idx < node.triangleCount; idx = idx + 1u) {
+                    let triangle: Positions = positionAttributes[node.trianglesOffset + idx];
+                    var trihit: TriangleHit;
+                    if rayIntersectTriangle(ray, triangle, tmax, &trihit) {
+                        tmax = trihit.t;
+                        didIntersect = true;
 
-    return vec3(x, y, z);
+                        let b = trihit.b;
+                        let triangleIdx = node.trianglesOffset + idx;
+                        let vert = vertexAttributes[triangleIdx];
+
+                        let p = trihit.p;
+                        let n = b[0] * vert.n0 + b[1] * vert.n1 + b[2] * vert.n2;
+                        let uv = b[0] * vert.uv0 + b[1] * vert.uv1 + b[2] * vert.uv2;
+                        let textureDescriptorIdx = vertexAttributes[triangleIdx].textureDescriptorIdx;
+
+                        *hit = Intersection(p, n, uv, textureDescriptorIdx);
+                    }
+                }
+                if toVisitOffset == 0u {
+                    break;
+                }
+                toVisitOffset -= 1u;
+                currentNodeIdx = nodesToVisit[toVisitOffset];
+            } else {
+                // Is intersector.invDir[node.splitAxis] < 0f? If so, visit second child first.
+                if intersector.dirNeg[node.splitAxis] == 1u {
+                    nodesToVisit[toVisitOffset] = currentNodeIdx + 1u;
+                    currentNodeIdx = node.secondChildOffset;
+                } else {
+                    nodesToVisit[toVisitOffset] = node.secondChildOffset;
+                    currentNodeIdx = currentNodeIdx + 1u;
+                }
+                toVisitOffset += 1u;
+            }
+        } else {
+            if toVisitOffset == 0u {
+                break;
+            }
+            toVisitOffset -= 1u;
+            currentNodeIdx = nodesToVisit[toVisitOffset];
+        }
+    }
+
+    return didIntersect;
 }
 
 // Returns 1.0 if no forward intersections, 0.0 otherwise.
@@ -1148,7 +1274,8 @@ const INT_SCALE = 1024;
 fn offsetPosition(p: vec3f, n: vec3f) -> vec3f {
     // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
-    // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
+    // Offset added straight )"
+R"(into the mantissa bits to ensure the offset is scale-invariant,
     // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
     let po = vec3f(
         bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
@@ -1161,6 +1288,37 @@ fn offsetPosition(p: vec3f, n: vec3f) -> vec3f {
         select(po.y, p.y + FLOAT_SCALE * n.y, (abs(p.y) < ORIGIN)),
         select(po.z, p.z + FLOAT_SCALE * n.z, (abs(p.z) < ORIGIN))
     );
+}
+
+@must_use
+fn rngNextInCone(state: ptr<function, u32>, cosThetaMax: f32) -> vec3f {
+    let u1 = rngNextFloat(state);
+    let u2 = rngNextFloat(state);
+
+    let cosTheta = 1f - u1 * (1f - cosThetaMax);
+    let sinTheta = sqrt(1f - cosTheta * cosTheta);
+    let phi = 2f * PI * u2;
+
+    let x = cos(phi) * sinTheta;
+    let y = sin(phi) * sinTheta;
+    let z = cosTheta;
+
+    return vec3(x, y, z);
+}
+
+@must_use
+fn rngNextInCosineWeightedHemisphere(state: ptr<function, u32>) -> vec3f {
+    let u1 = rngNextFloat(state);
+    let u2 = rngNextFloat(state);
+
+    let phi = 2f * PI * u2;
+    let sinTheta = sqrt(1f - u1);
+
+    let x = cos(phi) * sinTheta;
+    let y = sin(phi) * sinTheta;
+    let z = sqrt(u1);
+
+    return vec3(x, y, z);
 }
 
 @must_use

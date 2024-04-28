@@ -48,7 +48,7 @@ private:
     Angle     mYaw = Angle::degrees(129.64f);
     Angle     mPitch = Angle::degrees(-13.73f);
     Angle     mVfov = Angle::degrees(80.0f);
-    float     mAperture = 0.1f;
+    float     mAperture = 0.f;
     float     mFocusDistance = 10.0f;
 
     // Input state
