@@ -42,6 +42,8 @@ An interactive experimental pathtracer, implemented using WebGPU via the [Dawn](
 - Depth precision and reverse Z projection
   - [Depth Precision Visualized](https://www.reedbeta.com/blog/depth-precision-visualized/)
   - [Reverse Z (and why it's so awesome)](https://tomhultonharrop.com/mathematics/graphics/2023/08/06/reverse-z.html)
+- [Free blue noise textures](http://momentsingraphics.de/BlueNoise.html)
+- _Using Blue Noise for Ray Traced Soft Shadows_, _Ray Tracing Gems II_
 
 ## Build
 
