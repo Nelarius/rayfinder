@@ -777,6 +777,7 @@ struct Uniforms {
 @group(3) @binding(2) var<storage, read> vertexAttributes: array<VertexAttributes>;
 @group(3) @binding(3) var<storage, read> textureDescriptors: array<TextureDescriptor>;
 @group(3) @binding(4) var<storage, read> textures: array<u32>;
+@group(3) @binding(5) var<storage, read> blueNoise: BlueNoise;
 
 struct Aabb {
     min: vec3f,
@@ -820,6 +821,12 @@ struct Ray {
     direction: vec3f
 }
 
+struct BlueNoise {
+    width: u32,
+    height: u32,
+    data: array<vec2f>,
+}
+
 const CHANNEL_R = 0u;
 const CHANNEL_G = 1u;
 const CHANNEL_B = 2u;
@@ -843,7 +850,6 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 
     let uv = in.texCoord;
     let textureIdx = vec2u(floor(uv * uniforms.framebufferSize));
-    var rng = initRng(textureIdx, vec2u(uniforms.framebufferSize), uniforms.frameCount);
     let depthSample = textureLoad(gbufferDepth, textureIdx, 0);
     if depthSample == 0.0 {
         let world = worldFromUv(uv, depthSample);
@@ -858,11 +864,12 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
             skyRadiance(theta, gamma, CHANNEL_B)
         );
     } else {
+        let coord = vec2u(uv * uniforms.framebufferSize);
         let position = worldFromUv(uv, depthSample);
         let encodedNormal = textureLoad(gbufferNormal, textureIdx, 0).rgb;
         let decodedNormal = 2f * encodedNormal - vec3(1f);
         let albedo = textureLoad(gbufferAlbedo, textureIdx, 0).rgb;
-        color = surfaceColor(&rng, offsetPosition(position, decodedNormal), decodedNormal, albedo);
+        color = surfaceColor(coord, offsetPosition(position, decodedNormal), decodedNormal, albedo);
     }
 
     return vec4(acesFilmic(uniforms.exposure * color), 1.0);
@@ -879,17 +886,18 @@ fn worldFromUv(uv: vec2f, depthSample: f32) -> vec3f {
 const NUM_BOUNCES = 2;
 
 @must_use
-fn surfaceColor(rng: ptr<function, u32>, primaryPos: vec3f, primaryNormal: vec3f, primaryAlbedo: vec3f) -> vec3f {
+fn surfaceColor(coord: vec2u, primaryPos: vec3f, primaryNormal: vec3f, primaryAlbedo: vec3f) -> vec3f {
     var position = primaryPos;
     var normal = primaryNormal;
     var albedo = primaryAlbedo;
     var radiance = vec3(0f);
     var throughput = vec3(1f);
+    let blueNoise = animatedBlueNoise(coord, uniforms.frameCount, 512u);
 
-    radiance += throughput * lightSample(rng, position, normal, albedo);
+    radiance += throughput * lightSample(blueNoise, position, normal, albedo);
 
     for (var bounce = 1; bounce < NUM_BOUNCES; bounce += 1) {
-        let wi = evalImplicitLambertian(normal, rng);
+        let wi = evalImplicitLambertian(blueNoise, normal);
         let ray = Ray(position, wi);
         throughput *= albedo;
 
@@ -917,15 +925,15 @@ fn surfaceColor(rng: ptr<function, u32>, primaryPos: vec3f, primaryNormal: vec3f
             break;
         }
 
-        radiance += throughput * lightSample(rng, position, normal, albedo);
+        radiance += throughput * lightSample(blueNoise, position, normal, albedo);
     }
 
     return radiance;
 }
 
 @must_use
-fn lightSample(rng: ptr<function, u32>, position: vec3f, normal: vec3f, albedo: vec3f) -> vec3f {
-    let lightDirection = sampleSolarDiskDirection(SOLAR_COS_THETA_MAX, skyState.sunDirection, rng);
+fn lightSample(u: vec2f, position: vec3f, normal: vec3f, albedo: vec3f) -> vec3f {
+    let lightDirection = sampleSolarDiskDirection(u, SOLAR_COS_THETA_MAX, skyState.sunDirection);
     let lightIntensity = vec3(
         skyState.solarRadiances[CHANNEL_R],
         skyState.solarRadiances[CHANNEL_G],
@@ -984,15 +992,15 @@ fn acesFilmic(x: vec3f) -> vec3f {
 }
 
 @must_use
-fn sampleSolarDiskDirection(cosThetaMax: f32, direction: vec3f, state: ptr<function, u32>) -> vec3f {
-    let v = rngNextInCone(state, cosThetaMax);
+fn sampleSolarDiskDirection(u: vec2f, cosThetaMax: f32, direction: vec3f) -> vec3f {
+    let v = directionInCone(u, cosThetaMax);
     let onb = pixarOnb(direction);
     return onb * v;
 }
 
 @must_use
-fn evalImplicitLambertian(n: vec3f, rngState: ptr<function, u32>) -> vec3f {
-    let v = rngNextInCosineWeightedHemisphere(rngState);
+fn evalImplicitLambertian(u: vec2f, n: vec3f) -> vec3f {
+    let v = directionInCosineWeightedHemisphere(u);
     let onb = pixarOnb(n);
     return onb * v;
 }
@@ -1251,10 +1259,10 @@ const INT_SCALE = 1024;
 
 @must_use
 fn offsetPosition(p: vec3f, n: vec3f) -> vec3f {
-    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
+    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray T)"
+R"(racing Gems
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
-    // Offset added straight )"
-R"(into the mantissa bits to ensure the offset is scale-invariant,
+    // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
     // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
     let po = vec3f(
         bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
@@ -1269,14 +1277,12 @@ R"(into the mantissa bits to ensure the offset is scale-invariant,
     );
 }
 
+// `u` is a random number in [0, 1].
 @must_use
-fn rngNextInCone(state: ptr<function, u32>, cosThetaMax: f32) -> vec3f {
-    let u1 = rngNextFloat(state);
-    let u2 = rngNextFloat(state);
-
-    let cosTheta = 1f - u1 * (1f - cosThetaMax);
+fn directionInCone(u: vec2f, cosThetaMax: f32) -> vec3f {
+    let cosTheta = 1f - u.x * (1f - cosThetaMax);
     let sinTheta = sqrt(1f - cosTheta * cosTheta);
-    let phi = 2f * PI * u2;
+    let phi = 2f * PI * u.y;
 
     let x = cos(phi) * sinTheta;
     let y = sin(phi) * sinTheta;
@@ -1285,51 +1291,33 @@ fn rngNextInCone(state: ptr<function, u32>, cosThetaMax: f32) -> vec3f {
     return vec3(x, y, z);
 }
 
+// `u` is a random number in [0, 1].
 @must_use
-fn rngNextInCosineWeightedHemisphere(state: ptr<function, u32>) -> vec3f {
-    let u1 = rngNextFloat(state);
-    let u2 = rngNextFloat(state);
-
-    let phi = 2f * PI * u2;
-    let sinTheta = sqrt(1f - u1);
+fn directionInCosineWeightedHemisphere(u: vec2f) -> vec3f {
+    let phi = 2f * PI * u.y;
+    let sinTheta = sqrt(1f - u.x);
 
     let x = cos(phi) * sinTheta;
     let y = sin(phi) * sinTheta;
-    let z = sqrt(u1);
+    let z = sqrt(u.x);
 
     return vec3(x, y, z);
 }
 
 @must_use
-fn initRng(pixel: vec2u, resolution: vec2u, frame: u32) -> u32 {
-    // Adapted from https://github.com/boksajak/referencePT
-    let seed = dot(pixel, vec2u(1u, resolution.x)) ^ jenkinsHash(frame);
-    return jenkinsHash(seed);
-}
-
-@must_use
-fn jenkinsHash(input: u32) -> u32 {
-    var x = input;
-    x += x << 10u;
-    x ^= x >> 6u;
-    x += x << 3u;
-    x ^= x >> 11u;
-    x += x << 15u;
-    return x;
-}
-
-fn rngNextFloat(state: ptr<function, u32>) -> f32 {
-    rngNextInt(state);
-    return f32(*state) / f32(0xffffffffu);
-}
-
-fn rngNextInt(state: ptr<function, u32>) {
-    // PCG random number generator
-    // Based on https://www.shadertoy.com/view/XlGcRh
-
-    let oldState = *state + 747796405u + 2891336453u;
-    let word = ((oldState >> ((oldState >> 28u) + 4u)) ^ oldState) * 277803737u;
-    *state = (word >> 22u) ^ word;
+fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2f {
+    let idx = (coord.y % blueNoise.height) * blueNoise.width + (coord.x % blueNoise.width);
+    let blueNoise = blueNoise.data[idx];
+    // 2-dimensional golden ratio additive recurrence sequence
+    // https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+    let n = frameIdx % totalSampleCount;
+    let a1 = 0.7548776662466927f;
+    let a2 = 0.5698402909980532f;
+    let r2Seq = fract(vec2(
+        a1 * f32(n),
+        a2 * f32(n)
+    ));
+    return fract(blueNoise + r2Seq);
 }
 )";
 

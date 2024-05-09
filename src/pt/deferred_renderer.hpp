@@ -168,6 +168,7 @@ private:
         GpuBuffer          mVertexAttributesBuffer = GpuBuffer{};
         GpuBuffer          mTextureDescriptorBuffer = GpuBuffer{};
         GpuBuffer          mTextureBuffer = GpuBuffer{};
+        GpuBuffer          mBlueNoiseBuffer = GpuBuffer{};
         GpuBindGroup       mBvhBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
 
