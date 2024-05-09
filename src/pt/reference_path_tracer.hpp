@@ -84,6 +84,7 @@ private:
     GpuBuffer          mVertexAttributesBuffer;
     GpuBuffer          mTextureDescriptorBuffer;
     GpuBuffer          mTextureBuffer;
+    GpuBuffer          mBlueNoiseBuffer;
     GpuBindGroup       mSceneBindGroup;
     GpuBuffer          mImageBuffer;
     GpuBindGroup       mImageBindGroup;

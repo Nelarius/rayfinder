@@ -15,9 +15,10 @@ struct VertexOutput {
 
 @vertex
 fn vsMain(in: VertexInput) -> VertexOutput {
+    let uv = 0.5 * in.position + vec2f(0.5);
     var out: VertexOutput;
     out.position = vec4f(in.position, 0.0, 1.0);
-    out.texCoord = 0.5 * in.position + vec2f(0.5);
+    out.texCoord = vec2f(uv.x, 1.0 - uv.y);
     return out;
 }
 
@@ -31,6 +32,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 @group(1) @binding(2) var<storage, read> vertexAttributes: array<VertexAttributes>;
 @group(1) @binding(3) var<storage, read> textureDescriptors: array<TextureDescriptor>;
 @group(1) @binding(4) var<storage, read> textures: array<u32>;
+@group(1) @binding(5) var<storage, read> blueNoise: BlueNoise;
 
 // image bind group
 @group(2) @binding(0) var<storage, read_write> imageBuffer: array<vec3f>;
@@ -43,9 +45,8 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let dimensions = renderParams.frameData.dimensions;
     let frameCount = renderParams.frameData.frameCount;
 
-    let j = u32(u * f32(dimensions.x));
-    let i = u32(v * f32(dimensions.y));
-    let idx = i * dimensions.x + j;
+    let coord = vec2u(u32(u * f32(dimensions.x)), u32(v * f32(dimensions.y)));
+    let idx = coord.y * dimensions.x + coord.x;
 
     var accumulatedSampleCount = renderParams.samplingState.accumulatedSampleCount;
 
@@ -54,11 +55,10 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     }
 
     if accumulatedSampleCount < renderParams.samplingState.numSamplesPerPixel {
-        var rngState = initRng(vec2(j, i), dimensions, frameCount);
-        let uoffset = rngNextFloat(&rngState) / f32(dimensions.x);
-        let voffset = rngNextFloat(&rngState) / f32(dimensions.y);
-        let primaryRay = generateCameraRay(renderParams.camera, &rngState, u + uoffset, v + voffset);
-        imageBuffer[idx] += rayColor(primaryRay, &rngState);
+        let blueNoise = animatedBlueNoise(coord, renderParams.frameData.frameCount, renderParams.samplingState.numSamplesPerPixel);
+        let jitter = blueNoise / vec2f(dimensions);
+        let primaryRay = generateCameraRay(blueNoise, renderParams.camera, u + jitter.x, (1.0 - v) + jitter.y);
+        imageBuffer[idx] += rayColor(blueNoise, primaryRay, coord);
         accumulatedSampleCount += 1u;
     }
 
@@ -176,8 +176,14 @@ struct Scatter {
     throughput: vec3f,
 }
 
+struct BlueNoise {
+    width: u32,
+    height: u32,
+    data: array<vec2f>,
+}
+
 @must_use
-fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
+fn rayColor(blueNoise: vec2f, primaryRay: Ray, coord: vec2u) -> vec3f {
     var ray = primaryRay;
     var radiance = vec3(0f);
     var throughput = vec3(1f);
@@ -190,7 +196,7 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
             let albedo = evalTexture(hit.textureDescriptorIdx, hit.uv);
             let p = hit.p;
 
-            let lightDirection = sampleSolarDiskDirection(SOLAR_COS_THETA_MAX, skyState.sunDirection, rngState);
+            let lightDirection = sampleSolarDiskDirection(blueNoise, SOLAR_COS_THETA_MAX, skyState.sunDirection);
             let lightIntensity = vec3(
                 skyState.solarRadiances[CHANNEL_R],
                 skyState.solarRadiances[CHANNEL_G],
@@ -205,7 +211,7 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
                 break;
             }
 
-            let scatter = evalImplicitLambertian(hit.n, albedo, rngState);
+            let scatter = evalImplicitLambertian(blueNoise, hit.n, albedo);
             ray = Ray(p, scatter.wi);
             throughput *= scatter.throughput;
         } else {
@@ -233,8 +239,8 @@ fn rayColor(primaryRay: Ray, rngState: ptr<function, u32>) -> vec3f {
 }
 
 @must_use
-fn generateCameraRay(camera: Camera, rngState: ptr<function, u32>, u: f32, v: f32) -> Ray {
-    let randomPointInLens = camera.lensRadius * rngNextVec2InUnitDisk(rngState);
+fn generateCameraRay(noise: vec2f, camera: Camera, u: f32, v: f32) -> Ray {
+    let randomPointInLens = camera.lensRadius * pointInUnitDisk(noise);
     let lensOffset = randomPointInLens.x * camera.right + randomPointInLens.y * camera.up;
 
     let origin = camera.origin + lensOffset;
@@ -284,15 +290,15 @@ fn acesFilmic(x: vec3f) -> vec3f {
 }
 
 @must_use
-fn sampleSolarDiskDirection(cosThetaMax: f32, direction: vec3f, state: ptr<function, u32>) -> vec3f {
-    let v = rngNextInCone(state, cosThetaMax);
-    let onb = pixarOnb(direction);
+fn sampleSolarDiskDirection(u: vec2f, cosThetaMax: f32, sunDirection: vec3f) -> vec3f {
+    let v = directionInCone(u, cosThetaMax);
+    let onb = pixarOnb(sunDirection);
     return onb * v;
 }
 
 @must_use
-fn evalImplicitLambertian(n: vec3f, albedo: vec3f, rngState: ptr<function, u32>) -> Scatter {
-    let v = rngNextInCosineWeightedHemisphere(rngState);
+fn evalImplicitLambertian(blueNoise: vec2f, n: vec3f, albedo: vec3f) -> Scatter {
+    let v = directionInCosineWeightedHemisphere(blueNoise);
     let onb = pixarOnb(n);
     let wi = onb * v;
 
@@ -532,13 +538,13 @@ fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
     let po = vec3f(
         bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
         bitcast<f32>(bitcast<i32>(p.y) + select(offset.y, -offset.y, (p.y < 0))),
-        bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
+        bitcast<f32>(bitcast<i32>(p.z) + se)"
+R"(lect(offset.z, -offset.z, (p.z < 0)))
     );
 
     return vec3f(
         select(po.x, p.x + FLOAT_SCALE * n.x, (abs(p.x) < ORIGIN)),
-        select()"
-R"(po.y, p.y + FLOAT_SCALE * n.y, (abs(p.y) < ORIGIN)),
+        select(po.y, p.y + FLOAT_SCALE * n.y, (abs(p.y) < ORIGIN)),
         select(po.z, p.z + FLOAT_SCALE * n.z, (abs(p.z) < ORIGIN))
     );
 }
@@ -564,14 +570,12 @@ fn textureLookup(desc: TextureDescriptor, uv: vec2f) -> vec3f {
     return linearRgb;
 }
 
+// `u` is a random number in [0, 1].
 @must_use
-fn rngNextInCone(state: ptr<function, u32>, cosThetaMax: f32) -> vec3f {
-    let u1 = rngNextFloat(state);
-    let u2 = rngNextFloat(state);
-
-    let cosTheta = 1f - u1 * (1f - cosThetaMax);
+fn directionInCone(u: vec2f, cosThetaMax: f32) -> vec3f {
+    let cosTheta = 1f - u.x * (1f - cosThetaMax);
     let sinTheta = sqrt(1f - cosTheta * cosTheta);
-    let phi = 2f * PI * u2;
+    let phi = 2f * PI * u.y;
 
     let x = cos(phi) * sinTheta;
     let y = sin(phi) * sinTheta;
@@ -580,67 +584,45 @@ fn rngNextInCone(state: ptr<function, u32>, cosThetaMax: f32) -> vec3f {
     return vec3(x, y, z);
 }
 
+// `u` is a random number in [0, 1].
 @must_use
-fn rngNextInCosineWeightedHemisphere(state: ptr<function, u32>) -> vec3f {
-    let u1 = rngNextFloat(state);
-    let u2 = rngNextFloat(state);
-
-    let phi = 2f * PI * u2;
-    let sinTheta = sqrt(1f - u1);
+fn directionInCosineWeightedHemisphere(u: vec2f) -> vec3f {
+    let phi = 2f * PI * u.y;
+    let sinTheta = sqrt(1f - u.x);
 
     let x = cos(phi) * sinTheta;
     let y = sin(phi) * sinTheta;
-    let z = sqrt(u1);
+    let z = sqrt(u.x);
 
     return vec3(x, y, z);
 }
 
+// `u` is a random number in [0, 1]
 @must_use
-fn rngNextVec2InUnitDisk(state: ptr<function, u32>) -> vec2f {
-    // Generate numbers uniformly in a disk:
-    // https://stats.stackexchange.com/a/481559
-
-    // r^2 is distributed as U(0, 1).
-    let r = sqrt(rngNextFloat(state));
-    let alpha = 2f * PI * rngNextFloat(state);
-
-    let x = r * cos(alpha);
-    let y = r * sin(alpha);
-
-    return vec2(x, y);
+fn pointInUnitDisk(u: vec2f) -> vec2f {
+    let r = sqrt(u.x);
+    let theta = 2f * PI * u.y;
+    return vec2(r * cos(theta), r * sin(theta));
 }
 
 @must_use
-fn initRng(pixel: vec2u, resolution: vec2u, frame: u32) -> u32 {
-    // Adapted from https://github.com/boksajak/referencePT
-    let seed = dot(pixel, vec2u(1u, resolution.x)) ^ jenkinsHash(frame);
-    return jenkinsHash(seed);
+fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2f {
+    let idx = (coord.y % blueNoise.height) * blueNoise.width + (coord.x % blueNoise.width);
+    let blueNoise = blueNoise.data[idx];
+    // https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+    let n = frameIdx % totalSampleCount;
+    let a1 = 0.7548776662466927f;
+    let a2 = 0.5698402909980532f;
+    let r2Seq = fract(vec2(
+        a1 * f32(n),
+        a2 * f32(n)
+    ));
+    return fract(blueNoise + r2Seq);
 }
 
-@must_use
-fn jenkinsHash(input: u32) -> u32 {
-    var x = input;
-    x += x << 10u;
-    x ^= x >> 6u;
-    x += x << 3u;
-    x ^= x >> 11u;
-    x += x << 15u;
-    return x;
-}
-
-fn rngNextFloat(state: ptr<function, u32>) -> f32 {
-    rngNextInt(state);
-    return f32(*state) / f32(0xffffffffu);
-}
-
-fn rngNextInt(state: ptr<function, u32>) {
-    // PCG random number generator
-    // Based on https://www.shadertoy.com/view/XlGcRh
-
-    let oldState = *state + 747796405u + 2891336453u;
-    let word = ((oldState >> ((oldState >> 28u) + 4u)) ^ oldState) * 277803737u;
-    *state = (word >> 22u) ^ word;
-}
+// @must_use
+// fn r2Sequence(n: u32) -> vec2f {
+// }
 )";
 
 const char* const TEXTURE_BLIT_SOURCE = R"(struct VertexInput {
