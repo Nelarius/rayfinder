@@ -8,24 +8,36 @@ fn main() {
     let (width, height) = img.dimensions();
 
     // Prepare the output file.
-    let mut file = File::create("blue_noise.h").unwrap();
+    let mut header = File::create("blue_noise.h").unwrap();
 
-    write!(file, "#pragma once\n\n").unwrap();
-    write!(file, "#include <stddef.h>\n").unwrap();
-    write!(file, "#include <stdint.h>\n\n").unwrap();
+    write!(header, "#pragma once\n\n").unwrap();
+    write!(header, "#include <stddef.h>\n").unwrap();
+    write!(header, "#include <stdint.h>\n\n").unwrap();
+    write!(header, "#ifdef __cplusplus\n    extern \"C\" {{\n#endif\n").unwrap();
     // Write the array declaration to the file.
     write!(
-        file,
+        header,
         "// Array contains consecutive R, G values. Pixels are indexed from the top-left.\n"
     )
     .unwrap();
     write!(
-        file,
-        "uint8_t blueNoiseValues[{}] = {{\n",
+        header,
+        "extern const uint8_t blueNoiseValues[{}];\n\n",
         2 * height * width
     )
     .unwrap();
+    write!(header, "extern const size_t blueNoiseWidth;\n").unwrap();
+    write!(header, "extern const size_t blueNoiseHeight;\n").unwrap();
+    write!(header, "#ifdef __cplusplus\n    }}\n#endif\n").unwrap();
 
+    let mut source = File::create("blue_noise.c").unwrap();
+    write!(source, "#include \"blue_noise.h\"\n\n").unwrap();
+    write!(
+        source,
+        "const uint8_t blueNoiseValues[{}] = {{\n",
+        2 * height * width
+    )
+    .unwrap();
     // Iterate over the pixels of the image.
     for y in 0..height {
         for x in 0..width {
@@ -35,12 +47,12 @@ fn main() {
             let g = pixel[1];
 
             // Write the red channel value to the file.
-            write!(file, "{}, {}, ", r, g).unwrap();
+            write!(source, "{}, {}, ", r, g).unwrap();
         }
     }
 
     // Write the closing brace to the file.
-    write!(file, "}};\n").unwrap();
-    write!(file, "const size_t blueNoiseWidth = {};\n", width).unwrap();
-    write!(file, "const size_t blueNoiseHeight = {};\n", height).unwrap();
+    write!(source, "}};\n").unwrap();
+    write!(source, "const size_t blueNoiseWidth = {};\n", width).unwrap();
+    write!(source, "const size_t blueNoiseHeight = {};\n", height).unwrap();
 }

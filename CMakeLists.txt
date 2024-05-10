@@ -91,6 +91,7 @@ add_custom_target(bake-wgsl DEPENDS ${SHADER_SOURCE_HEADER_FILE})
 
 # pt
 set(PT_SOURCE_FILES
+    blue_noise.c
     fly_camera_controller.cpp
     main.cpp
     gpu_bind_group.cpp

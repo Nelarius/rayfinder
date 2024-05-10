@@ -165,8 +165,8 @@ ReferencePathTracer::ReferencePathTracer(
       mTextureDescriptorBuffer(),
       mTextureBuffer(),
       mBlueNoiseBuffer([&gpuContext]() -> GpuBuffer {
-          std::span<std::uint8_t>    blueNoise(blueNoiseValues, sizeof(blueNoiseValues));
-          std::vector<std::uint32_t> bufferData;
+          std::span<const std::uint8_t> blueNoise(blueNoiseValues, sizeof(blueNoiseValues));
+          std::vector<std::uint32_t>    bufferData;
           bufferData.reserve(2 + blueNoise.size()); // size + array of values
           bufferData.push_back(static_cast<std::uint32_t>(blueNoiseWidth));
           bufferData.push_back(static_cast<std::uint32_t>(blueNoiseHeight));

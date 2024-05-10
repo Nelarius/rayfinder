@@ -609,6 +609,7 @@ fn pointInUnitDisk(u: vec2f) -> vec2f {
 fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2f {
     let idx = (coord.y % blueNoise.height) * blueNoise.width + (coord.x % blueNoise.width);
     let blueNoise = blueNoise.data[idx];
+    // 2-dimensional golden ratio additive recurrence sequence
     // https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
     let n = frameIdx % totalSampleCount;
     let a1 = 0.7548776662466927f;
@@ -619,10 +620,6 @@ fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2
     ));
     return fract(blueNoise + r2Seq);
 }
-
-// @must_use
-// fn r2Sequence(n: u32) -> vec2f {
-// }
 )";
 
 const char* const TEXTURE_BLIT_SOURCE = R"(struct VertexInput {
