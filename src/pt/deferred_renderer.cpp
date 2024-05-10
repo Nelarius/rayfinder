@@ -1,3 +1,4 @@
+#include "blue_noise.h"
 #include "gpu_context.hpp"
 #include "gpu_limits.hpp"
 #include "deferred_renderer.hpp"
@@ -9,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <numeric>
 
 namespace nlrs
@@ -1230,6 +1232,23 @@ DeferredRenderer::LightingPass::LightingPass(
           std::span<const VertexAttributes>(sceneVertexAttributes)},
       mTextureDescriptorBuffer{},
       mTextureBuffer{},
+      mBlueNoiseBuffer{[&gpuContext]() -> GpuBuffer {
+          std::span<const std::uint8_t> blueNoise(blueNoiseValues, sizeof(blueNoiseValues));
+          std::vector<std::uint32_t>    bufferData;
+          bufferData.reserve(2 + blueNoise.size()); // size + array of values
+          bufferData.push_back(static_cast<std::uint32_t>(blueNoiseWidth));
+          bufferData.push_back(static_cast<std::uint32_t>(blueNoiseHeight));
+          for (const std::uint8_t value : blueNoise)
+          {
+              const float f = static_cast<float>(value) / 255.0f;
+              bufferData.push_back(std::bit_cast<std::uint32_t>(f));
+          }
+          return GpuBuffer{
+              gpuContext.device,
+              "blue noise buffer",
+              {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
+              std::span<const std::uint32_t>(bufferData)};
+      }()},
       mBvhBindGroup{},
       mPipeline(nullptr)
 {
@@ -1323,24 +1342,26 @@ DeferredRenderer::LightingPass::LightingPass(
     const GpuBindGroupLayout bvhBindGroupLayout{
         gpuContext.device,
         "Scene bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 5>{
+        std::array<WGPUBindGroupLayoutEntry, 6>{
             mBvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
             mPositionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
             mVertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
             mTextureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
             mTextureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
+            mBlueNoiseBuffer.bindGroupLayoutEntry(5, WGPUShaderStage_Fragment),
         }};
 
     mBvhBindGroup = GpuBindGroup{
         gpuContext.device,
         "Lighting pass BVH bind group",
         bvhBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 5>{
+        std::array<WGPUBindGroupEntry, 6>{
             mBvhNodeBuffer.bindGroupEntry(0),
             mPositionAttributesBuffer.bindGroupEntry(1),
             mVertexAttributesBuffer.bindGroupEntry(2),
             mTextureDescriptorBuffer.bindGroupEntry(3),
             mTextureBuffer.bindGroupEntry(4),
+            mBlueNoiseBuffer.bindGroupEntry(5),
         }};
 
     {
@@ -1492,6 +1513,7 @@ DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
         mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
         mTextureBuffer = std::move(other.mTextureBuffer);
+        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
         mBvhBindGroup = std::move(other.mBvhBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
@@ -1515,6 +1537,7 @@ DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
         mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
         mTextureBuffer = std::move(other.mTextureBuffer);
+        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
         mBvhBindGroup = std::move(other.mBvhBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;

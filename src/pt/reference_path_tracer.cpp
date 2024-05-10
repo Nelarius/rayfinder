@@ -1,3 +1,4 @@
+#include "blue_noise.h"
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_context.hpp"
 #include "gpu_limits.hpp"
@@ -14,6 +15,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
+#include <bit>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -162,6 +164,23 @@ ReferencePathTracer::ReferencePathTracer(
           std::span<const VertexAttributes>(scene.vertexAttributes)),
       mTextureDescriptorBuffer(),
       mTextureBuffer(),
+      mBlueNoiseBuffer([&gpuContext]() -> GpuBuffer {
+          std::span<const std::uint8_t> blueNoise(blueNoiseValues, sizeof(blueNoiseValues));
+          std::vector<std::uint32_t>    bufferData;
+          bufferData.reserve(2 + blueNoise.size()); // size + array of values
+          bufferData.push_back(static_cast<std::uint32_t>(blueNoiseWidth));
+          bufferData.push_back(static_cast<std::uint32_t>(blueNoiseHeight));
+          for (const std::uint8_t value : blueNoise)
+          {
+              const float f = static_cast<float>(value) / 255.0f;
+              bufferData.push_back(std::bit_cast<std::uint32_t>(f));
+          }
+          return GpuBuffer{
+              gpuContext.device,
+              "blue noise buffer",
+              {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
+              std::span<const std::uint32_t>(bufferData)};
+      }()),
       mSceneBindGroup(),
       mImageBuffer(
           gpuContext.device,
@@ -335,12 +354,13 @@ ReferencePathTracer::ReferencePathTracer(
 
         // scene bind group layout
 
-        const std::array<WGPUBindGroupLayoutEntry, 5> sceneBindGroupLayoutEntries{
+        const std::array<WGPUBindGroupLayoutEntry, 6> sceneBindGroupLayoutEntries{
             mBvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
             mPositionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
             mVertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
             mTextureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
             mTextureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
+            mBlueNoiseBuffer.bindGroupLayoutEntry(5, WGPUShaderStage_Fragment),
         };
         const GpuBindGroupLayout sceneBindGroupLayout{
             gpuContext.device, "Scene bind group layout", sceneBindGroupLayoutEntries};
@@ -383,12 +403,13 @@ ReferencePathTracer::ReferencePathTracer(
 
         // scene bind group
 
-        const std::array<WGPUBindGroupEntry, 5> sceneBindGroupEntries{
+        const std::array<WGPUBindGroupEntry, 6> sceneBindGroupEntries{
             mBvhNodeBuffer.bindGroupEntry(0),
             mPositionAttributesBuffer.bindGroupEntry(1),
             mVertexAttributesBuffer.bindGroupEntry(2),
             mTextureDescriptorBuffer.bindGroupEntry(3),
             mTextureBuffer.bindGroupEntry(4),
+            mBlueNoiseBuffer.bindGroupEntry(5),
         };
         mSceneBindGroup = GpuBindGroup{
             gpuContext.device,
@@ -471,6 +492,7 @@ ReferencePathTracer::ReferencePathTracer(ReferencePathTracer&& other)
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
         mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
         mTextureBuffer = std::move(other.mTextureBuffer);
+        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
         mSceneBindGroup = std::move(other.mSceneBindGroup);
         mImageBuffer = std::move(other.mImageBuffer);
         mImageBindGroup = std::move(other.mImageBindGroup);
@@ -502,6 +524,7 @@ ReferencePathTracer& ReferencePathTracer::operator=(ReferencePathTracer&& other)
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
         mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
         mTextureBuffer = std::move(other.mTextureBuffer);
+        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
         mSceneBindGroup = std::move(other.mSceneBindGroup);
         mImageBuffer = std::move(other.mImageBuffer);
         mImageBindGroup = std::move(other.mImageBindGroup);
