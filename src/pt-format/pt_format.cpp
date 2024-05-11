@@ -149,8 +149,8 @@ PtFormat::PtFormat(std::filesystem::path gltfPath)
 template<typename T>
 void serialize(OutputStream& stream, const std::span<const T>& data)
 {
-    const std::size_t numElements = data.size();
-    stream.write(reinterpret_cast<const char*>(&numElements), sizeof(std::size_t));
+    const std::uint64_t numElements = static_cast<std::uint64_t>(data.size());
+    stream.write(reinterpret_cast<const char*>(&numElements), sizeof(std::uint64_t));
     const std::size_t numBytes = sizeof(T) * numElements;
     stream.write(reinterpret_cast<const char*>(data.data()), numBytes);
 }
@@ -158,8 +158,8 @@ void serialize(OutputStream& stream, const std::span<const T>& data)
 template<typename T>
 void deserialize(InputStream& stream, std::vector<T>& data)
 {
-    std::size_t numElements;
-    stream.read(reinterpret_cast<char*>(&numElements), sizeof(std::size_t));
+    std::uint64_t numElements;
+    stream.read(reinterpret_cast<char*>(&numElements), sizeof(std::uint64_t));
     data.resize(numElements);
     const std::size_t numBytes = sizeof(T) * numElements;
     NLRS_ASSERT(stream.read(reinterpret_cast<char*>(data.data()), numBytes) == numBytes);
@@ -183,7 +183,7 @@ void deserialize(InputStream& stream, Texture& texture)
     texture = Texture{std::move(pixels), dimensions};
 }
 
-constexpr std::string_view MAGIC_BYTES = "PTFORMAT2";
+constexpr std::string_view MAGIC_BYTES = "PTFORMAT3";
 
 void serialize(OutputStream& stream, const PtFormat& format)
 {
@@ -195,8 +195,9 @@ void serialize(OutputStream& stream, const PtFormat& format)
     serialize(stream, std::span(format.triangleVertexAttributes));
 
     {
-        const std::size_t numTextures = format.baseColorTextures.size();
-        stream.write(reinterpret_cast<const char*>(&numTextures), sizeof(std::size_t));
+        const std::uint64_t numTextures =
+            static_cast<std::uint64_t>(format.baseColorTextures.size());
+        stream.write(reinterpret_cast<const char*>(&numTextures), sizeof(std::uint64_t));
         std::for_each(
             format.baseColorTextures.begin(),
             format.baseColorTextures.end(),
@@ -233,10 +234,10 @@ void deserialize(InputStream& stream, PtFormat& format)
     deserialize(stream, format.triangleVertexAttributes);
 
     {
-        std::size_t numTextures;
+        std::uint64_t numTextures;
         NLRS_ASSERT(
-            stream.read(reinterpret_cast<char*>(&numTextures), sizeof(std::size_t)) ==
-            sizeof(std::size_t));
+            stream.read(reinterpret_cast<char*>(&numTextures), sizeof(std::uint64_t)) ==
+            sizeof(std::uint64_t));
         format.baseColorTextures.resize(numTextures);
         std::for_each(
             format.baseColorTextures.begin(), format.baseColorTextures.end(), [&](auto& texture) {
