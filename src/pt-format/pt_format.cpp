@@ -22,50 +22,127 @@ PtFormat::PtFormat(std::filesystem::path gltfPath)
       bvhPositionAttributes(),
       trianglePositionAttributes(),
       triangleVertexAttributes(),
+      vertexPositions(),
+      vertexNormals(),
+      vertexTexCoords(),
+      vertexIndices(),
+      modelVertexPositions(),
+      modelVertexNormals(),
+      modelVertexTexCoords(),
+      modelvertexIndices(),
+      modelBaseColorTextureIndices(),
       baseColorTextures()
 {
-    nlrs::GltfModel      model{gltfPath};
-    const FlattenedModel flattenedModel{model};
-    auto [nodes, triangleIndices] = nlrs::buildBvh(flattenedModel.positions);
+    nlrs::GltfModel model{gltfPath};
 
-    auto positions = nlrs::reorderAttributes(std::span(flattenedModel.positions), triangleIndices);
-    const auto normals =
-        nlrs::reorderAttributes(std::span(flattenedModel.normals), triangleIndices);
-    const auto texCoords =
-        nlrs::reorderAttributes(std::span(flattenedModel.texCoords), triangleIndices);
-    const auto textureIndices =
-        nlrs::reorderAttributes(std::span(flattenedModel.baseColorTextureIndices), triangleIndices);
-    NLRS_ASSERT(positions.size() == normals.size());
-    NLRS_ASSERT(positions.size() == texCoords.size());
-    NLRS_ASSERT(positions.size() == textureIndices.size());
-
-    std::vector<nlrs::PositionAttribute> positionAttributes;
-    std::vector<nlrs::VertexAttributes>  vertexAttributes;
-    positionAttributes.reserve(positions.size());
-    vertexAttributes.reserve(positions.size());
-    for (std::size_t i = 0; i < positions.size(); ++i)
     {
-        const auto& ps = positions[i];
-        const auto& ns = normals[i];
-        const auto& uvs = texCoords[i];
-        const auto  textureIdx = textureIndices[i];
+        const FlattenedModel flattenedModel{model};
+        auto [nodes, triangleIndices] = nlrs::buildBvh(flattenedModel.positions);
 
-        positionAttributes.push_back(
-            nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
-        vertexAttributes.push_back(nlrs::VertexAttributes{
-            .n0 = ns.n0,
-            .n1 = ns.n1,
-            .n2 = ns.n2,
-            .uv0 = uvs.uv0,
-            .uv1 = uvs.uv1,
-            .uv2 = uvs.uv2,
-            .textureIdx = textureIdx});
+        auto positions =
+            nlrs::reorderAttributes(std::span(flattenedModel.positions), triangleIndices);
+        const auto normals =
+            nlrs::reorderAttributes(std::span(flattenedModel.normals), triangleIndices);
+        const auto texCoords =
+            nlrs::reorderAttributes(std::span(flattenedModel.texCoords), triangleIndices);
+        const auto textureIndices = nlrs::reorderAttributes(
+            std::span(flattenedModel.baseColorTextureIndices), triangleIndices);
+        NLRS_ASSERT(positions.size() == normals.size());
+        NLRS_ASSERT(positions.size() == texCoords.size());
+        NLRS_ASSERT(positions.size() == textureIndices.size());
+
+        std::vector<nlrs::PositionAttribute> positionAttributes;
+        std::vector<nlrs::VertexAttributes>  vertexAttributes;
+        positionAttributes.reserve(positions.size());
+        vertexAttributes.reserve(positions.size());
+        for (std::size_t i = 0; i < positions.size(); ++i)
+        {
+            const auto& ps = positions[i];
+            const auto& ns = normals[i];
+            const auto& uvs = texCoords[i];
+            const auto  textureIdx = textureIndices[i];
+
+            positionAttributes.push_back(
+                nlrs::PositionAttribute{.p0 = ps.v0, .p1 = ps.v1, .p2 = ps.v2});
+            vertexAttributes.push_back(nlrs::VertexAttributes{
+                .n0 = ns.n0,
+                .n1 = ns.n1,
+                .n2 = ns.n2,
+                .uv0 = uvs.uv0,
+                .uv1 = uvs.uv1,
+                .uv2 = uvs.uv2,
+                .textureIdx = textureIdx});
+        }
+
+        // TODO: why move? why not just add directly to the members?
+        bvhNodes = std::move(nodes);
+        bvhPositionAttributes = std::move(positions);
+        trianglePositionAttributes = std::move(positionAttributes);
+        triangleVertexAttributes = std::move(vertexAttributes);
     }
 
-    bvhNodes = std::move(nodes);
-    bvhPositionAttributes = std::move(positions);
-    trianglePositionAttributes = std::move(positionAttributes);
-    triangleVertexAttributes = std::move(vertexAttributes);
+    {
+        const auto [numModelVertices, numModelIndices] =
+            [&model]() -> std::tuple<std::size_t, std::size_t> {
+            std::size_t numModelVertices = 0;
+            std::size_t numModelIndices = 0;
+            for (const auto& mesh : model.meshes)
+            {
+                numModelVertices += mesh.positions.size();
+                numModelIndices += mesh.indices.size();
+                NLRS_ASSERT(mesh.positions.size() == mesh.texCoords.size());
+            }
+            return std::make_tuple(numModelVertices, numModelIndices);
+        }();
+
+        vertexPositions.reserve(numModelVertices);
+        modelVertexPositions.reserve(model.meshes.size());
+        vertexNormals.reserve(numModelVertices);
+        modelVertexNormals.reserve(model.meshes.size());
+        vertexTexCoords.reserve(numModelVertices);
+        modelVertexTexCoords.reserve(model.meshes.size());
+        vertexIndices.reserve(numModelIndices);
+        modelvertexIndices.reserve(model.meshes.size());
+
+        for (const auto& mesh : model.meshes)
+        {
+            const std::size_t vertexOffsetIdx = vertexPositions.size();
+            const std::size_t numVertices = mesh.positions.size();
+
+            NLRS_ASSERT(mesh.positions.size() == mesh.normals.size());
+            NLRS_ASSERT(mesh.positions.size() == mesh.texCoords.size());
+
+            std::transform(
+                mesh.positions.begin(),
+                mesh.positions.end(),
+                std::back_inserter(vertexPositions),
+                [](const glm::vec3& v) -> glm::vec4 { return glm::vec4(v, 1.0f); });
+            modelVertexPositions.push_back(
+                std::span(vertexPositions).subspan(vertexOffsetIdx, numVertices));
+
+            std::transform(
+                mesh.normals.begin(),
+                mesh.normals.end(),
+                std::back_inserter(vertexNormals),
+                [](const glm::vec3& n) -> glm::vec4 { return glm::vec4(n, 0.0f); });
+            modelVertexNormals.push_back(
+                std::span(vertexNormals).subspan(vertexOffsetIdx, numVertices));
+
+            vertexTexCoords.insert(
+                vertexTexCoords.end(), mesh.texCoords.begin(), mesh.texCoords.end());
+            modelVertexTexCoords.push_back(
+                std::span(vertexTexCoords).subspan(vertexOffsetIdx, numVertices));
+
+            const std::size_t indexOffsetIdx = vertexIndices.size();
+            const std::size_t numIndices = mesh.indices.size();
+            vertexIndices.insert(vertexIndices.end(), mesh.indices.begin(), mesh.indices.end());
+            modelvertexIndices.push_back(
+                std::span<const std::uint32_t>(vertexIndices).subspan(indexOffsetIdx, numIndices));
+
+            modelBaseColorTextureIndices.push_back(mesh.baseColorTextureIndex);
+        }
+    }
+
     baseColorTextures = std::move(model.baseColorTextures);
 }
 
