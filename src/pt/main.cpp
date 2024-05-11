@@ -10,8 +10,6 @@
 #include <common/assert.hpp>
 #include <common/bvh.hpp>
 #include <common/file_stream.hpp>
-#include <common/flattened_model.hpp>
-#include <common/gltf_model.hpp>
 #include <common/ray_intersection.hpp>
 #include <common/triangle_attributes.hpp>
 #include <pt-format/vertex_attributes.hpp>
@@ -144,91 +142,16 @@ try
             nlrs::deserialize(file, ptFormat);
         }
 
-        fs::path path = argv[1];
-        path.replace_extension(".glb");
-        if (!fs::exists(path))
-        {
-            fmt::print(stderr, "File {} does not exist\n", path.string());
-            std::exit(1);
-        }
-        nlrs::GltfModel gltf{path};
-
-        const auto [numModelVertices, numModelIndices] =
-            [&gltf]() -> std::tuple<std::size_t, std::size_t> {
-            std::size_t numModelVertices = 0;
-            std::size_t numModelIndices = 0;
-            for (const auto& mesh : gltf.meshes)
-            {
-                numModelVertices += mesh.positions.size();
-                numModelIndices += mesh.indices.size();
-                NLRS_ASSERT(mesh.positions.size() == mesh.texCoords.size());
-            }
-            return std::make_tuple(numModelVertices, numModelIndices);
-        }();
-
-        std::vector<glm::vec4> flattenedVertices;
-        flattenedVertices.reserve(numModelVertices);
-        std::vector<std::span<const glm::vec4>> modelVertices;
-
-        std::vector<glm::vec4> flattenedNormals;
-        flattenedNormals.reserve(numModelVertices);
-        std::vector<std::span<const glm::vec4>> modelNormals;
-
-        std::vector<glm::vec2> flattenedTexCoords;
-        flattenedTexCoords.reserve(numModelVertices);
-        std::vector<std::span<const glm::vec2>> modelTexCoords;
-
-        std::vector<std::uint32_t> flattenedIndices;
-        flattenedIndices.reserve(numModelIndices);
-        std::vector<std::span<const std::uint32_t>> modelIndices;
-
-        std::vector<std::size_t> baseColorTextureIndices;
-
-        for (const auto& mesh : gltf.meshes)
-        {
-            const std::size_t vertexOffsetIdx = flattenedVertices.size();
-            const std::size_t numVertices = mesh.positions.size();
-
-            NLRS_ASSERT(mesh.positions.size() == mesh.normals.size());
-            NLRS_ASSERT(mesh.positions.size() == mesh.texCoords.size());
-
-            std::transform(
-                mesh.positions.begin(),
-                mesh.positions.end(),
-                std::back_inserter(flattenedVertices),
-                [](const glm::vec3& v) -> glm::vec4 { return glm::vec4(v, 1.0f); });
-            modelVertices.emplace_back(flattenedVertices.data() + vertexOffsetIdx, numVertices);
-
-            std::transform(
-                mesh.normals.begin(),
-                mesh.normals.end(),
-                std::back_inserter(flattenedNormals),
-                [](const glm::vec3& n) -> glm::vec4 { return glm::vec4(n, 0.0f); });
-            modelNormals.emplace_back(flattenedNormals.data() + vertexOffsetIdx, numVertices);
-
-            flattenedTexCoords.insert(
-                flattenedTexCoords.end(), mesh.texCoords.begin(), mesh.texCoords.end());
-            modelTexCoords.emplace_back(flattenedTexCoords.data() + vertexOffsetIdx, numVertices);
-
-            const std::size_t indexOffsetIdx = flattenedIndices.size();
-            const std::size_t numIndices = mesh.indices.size();
-            flattenedIndices.insert(
-                flattenedIndices.end(), mesh.indices.begin(), mesh.indices.end());
-            modelIndices.emplace_back(flattenedIndices.data() + indexOffsetIdx, numIndices);
-
-            baseColorTextureIndices.push_back(mesh.baseColorTextureIndex);
-        }
-
         return nlrs::DeferredRenderer{
             gpuContext,
             nlrs::DeferredRendererDescriptor{
                 .framebufferSize = nlrs::Extent2u(window.resolution()),
-                .modelPositions = modelVertices,
-                .modelNormals = modelNormals,
-                .modelTexCoords = modelTexCoords,
-                .modelIndices = modelIndices,
-                .modelBaseColorTextureIndices = baseColorTextureIndices,
-                .sceneBaseColorTextures = gltf.baseColorTextures,
+                .modelPositions = ptFormat.modelVertexPositions,
+                .modelNormals = ptFormat.modelVertexNormals,
+                .modelTexCoords = ptFormat.modelVertexTexCoords,
+                .modelIndices = ptFormat.modelVertexIndices,
+                .modelBaseColorTextureIndices = ptFormat.modelBaseColorTextureIndices,
+                .sceneBaseColorTextures = ptFormat.baseColorTextures,
                 .sceneBvhNodes = ptFormat.bvhNodes,
                 .scenePositionAttributes = ptFormat.trianglePositionAttributes,
                 .sceneVertexAttributes = ptFormat.triangleVertexAttributes}};

@@ -29,7 +29,7 @@ PtFormat::PtFormat(std::filesystem::path gltfPath)
       modelVertexPositions(),
       modelVertexNormals(),
       modelVertexTexCoords(),
-      modelvertexIndices(),
+      modelVertexIndices(),
       modelBaseColorTextureIndices(),
       baseColorTextures()
 {
@@ -102,7 +102,7 @@ PtFormat::PtFormat(std::filesystem::path gltfPath)
         vertexTexCoords.reserve(numModelVertices);
         modelVertexTexCoords.reserve(model.meshes.size());
         vertexIndices.reserve(numModelIndices);
-        modelvertexIndices.reserve(model.meshes.size());
+        modelVertexIndices.reserve(model.meshes.size());
 
         for (const auto& mesh : model.meshes)
         {
@@ -136,10 +136,14 @@ PtFormat::PtFormat(std::filesystem::path gltfPath)
             const std::size_t indexOffsetIdx = vertexIndices.size();
             const std::size_t numIndices = mesh.indices.size();
             vertexIndices.insert(vertexIndices.end(), mesh.indices.begin(), mesh.indices.end());
-            modelvertexIndices.push_back(
+            modelVertexIndices.push_back(
                 std::span<const std::uint32_t>(vertexIndices).subspan(indexOffsetIdx, numIndices));
 
-            modelBaseColorTextureIndices.push_back(mesh.baseColorTextureIndex);
+            NLRS_ASSERT(
+                mesh.baseColorTextureIndex <
+                static_cast<std::size_t>(std::numeric_limits<std::uint32_t>::max()));
+            modelBaseColorTextureIndices.push_back(
+                static_cast<std::uint32_t>(mesh.baseColorTextureIndex));
         }
     }
 
@@ -153,6 +157,54 @@ void serialize(OutputStream& stream, const std::span<const T>& data)
     stream.write(reinterpret_cast<const char*>(&numElements), sizeof(std::uint64_t));
     const std::size_t numBytes = sizeof(T) * numElements;
     stream.write(reinterpret_cast<const char*>(data.data()), numBytes);
+}
+
+template<typename T>
+void serialize(
+    OutputStream&                              stream,
+    const std::vector<T>&                      buffer,
+    const std::span<const std::span<const T>>& slices)
+{
+    const std::uint64_t numSlices = static_cast<std::uint64_t>(slices.size());
+    stream.write(reinterpret_cast<const char*>(&numSlices), sizeof(std::uint64_t));
+    const T* const bufferBegin = buffer.data();
+    for (const auto& offset : slices)
+    {
+        const T* const offsetBegin = offset.data();
+        NLRS_ASSERT(bufferBegin <= offsetBegin);
+        const std::uint64_t offsetIdx = static_cast<std::uint64_t>(offsetBegin - bufferBegin);
+        const std::uint64_t numElements = static_cast<std::uint64_t>(offset.size());
+        NLRS_ASSERT(offsetIdx + numElements <= buffer.size());
+        stream.write(reinterpret_cast<const char*>(&offsetIdx), sizeof(std::uint64_t));
+        stream.write(reinterpret_cast<const char*>(&numElements), sizeof(std::uint64_t));
+    }
+}
+
+template<typename T>
+void deserialize(
+    InputStream&                     stream,
+    const std::vector<T>&            buffer,
+    std::vector<std::span<const T>>& slices)
+{
+    std::uint64_t numSlices;
+    NLRS_ASSERT(
+        stream.read(reinterpret_cast<char*>(&numSlices), sizeof(std::uint64_t)) ==
+        sizeof(std::uint64_t));
+    slices.reserve(static_cast<std::size_t>(numSlices));
+
+    for (std::uint64_t i = 0; i < numSlices; ++i)
+    {
+        std::uint64_t offsetIdx;
+        NLRS_ASSERT(
+            stream.read(reinterpret_cast<char*>(&offsetIdx), sizeof(std::uint64_t)) ==
+            sizeof(std::uint64_t));
+        std::uint64_t numElements;
+        NLRS_ASSERT(
+            stream.read(reinterpret_cast<char*>(&numElements), sizeof(std::uint64_t)) ==
+            sizeof(std::uint64_t));
+        NLRS_ASSERT(offsetIdx + numElements <= buffer.size());
+        slices.push_back(std::span<const T>{buffer}.subspan(offsetIdx, numElements));
+    }
 }
 
 template<typename T>
@@ -194,6 +246,17 @@ void serialize(OutputStream& stream, const PtFormat& format)
     serialize(stream, std::span(format.trianglePositionAttributes));
     serialize(stream, std::span(format.triangleVertexAttributes));
 
+    serialize(stream, std::span(format.vertexPositions));
+    serialize(stream, std::span(format.vertexNormals));
+    serialize(stream, std::span(format.vertexTexCoords));
+    serialize(stream, std::span(format.vertexIndices));
+
+    serialize(stream, format.vertexPositions, std::span(format.modelVertexPositions));
+    serialize(stream, format.vertexNormals, std::span(format.modelVertexNormals));
+    serialize(stream, format.vertexTexCoords, std::span(format.modelVertexTexCoords));
+    serialize(stream, format.vertexIndices, std::span(format.modelVertexIndices));
+    serialize(stream, std::span(format.modelBaseColorTextureIndices));
+
     {
         const std::uint64_t numTextures =
             static_cast<std::uint64_t>(format.baseColorTextures.size());
@@ -232,6 +295,17 @@ void deserialize(InputStream& stream, PtFormat& format)
     deserialize(stream, format.bvhPositionAttributes);
     deserialize(stream, format.trianglePositionAttributes);
     deserialize(stream, format.triangleVertexAttributes);
+
+    deserialize(stream, format.vertexPositions);
+    deserialize(stream, format.vertexNormals);
+    deserialize(stream, format.vertexTexCoords);
+    deserialize(stream, format.vertexIndices);
+
+    deserialize(stream, format.vertexPositions, format.modelVertexPositions);
+    deserialize(stream, format.vertexNormals, format.modelVertexNormals);
+    deserialize(stream, format.vertexTexCoords, format.modelVertexTexCoords);
+    deserialize(stream, format.vertexIndices, format.modelVertexIndices);
+    deserialize(stream, format.modelBaseColorTextureIndices);
 
     {
         std::uint64_t numTextures;

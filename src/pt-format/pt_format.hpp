@@ -33,8 +33,8 @@ struct PtFormat
     std::vector<std::span<const glm::vec4>>     modelVertexPositions;
     std::vector<std::span<const glm::vec4>>     modelVertexNormals;
     std::vector<std::span<const glm::vec2>>     modelVertexTexCoords;
-    std::vector<std::span<const std::uint32_t>> modelvertexIndices;
-    std::vector<std::size_t>                    modelBaseColorTextureIndices;
+    std::vector<std::span<const std::uint32_t>> modelVertexIndices;
+    std::vector<std::uint32_t>                  modelBaseColorTextureIndices;
 
     std::vector<Texture> baseColorTextures;
 };

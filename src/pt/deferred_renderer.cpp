@@ -507,9 +507,15 @@ DeferredRenderer::GbufferPass::GbufferPass(
               });
           return buffers;
       }()),
-      mBaseColorTextureIndices(
-          rendererDesc.modelBaseColorTextureIndices.begin(),
-          rendererDesc.modelBaseColorTextureIndices.end()),
+      mBaseColorTextureIndices([&rendererDesc]() -> std::vector<std::size_t> {
+          std::vector<std::size_t> indices;
+          std::transform(
+              rendererDesc.modelBaseColorTextureIndices.begin(),
+              rendererDesc.modelBaseColorTextureIndices.end(),
+              std::back_inserter(indices),
+              [](const std::uint32_t index) { return static_cast<std::size_t>(index); });
+          return indices;
+      }()),
       mBaseColorTextures([&gpuContext, &rendererDesc]() -> std::vector<GpuTexture> {
           std::vector<GpuTexture> textures;
           std::transform(

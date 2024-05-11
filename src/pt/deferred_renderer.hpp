@@ -33,7 +33,7 @@ struct DeferredRendererDescriptor
     std::span<std::span<const glm::vec4>>     modelNormals;
     std::span<std::span<const glm::vec2>>     modelTexCoords;
     std::span<std::span<const std::uint32_t>> modelIndices;
-    std::span<std::size_t>                    modelBaseColorTextureIndices;
+    std::span<std::uint32_t>                  modelBaseColorTextureIndices;
     std::span<Texture>                        sceneBaseColorTextures;
 
     std::span<const BvhNode>           sceneBvhNodes;
