@@ -43,20 +43,20 @@ SCENARIO("Serialize and deserialize PtFormat", "[pt-format]")
                         ptFormat.bvhPositionAttributes.data(),
                         deserializedPtFormat.bvhPositionAttributes.data(),
                         bvhPositionAttributesBytes) == 0);
-                const std::size_t gpuPositionAttributesBytes =
-                    ptFormat.gpuPositionAttributes.size() * sizeof(PositionAttribute);
+                const std::size_t trianglePositionAttributesBytes =
+                    ptFormat.trianglePositionAttributes.size() * sizeof(PositionAttribute);
                 REQUIRE(
                     std::memcmp(
-                        ptFormat.gpuPositionAttributes.data(),
-                        deserializedPtFormat.gpuPositionAttributes.data(),
-                        gpuPositionAttributesBytes) == 0);
-                const std::size_t gpuVertexAttributesBytes =
-                    ptFormat.gpuVertexAttributes.size() * sizeof(VertexAttributes);
+                        ptFormat.trianglePositionAttributes.data(),
+                        deserializedPtFormat.trianglePositionAttributes.data(),
+                        trianglePositionAttributesBytes) == 0);
+                const std::size_t triangleVertexAttributesBytes =
+                    ptFormat.triangleVertexAttributes.size() * sizeof(VertexAttributes);
                 REQUIRE(
                     std::memcmp(
-                        ptFormat.gpuVertexAttributes.data(),
-                        deserializedPtFormat.gpuVertexAttributes.data(),
-                        gpuVertexAttributesBytes) == 0);
+                        ptFormat.triangleVertexAttributes.data(),
+                        deserializedPtFormat.triangleVertexAttributes.data(),
+                        triangleVertexAttributesBytes) == 0);
                 REQUIRE(
                     ptFormat.baseColorTextures.size() ==
                     deserializedPtFormat.baseColorTextures.size());
@@ -108,21 +108,21 @@ SCENARIO("Serialize and deserialize PtFormat", "[pt-format]")
                         deserializedPtFormat.bvhPositionAttributes.data(),
                         bvhPositionAttributesBytes) == 0);
 
-                const std::size_t gpuPositionAttributesBytes =
-                    ptFormat.gpuPositionAttributes.size() * sizeof(PositionAttribute);
+                const std::size_t trianglePositionAttributesBytes =
+                    ptFormat.trianglePositionAttributes.size() * sizeof(PositionAttribute);
                 REQUIRE(
                     std::memcmp(
-                        ptFormat.gpuPositionAttributes.data(),
-                        deserializedPtFormat.gpuPositionAttributes.data(),
-                        gpuPositionAttributesBytes) == 0);
+                        ptFormat.trianglePositionAttributes.data(),
+                        deserializedPtFormat.trianglePositionAttributes.data(),
+                        trianglePositionAttributesBytes) == 0);
 
-                const std::size_t gpuVertexAttributesBytes =
-                    ptFormat.gpuVertexAttributes.size() * sizeof(VertexAttributes);
+                const std::size_t triangleVertexAttributesBytes =
+                    ptFormat.triangleVertexAttributes.size() * sizeof(VertexAttributes);
                 REQUIRE(
                     std::memcmp(
-                        ptFormat.gpuVertexAttributes.data(),
-                        deserializedPtFormat.gpuVertexAttributes.data(),
-                        gpuVertexAttributesBytes) == 0);
+                        ptFormat.triangleVertexAttributes.data(),
+                        deserializedPtFormat.triangleVertexAttributes.data(),
+                        triangleVertexAttributesBytes) == 0);
 
                 REQUIRE(
                     ptFormat.baseColorTextures.size() ==

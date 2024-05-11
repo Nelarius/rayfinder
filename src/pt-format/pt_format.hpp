@@ -21,9 +21,10 @@ struct PtFormat
 
     std::vector<BvhNode>           bvhNodes;
     std::vector<Positions>         bvhPositionAttributes;
-    std::vector<PositionAttribute> gpuPositionAttributes;
-    std::vector<VertexAttributes>  gpuVertexAttributes;
-    std::vector<Texture>           baseColorTextures;
+    std::vector<PositionAttribute> trianglePositionAttributes;
+    std::vector<VertexAttributes>  triangleVertexAttributes;
+
+    std::vector<Texture> baseColorTextures;
 };
 
 void serialize(OutputStream&, const PtFormat&);

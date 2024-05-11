@@ -230,8 +230,8 @@ try
                 .modelBaseColorTextureIndices = baseColorTextureIndices,
                 .sceneBaseColorTextures = gltf.baseColorTextures,
                 .sceneBvhNodes = ptFormat.bvhNodes,
-                .scenePositionAttributes = ptFormat.gpuPositionAttributes,
-                .sceneVertexAttributes = ptFormat.gpuVertexAttributes}};
+                .scenePositionAttributes = ptFormat.trianglePositionAttributes,
+                .sceneVertexAttributes = ptFormat.triangleVertexAttributes}};
     }();
 
     auto [appState, renderer] =
@@ -260,8 +260,8 @@ try
 
         nlrs::Scene scene{
             .bvhNodes = ptFormat.bvhNodes,
-            .positionAttributes = ptFormat.gpuPositionAttributes,
-            .vertexAttributes = ptFormat.gpuVertexAttributes,
+            .positionAttributes = ptFormat.trianglePositionAttributes,
+            .vertexAttributes = ptFormat.triangleVertexAttributes,
             .baseColorTextures = ptFormat.baseColorTextures,
         };
 

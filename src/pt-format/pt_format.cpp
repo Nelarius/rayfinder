@@ -20,8 +20,8 @@ namespace nlrs
 PtFormat::PtFormat(std::filesystem::path gltfPath)
     : bvhNodes(),
       bvhPositionAttributes(),
-      gpuPositionAttributes(),
-      gpuVertexAttributes(),
+      trianglePositionAttributes(),
+      triangleVertexAttributes(),
       baseColorTextures()
 {
     nlrs::GltfModel      model{gltfPath};
@@ -64,8 +64,8 @@ PtFormat::PtFormat(std::filesystem::path gltfPath)
 
     bvhNodes = std::move(nodes);
     bvhPositionAttributes = std::move(positions);
-    gpuPositionAttributes = std::move(positionAttributes);
-    gpuVertexAttributes = std::move(vertexAttributes);
+    trianglePositionAttributes = std::move(positionAttributes);
+    triangleVertexAttributes = std::move(vertexAttributes);
     baseColorTextures = std::move(model.baseColorTextures);
 }
 
@@ -114,8 +114,8 @@ void serialize(OutputStream& stream, const PtFormat& format)
 
     serialize(stream, std::span(format.bvhNodes));
     serialize(stream, std::span(format.bvhPositionAttributes));
-    serialize(stream, std::span(format.gpuPositionAttributes));
-    serialize(stream, std::span(format.gpuVertexAttributes));
+    serialize(stream, std::span(format.trianglePositionAttributes));
+    serialize(stream, std::span(format.triangleVertexAttributes));
 
     {
         const std::size_t numTextures = format.baseColorTextures.size();
@@ -152,8 +152,8 @@ void deserialize(InputStream& stream, PtFormat& format)
 
     deserialize(stream, format.bvhNodes);
     deserialize(stream, format.bvhPositionAttributes);
-    deserialize(stream, format.gpuPositionAttributes);
-    deserialize(stream, format.gpuVertexAttributes);
+    deserialize(stream, format.trianglePositionAttributes);
+    deserialize(stream, format.triangleVertexAttributes);
 
     {
         std::size_t numTextures;
