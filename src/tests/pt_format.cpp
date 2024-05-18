@@ -157,7 +157,7 @@ SCENARIO("Serialize and deserialize PtFormat", "[pt-format]")
                     std::memcmp(
                         ptFormat.modelBaseColorTextureIndices.data(),
                         deserializedPtFormat.modelBaseColorTextureIndices.data(),
-                        ptFormat.modelBaseColorTextureIndices.size() * sizeof(std::size_t)) == 0);
+                        ptFormat.modelBaseColorTextureIndices.size() * sizeof(std::uint32_t)) == 0);
                 for (std::size_t i = 0; i < ptFormat.baseColorTextures.size(); ++i)
                 {
                     const auto& sourceTexture = ptFormat.baseColorTextures[i];
