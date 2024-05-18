@@ -1,6 +1,7 @@
 #include "blue_noise.h"
 #include "gpu_context.hpp"
 #include "gpu_limits.hpp"
+#include "gui.hpp"
 #include "deferred_renderer.hpp"
 #include "shader_source.hpp"
 #include "webgpu_utils.hpp"
@@ -214,7 +215,10 @@ DeferredRenderer::~DeferredRenderer()
     mDepthTexture = nullptr;
 }
 
-void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescriptor& renderDesc)
+void DeferredRenderer::render(
+    const GpuContext&       gpuContext,
+    const RenderDescriptor& renderDesc,
+    Gui&                    gui)
 {
     // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
     do
@@ -263,7 +267,8 @@ void DeferredRenderer::render(const GpuContext& gpuContext, const RenderDescript
             renderDesc.cameraPosition,
             framebufferSize,
             renderDesc.sky,
-            renderDesc.exposure);
+            renderDesc.exposure,
+            gui);
     }
     wgpuCommandEncoderWriteTimestamp(
         encoder,
@@ -334,7 +339,8 @@ void DeferredRenderer::renderDebug(
     const GpuContext&     gpuContext,
     const glm::mat4&      viewProjectionMat,
     const Extent2f&       framebufferSize,
-    const WGPUTextureView textureView)
+    const WGPUTextureView textureView,
+    Gui&                  gui)
 {
     wgpuDeviceTick(gpuContext.device);
 
@@ -354,7 +360,7 @@ void DeferredRenderer::renderDebug(
         mAlbedoTextureView,
         mNormalTextureView);
 
-    mDebugPass.render(gpuContext, mGbufferBindGroup, encoder, textureView, framebufferSize);
+    mDebugPass.render(gpuContext, mGbufferBindGroup, encoder, textureView, framebufferSize, gui);
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -1156,7 +1162,8 @@ void DeferredRenderer::DebugPass::render(
     const GpuBindGroup&      gbufferBindGroup,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    textureView,
-    const Extent2f&          framebufferSize)
+    const Extent2f&          framebufferSize,
+    Gui&                     gui)
 {
     wgpuQueueWriteBuffer(
         gpuContext.queue, mUniformBuffer.ptr(), 0, &framebufferSize.x, sizeof(Extent2f));
@@ -1192,6 +1199,8 @@ void DeferredRenderer::DebugPass::render(
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
+
+    gui.render(renderPass);
 
     wgpuRenderPassEncoderEnd(renderPass);
 }
@@ -1562,7 +1571,8 @@ void DeferredRenderer::LightingPass::render(
     const glm::vec3&         cameraPosition,
     const Extent2f&          fbsize,
     const Sky&               sky,
-    const float              exposure)
+    const float              exposure,
+    Gui&                     gui)
 {
     if (mCurrentSky != sky)
     {
@@ -1617,6 +1627,9 @@ void DeferredRenderer::LightingPass::render(
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
+
+    gui.render(renderPass);
+
     wgpuRenderPassEncoderEnd(renderPass);
 }
 

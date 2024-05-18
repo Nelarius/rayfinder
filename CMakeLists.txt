@@ -73,7 +73,6 @@ target_link_libraries(pt-format-tool PRIVATE common fmt pt-format glm::glm)
 # bake-wgsl
 set(WGSL_SHADER_FILES
     reference_path_tracer.wgsl
-    texture_blit.wgsl
     deferred_renderer_gbuffer_pass.wgsl
     deferred_renderer_debug_pass.wgsl
     deferred_renderer_lighting_pass.wgsl)
@@ -101,7 +100,6 @@ set(PT_SOURCE_FILES
     gui.cpp
     deferred_renderer.cpp
     reference_path_tracer.cpp
-    texture_blit_renderer.cpp
     window.cpp)
 list(TRANSFORM PT_SOURCE_FILES PREPEND src/pt/)
 

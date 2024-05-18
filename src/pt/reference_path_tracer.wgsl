@@ -59,7 +59,8 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
 
     let rgb = acesFilmic(renderParams.exposure * estimator);
-    return vec4f(rgb, 1f);
+    let srgb = pow(rgb, vec3(1.0 / 2.2));
+    return vec4f(srgb, 1f);
 }
 
 const EPSILON = 0.00001f;

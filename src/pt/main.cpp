@@ -4,7 +4,6 @@
 #include "gui.hpp"
 #include "deferred_renderer.hpp"
 #include "reference_path_tracer.hpp"
-#include "texture_blit_renderer.hpp"
 #include "window.hpp"
 
 #include <common/assert.hpp>
@@ -122,11 +121,6 @@ try
     }();
 
     nlrs::Gui gui(window.ptr(), gpuContext);
-
-    nlrs::TextureBlitRenderer textureBlitter{
-        gpuContext,
-        nlrs::TextureBlitRendererDescriptor{
-            .framebufferSize = nlrs::Extent2u(window.resolution())}};
 
     nlrs::DeferredRenderer deferredRenderer =
         [&gpuContext, &window, argv]() -> nlrs::DeferredRenderer {
@@ -352,8 +346,16 @@ try
         }
     };
 
-    auto onRender = [&appState, &gpuContext, &gui, &renderer, &deferredRenderer, &textureBlitter](
+    auto onRender = [&appState, &gpuContext, &gui, &renderer, &deferredRenderer](
                         GLFWwindow* windowPtr, WGPUSwapChain swapChain) -> void {
+        const WGPUTextureView targetTextureView = wgpuSwapChainGetCurrentTextureView(swapChain);
+        if (!targetTextureView)
+        {
+            // Getting the next texture can fail, if e.g. the window has been resized.
+            std::fprintf(stderr, "Failed to get texture view from swap chain\n");
+            return;
+        }
+
         nlrs::Extent2i windowResolution;
         glfwGetFramebufferSize(windowPtr, &windowResolution.x, &windowResolution.y);
         NLRS_ASSERT(appState.ui.exposureStops >= 0);
@@ -376,7 +378,7 @@ try
         switch (appState.ui.rendererType)
         {
         case RendererType_PathTracer:
-            renderer.render(gpuContext, textureBlitter.textureView());
+            renderer.render(gpuContext, targetTextureView, gui);
             break;
         case RendererType_Deferred:
         {
@@ -392,9 +394,9 @@ try
                 },
                 nlrs::Extent2u(windowResolution),
                 1.0f / std::exp2(static_cast<float>(appState.ui.exposureStops)),
-                textureBlitter.textureView(),
+                targetTextureView,
             };
-            deferredRenderer.render(gpuContext, renderDesc);
+            deferredRenderer.render(gpuContext, renderDesc, gui);
             break;
         }
         case RendererType_Debug:
@@ -403,20 +405,20 @@ try
                 gpuContext,
                 appState.cameraController.viewReverseZProjectionMatrix(),
                 nlrs::Extent2f(windowResolution),
-                textureBlitter.textureView());
+                targetTextureView,
+                gui);
             break;
         }
         }
-        textureBlitter.render(gpuContext, gui, swapChain);
+
+        wgpuTextureViewRelease(targetTextureView);
     };
 
-    auto onResize = [&gpuContext, &deferredRenderer, &textureBlitter](
-                        const nlrs::FramebufferSize newSize) -> void {
+    auto onResize = [&gpuContext, &deferredRenderer](const nlrs::FramebufferSize newSize) -> void {
         // TODO: this function is not really needed since I get the current framebuffer size on
         // each render anyway.
         const auto sz = nlrs::Extent2u(newSize);
         deferredRenderer.resize(gpuContext, sz);
-        textureBlitter.resize(gpuContext, sz);
     };
 
     window.run(

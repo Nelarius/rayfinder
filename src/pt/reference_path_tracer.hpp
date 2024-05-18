@@ -20,6 +20,7 @@
 namespace nlrs
 {
 struct GpuContext;
+class Gui;
 class Window;
 
 struct SamplingParams
@@ -69,7 +70,7 @@ public:
     ~ReferencePathTracer();
 
     void setRenderParameters(const RenderParameters&);
-    void render(const GpuContext&, WGPUTextureView);
+    void render(const GpuContext&, WGPUTextureView, Gui&);
 
     float averageRenderpassDurationMs() const;
     float renderProgressPercentage() const;

@@ -138,7 +138,9 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
         color = surfaceColor(coord, offsetPosition(position, decodedNormal), decodedNormal, albedo);
     }
 
-    return vec4(acesFilmic(uniforms.exposure * color), 1.0);
+    let rgb = acesFilmic(uniforms.exposure * color);
+    let srgb = pow(rgb, vec3(1f / 2.2f));
+    return vec4(srgb, 1f);
 }
 
 @must_use

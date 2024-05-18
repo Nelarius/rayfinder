@@ -65,7 +65,8 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let estimator = imageBuffer[idx] / f32(accumulatedSampleCount);
 
     let rgb = acesFilmic(renderParams.exposure * estimator);
-    return vec4f(rgb, 1f);
+    let srgb = pow(rgb, vec3(1.0 / 2.2));
+    return vec4f(srgb, 1f);
 }
 
 const EPSILON = 0.00001f;
@@ -538,8 +539,8 @@ fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
     let po = vec3f(
         bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
         bitcast<f32>(bitcast<i32>(p.y) + select(offset.y, -offset.y, (p.y < 0))),
-        bitcast<f32>(bitcast<i32>(p.z) + se)"
-R"(lect(offset.z, -offset.z, (p.z < 0)))
+)"
+R"(        bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
     );
 
     return vec3f(
@@ -622,36 +623,6 @@ fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2
 }
 )";
 
-const char* const TEXTURE_BLIT_SOURCE = R"(struct VertexInput {
-    @location(0) position: vec2f,
-}
-
-struct VertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) texCoord: vec2f,
-}
-
-@vertex
-fn vsMain(in: VertexInput) -> VertexOutput {
-    let uv = 0.5 * in.position + vec2f(0.5);
-    var out: VertexOutput;
-    out.position = vec4f(in.position, 0.0, 1.0);
-    out.texCoord = vec2f(uv.x, 1.0 - uv.y);
-
-    return out;
-}
-
-@group(0) @binding(0) var texture: texture_2d<f32>;
-@group(0) @binding(1) var textureSampler: sampler;
-
-@fragment
-fn fsMain(in: VertexOutput) -> @location(0) vec4f {
-    let c = textureSample(texture, textureSampler, in.texCoord);
-    let srgb = pow(c.xyz, vec3(1f / 2.2f));
-    return vec4f(srgb, 1f);
-}
-)";
-
 const char* const DEFERRED_RENDERER_GBUFFER_PASS_SOURCE = R"(@group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
 
 struct VertexInput {
@@ -719,16 +690,19 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let c = in.texCoord;
     let idx = vec2u(floor(c * framebufferSize));
+    var rgb = vec3f(0f);
     if c.x < 0.333 {
-        return textureLoad(gbufferAlbedo, idx, 0);
+        rgb = textureLoad(gbufferAlbedo, idx, 0).rgb;
     } else if c.x < 0.666 {
-        return textureLoad(gbufferNormal, idx, 0);
+        rgb = textureLoad(gbufferNormal, idx, 0).rgb;
     } else {
         let d = textureLoad(gbufferDepth, idx, 0);
         let x = d;
         let a = 0.1;
-        return vec4((1.0 + a) * x / (x + vec3(a)), 1.0);
+        rgb = vec3((1.0 + a) * x / (x + vec3(a)));
     }
+    let srgb = pow(rgb, vec3(1.0 / 2.2));
+    return vec4(srgb, 1.0);
 }
 )";
 
@@ -872,7 +846,9 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
         color = surfaceColor(coord, offsetPosition(position, decodedNormal), decodedNormal, albedo);
     }
 
-    return vec4(acesFilmic(uniforms.exposure * color), 1.0);
+    let rgb = acesFilmic(uniforms.exposure * color);
+    let srgb = pow(rgb, vec3(1f / 2.2f));
+    return vec4(srgb, 1f);
 }
 
 @must_use
@@ -1259,8 +1235,8 @@ const INT_SCALE = 1024;
 
 @must_use
 fn offsetPosition(p: vec3f, n: vec3f) -> vec3f {
-    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray T)"
-R"(racing Gems
+    // Source: A)"
+R"( Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
     // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
     // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.

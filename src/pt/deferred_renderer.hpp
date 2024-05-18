@@ -23,6 +23,7 @@
 namespace nlrs
 {
 struct GpuContext;
+class Gui;
 
 // TODO: the naming could be considered inconsistent here. What about modelBvhNodes, etc. and
 // meshPositions, meshNormals, etc.?
@@ -69,8 +70,8 @@ public:
     DeferredRenderer(DeferredRenderer&&) = delete;
     DeferredRenderer& operator=(DeferredRenderer&&) = delete;
 
-    void render(const GpuContext& gpuContext, const RenderDescriptor& renderDescriptor);
-    void renderDebug(const GpuContext&, const glm::mat4&, const Extent2f&, WGPUTextureView);
+    void render(const GpuContext&, const RenderDescriptor&, Gui&);
+    void renderDebug(const GpuContext&, const glm::mat4&, const Extent2f&, WGPUTextureView, Gui&);
     void resize(const GpuContext&, const Extent2u&);
 
     PerfStats getPerfStats() const;
@@ -151,7 +152,8 @@ private:
             const GpuBindGroup& gbufferBindGroup,
             WGPUCommandEncoder  encoder,
             WGPUTextureView     textureView,
-            const Extent2f&     framebufferSize);
+            const Extent2f&     framebufferSize,
+            Gui&                gui);
     };
 
     struct LightingPass
@@ -209,7 +211,8 @@ private:
             const glm::vec3&    cameraPosition,
             const Extent2f&     framebufferSize,
             const Sky&          sky,
-            float               exposure);
+            float               exposure,
+            Gui&                gui);
     };
 
     WGPUTexture               mDepthTexture;

@@ -26,14 +26,17 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let c = in.texCoord;
     let idx = vec2u(floor(c * framebufferSize));
+    var rgb = vec3f(0f);
     if c.x < 0.333 {
-        return textureLoad(gbufferAlbedo, idx, 0);
+        rgb = textureLoad(gbufferAlbedo, idx, 0).rgb;
     } else if c.x < 0.666 {
-        return textureLoad(gbufferNormal, idx, 0);
+        rgb = textureLoad(gbufferNormal, idx, 0).rgb;
     } else {
         let d = textureLoad(gbufferDepth, idx, 0);
         let x = d;
         let a = 0.1;
-        return vec4((1.0 + a) * x / (x + vec3(a)), 1.0);
+        rgb = vec3((1.0 + a) * x / (x + vec3(a)));
     }
+    let srgb = pow(rgb, vec3(1.0 / 2.2));
+    return vec4(srgb, 1.0);
 }

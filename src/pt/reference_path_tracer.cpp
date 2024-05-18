@@ -2,6 +2,7 @@
 #include "gpu_bind_group_layout.hpp"
 #include "gpu_context.hpp"
 #include "gpu_limits.hpp"
+#include "gui.hpp"
 #include "reference_path_tracer.hpp"
 #include "shader_source.hpp"
 #include "webgpu_utils.hpp"
@@ -561,7 +562,10 @@ void ReferencePathTracer::setRenderParameters(const RenderParameters& renderPara
     }
 }
 
-void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView textureView)
+void ReferencePathTracer::render(
+    const GpuContext&     gpuContext,
+    const WGPUTextureView textureView,
+    Gui&                  gui)
 {
     // Non-standard Dawn way to ensure that Dawn ticks pending async operations.
     do
@@ -639,6 +643,8 @@ void ReferencePathTracer::render(const GpuContext& gpuContext, WGPUTextureView t
                 renderPassEncoder, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
             wgpuRenderPassEncoderDraw(renderPassEncoder, 6, 1, 0, 0);
         }
+
+        gui.render(renderPassEncoder);
 
         wgpuRenderPassEncoderEnd(renderPassEncoder);
     }
