@@ -25,8 +25,6 @@ namespace nlrs
 struct GpuContext;
 class Gui;
 
-// TODO: the naming could be considered inconsistent here. What about modelBvhNodes, etc. and
-// meshPositions, meshNormals, etc.?
 struct DeferredRendererDescriptor
 {
     Extent2u                                  framebufferSize;
