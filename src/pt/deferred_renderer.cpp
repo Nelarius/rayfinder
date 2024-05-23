@@ -215,6 +215,67 @@ DeferredRenderer::~DeferredRenderer()
     mDepthTexture = nullptr;
 }
 
+DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
+{
+    if (this != &other)
+    {
+        mDepthTexture = other.mDepthTexture;
+        other.mDepthTexture = nullptr;
+        mDepthTextureView = other.mDepthTextureView;
+        other.mDepthTextureView = nullptr;
+        mAlbedoTexture = other.mAlbedoTexture;
+        other.mAlbedoTexture = nullptr;
+        mAlbedoTextureView = other.mAlbedoTextureView;
+        other.mAlbedoTextureView = nullptr;
+        mNormalTexture = other.mNormalTexture;
+        other.mNormalTexture = nullptr;
+        mNormalTextureView = other.mNormalTextureView;
+        other.mNormalTextureView = nullptr;
+        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
+        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mQuerySet = other.mQuerySet;
+        other.mQuerySet = nullptr;
+        mQueryBuffer = std::move(other.mQueryBuffer);
+        mTimestampsBuffer = std::move(other.mTimestampsBuffer);
+        mGbufferPass = std::move(other.mGbufferPass);
+        mDebugPass = std::move(other.mDebugPass);
+        mLightingPass = std::move(other.mLightingPass);
+        mGbufferPassDurationsNs = std::move(other.mGbufferPassDurationsNs);
+        mLightingPassDurationsNs = std::move(other.mLightingPassDurationsNs);
+    }
+}
+
+DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
+{
+    if (this != &other)
+    {
+        mDepthTexture = other.mDepthTexture;
+        other.mDepthTexture = nullptr;
+        mDepthTextureView = other.mDepthTextureView;
+        other.mDepthTextureView = nullptr;
+        mAlbedoTexture = other.mAlbedoTexture;
+        other.mAlbedoTexture = nullptr;
+        mAlbedoTextureView = other.mAlbedoTextureView;
+        other.mAlbedoTextureView = nullptr;
+        mNormalTexture = other.mNormalTexture;
+        other.mNormalTexture = nullptr;
+        mNormalTextureView = other.mNormalTextureView;
+        other.mNormalTextureView = nullptr;
+        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
+        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mQuerySet = other.mQuerySet;
+        other.mQuerySet = nullptr;
+        mQueryBuffer = std::move(other.mQueryBuffer);
+        mTimestampsBuffer = std::move(other.mTimestampsBuffer);
+        mGbufferPass = std::move(other.mGbufferPass);
+        mDebugPass = std::move(other.mDebugPass);
+        mLightingPass = std::move(other.mLightingPass);
+        mGbufferPassDurationsNs = std::move(other.mGbufferPassDurationsNs);
+        mLightingPassDurationsNs = std::move(other.mLightingPassDurationsNs);
+    }
+    return *this;
+}
+
 void DeferredRenderer::render(
     const GpuContext&       gpuContext,
     const RenderDescriptor& renderDesc,
@@ -860,6 +921,51 @@ DeferredRenderer::GbufferPass::~GbufferPass()
         textureViewSafeRelease(texture.view);
     }
     mBaseColorTextures.clear();
+}
+
+
+DeferredRenderer::GbufferPass::GbufferPass(GbufferPass&& other) noexcept
+{
+    if (this != &other)
+    {
+        mPositionBuffers = std::move(other.mPositionBuffers);
+        mNormalBuffers = std::move(other.mNormalBuffers);
+        mTexCoordBuffers = std::move(other.mTexCoordBuffers);
+        mIndexBuffers = std::move(other.mIndexBuffers);
+        mBaseColorTextureIndices = std::move(other.mBaseColorTextureIndices);
+        mBaseColorTextures = std::move(other.mBaseColorTextures);
+        mBaseColorTextureBindGroups = std::move(other.mBaseColorTextureBindGroups);
+        mBaseColorSampler = other.mBaseColorSampler;
+        other.mBaseColorSampler = nullptr;
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mSamplerBindGroup = std::move(other.mSamplerBindGroup);
+        mPipeline = other.mPipeline;
+        other.mPipeline = nullptr;
+    }
+}
+
+DeferredRenderer::GbufferPass& DeferredRenderer::GbufferPass::operator=(
+    GbufferPass&& other) noexcept
+{
+    if (this != &other)
+    {
+        mPositionBuffers = std::move(other.mPositionBuffers);
+        mNormalBuffers = std::move(other.mNormalBuffers);
+        mTexCoordBuffers = std::move(other.mTexCoordBuffers);
+        mIndexBuffers = std::move(other.mIndexBuffers);
+        mBaseColorTextureIndices = std::move(other.mBaseColorTextureIndices);
+        mBaseColorTextures = std::move(other.mBaseColorTextures);
+        mBaseColorTextureBindGroups = std::move(other.mBaseColorTextureBindGroups);
+        mBaseColorSampler = other.mBaseColorSampler;
+        other.mBaseColorSampler = nullptr;
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mSamplerBindGroup = std::move(other.mSamplerBindGroup);
+        mPipeline = other.mPipeline;
+        other.mPipeline = nullptr;
+    }
+    return *this;
 }
 
 void DeferredRenderer::GbufferPass::render(

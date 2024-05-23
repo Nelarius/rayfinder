@@ -65,8 +65,8 @@ public:
     DeferredRenderer(const DeferredRenderer&) = delete;
     DeferredRenderer& operator=(const DeferredRenderer&) = delete;
 
-    DeferredRenderer(DeferredRenderer&&) = delete;
-    DeferredRenderer& operator=(DeferredRenderer&&) = delete;
+    DeferredRenderer(DeferredRenderer&&);
+    DeferredRenderer& operator=(DeferredRenderer&&);
 
     void render(const GpuContext&, const RenderDescriptor&, Gui&);
     void renderDebug(const GpuContext&, const glm::mat4&, const Extent2f&, WGPUTextureView, Gui&);
@@ -91,28 +91,29 @@ private:
     struct GbufferPass
     {
     private:
-        std::vector<GpuBuffer>    mPositionBuffers;
-        std::vector<GpuBuffer>    mNormalBuffers;
-        std::vector<GpuBuffer>    mTexCoordBuffers;
-        std::vector<IndexBuffer>  mIndexBuffers;
-        std::vector<std::size_t>  mBaseColorTextureIndices;
-        std::vector<GpuTexture>   mBaseColorTextures;
-        std::vector<GpuBindGroup> mBaseColorTextureBindGroups;
-        WGPUSampler               mBaseColorSampler;
-        GpuBuffer                 mUniformBuffer;
-        GpuBindGroup              mUniformBindGroup;
-        GpuBindGroup              mSamplerBindGroup;
-        WGPURenderPipeline        mPipeline;
+        std::vector<GpuBuffer>    mPositionBuffers{};
+        std::vector<GpuBuffer>    mNormalBuffers{};
+        std::vector<GpuBuffer>    mTexCoordBuffers{};
+        std::vector<IndexBuffer>  mIndexBuffers{};
+        std::vector<std::size_t>  mBaseColorTextureIndices{};
+        std::vector<GpuTexture>   mBaseColorTextures{};
+        std::vector<GpuBindGroup> mBaseColorTextureBindGroups{};
+        WGPUSampler               mBaseColorSampler = nullptr;
+        GpuBuffer                 mUniformBuffer{};
+        GpuBindGroup              mUniformBindGroup{};
+        GpuBindGroup              mSamplerBindGroup{};
+        WGPURenderPipeline        mPipeline = nullptr;
 
     public:
+        GbufferPass() = default;
         GbufferPass(const GpuContext&, const DeferredRendererDescriptor&);
         ~GbufferPass();
 
         GbufferPass(const GbufferPass&) = delete;
         GbufferPass& operator=(const GbufferPass&) = delete;
 
-        GbufferPass(GbufferPass&&) = delete;
-        GbufferPass& operator=(GbufferPass&&) = delete;
+        GbufferPass(GbufferPass&&) noexcept;
+        GbufferPass& operator=(GbufferPass&&) noexcept;
 
         void render(
             const GpuContext&  gpuContext,

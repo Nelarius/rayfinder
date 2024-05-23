@@ -121,38 +121,8 @@ try
     }();
 
     nlrs::Gui gui(window.ptr(), gpuContext);
-
-    nlrs::DeferredRenderer deferredRenderer =
-        [&gpuContext, &window, argv]() -> nlrs::DeferredRenderer {
-        nlrs::PtFormat ptFormat;
-        {
-            const fs::path path = argv[1];
-            if (!fs::exists(path))
-            {
-                fmt::print(stderr, "File {} does not exist\n", path.string());
-                std::exit(1);
-            }
-            nlrs::InputFileStream file(argv[1]);
-            nlrs::deserialize(file, ptFormat);
-        }
-
-        return nlrs::DeferredRenderer{
-            gpuContext,
-            nlrs::DeferredRendererDescriptor{
-                .framebufferSize = nlrs::Extent2u(window.resolution()),
-                .modelPositions = ptFormat.modelVertexPositions,
-                .modelNormals = ptFormat.modelVertexNormals,
-                .modelTexCoords = ptFormat.modelVertexTexCoords,
-                .modelIndices = ptFormat.modelVertexIndices,
-                .modelBaseColorTextureIndices = ptFormat.modelBaseColorTextureIndices,
-                .sceneBaseColorTextures = ptFormat.baseColorTextures,
-                .sceneBvhNodes = ptFormat.bvhNodes,
-                .scenePositionAttributes = ptFormat.trianglePositionAttributes,
-                .sceneVertexAttributes = ptFormat.triangleVertexAttributes}};
-    }();
-
-    auto [appState, renderer] =
-        [&gpuContext, &window, argv]() -> std::tuple<AppState, nlrs::ReferencePathTracer> {
+    auto [appState, referenceRenderer, deferredRenderer] = [&gpuContext, &window, argv]()
+        -> std::tuple<AppState, nlrs::ReferencePathTracer, nlrs::DeferredRenderer> {
         nlrs::PtFormat ptFormat;
         {
             const fs::path path = argv[1];
@@ -182,6 +152,22 @@ try
             .baseColorTextures = ptFormat.baseColorTextures,
         };
 
+        nlrs::ReferencePathTracer referenceRenderer{rendererDesc, gpuContext, std::move(scene)};
+
+        nlrs::DeferredRenderer deferredRenderer{
+            gpuContext,
+            nlrs::DeferredRendererDescriptor{
+                .framebufferSize = nlrs::Extent2u(window.resolution()),
+                .modelPositions = ptFormat.modelVertexPositions,
+                .modelNormals = ptFormat.modelVertexNormals,
+                .modelTexCoords = ptFormat.modelVertexTexCoords,
+                .modelIndices = ptFormat.modelVertexIndices,
+                .modelBaseColorTextureIndices = ptFormat.modelBaseColorTextureIndices,
+                .sceneBaseColorTextures = ptFormat.baseColorTextures,
+                .sceneBvhNodes = ptFormat.bvhNodes,
+                .scenePositionAttributes = ptFormat.trianglePositionAttributes,
+                .sceneVertexAttributes = ptFormat.triangleVertexAttributes}};
+
         AppState app{
             .cameraController{},
             .bvhNodes = std::move(ptFormat.bvhNodes),
@@ -190,15 +176,14 @@ try
             .focusPressed = false,
         };
 
-        nlrs::ReferencePathTracer renderer{rendererDesc, gpuContext, std::move(scene)};
-
-        return std::make_tuple(std::move(app), std::move(renderer));
+        return std::make_tuple(
+            std::move(app), std::move(referenceRenderer), std::move(deferredRenderer));
     }();
 
     auto onNewFrame = [&gui]() -> void { gui.beginFrame(); };
 
-    auto onUpdate =
-        [&appState, &renderer, &deferredRenderer](GLFWwindow* windowPtr, float deltaTime) -> void {
+    auto onUpdate = [&appState, &referenceRenderer, &deferredRenderer](
+                        GLFWwindow* windowPtr, float deltaTime) -> void {
         {
             // Skip input if ImGui captured input
             if (!ImGui::GetIO().WantCaptureMouse)
@@ -260,8 +245,8 @@ try
                 {
                 case RendererType_PathTracer:
                 {
-                    const float renderAverageMs = renderer.averageRenderpassDurationMs();
-                    const float progressPercentage = renderer.renderProgressPercentage();
+                    const float renderAverageMs = referenceRenderer.averageRenderpassDurationMs();
+                    const float progressPercentage = referenceRenderer.renderProgressPercentage();
                     ImGui::Text(
                         "render pass: %.2f ms (%.1f FPS)",
                         renderAverageMs,
@@ -346,7 +331,7 @@ try
         }
     };
 
-    auto onRender = [&appState, &gpuContext, &gui, &renderer, &deferredRenderer](
+    auto onRender = [&appState, &gpuContext, &gui, &referenceRenderer, &deferredRenderer](
                         GLFWwindow* windowPtr, WGPUSwapChain swapChain) -> void {
         const WGPUTextureView targetTextureView = wgpuSwapChainGetCurrentTextureView(swapChain);
         if (!targetTextureView)
@@ -373,12 +358,12 @@ try
                 appState.ui.sunAzimuthDegrees,
             },
             1.0f / std::exp2(static_cast<float>(appState.ui.exposureStops))};
-        renderer.setRenderParameters(renderParams);
+        referenceRenderer.setRenderParameters(renderParams);
 
         switch (appState.ui.rendererType)
         {
         case RendererType_PathTracer:
-            renderer.render(gpuContext, targetTextureView, gui);
+            referenceRenderer.render(gpuContext, targetTextureView, gui);
             break;
         case RendererType_Deferred:
         {
