@@ -46,6 +46,14 @@ inline void renderPipelineSafeRelease(const WGPURenderPipeline pipeline) noexcep
     }
 }
 
+inline void computePipelineSafeRelease(const WGPUComputePipeline pipeline) noexcept
+{
+    if (pipeline)
+    {
+        wgpuComputePipelineRelease(pipeline);
+    }
+}
+
 inline void samplerSafeRelease(const WGPUSampler sampler) noexcept
 {
     if (sampler)
@@ -144,12 +152,13 @@ inline WGPUBindGroupEntry bufferBindGroupEntry(
 
 inline WGPUBindGroupLayoutEntry textureBindGroupLayoutEntry(
     const std::uint32_t         bindingIdx,
-    const WGPUTextureSampleType sampleType)
+    const WGPUTextureSampleType sampleType,
+    const WGPUShaderStageFlags  visibility)
 {
     return WGPUBindGroupLayoutEntry{
         .nextInChain = nullptr,
         .binding = bindingIdx,
-        .visibility = WGPUShaderStage_Fragment,
+        .visibility = visibility,
         .buffer = DEFAULT_BUFFER_BINDING_LAYOUT,
         .sampler = DEFAULT_SAMPLER_BINDING_LAYOUT,
         .texture =

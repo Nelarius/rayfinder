@@ -706,26 +706,7 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
 }
 )";
 
-const char* const DEFERRED_RENDERER_LIGHTING_PASS_SOURCE = R"(struct VertexInput {
-    @location(0) position: vec2f,
-}
-
-struct VertexOutput {
-    @builtin(position) position: vec4f,
-    @location(0) texCoord: vec2f,
-}
-
-@vertex
-fn vsMain(in: VertexInput) -> VertexOutput {
-    let uv = 0.5 * in.position + vec2f(0.5);
-    var out: VertexOutput;
-    out.position = vec4f(in.position, 0.0, 1.0);
-    out.texCoord = vec2f(uv.x, 1.0 - uv.y);
-
-    return out;
-}
-
-struct SkyState {
+const char* const DEFERRED_RENDERER_LIGHTING_PASS_SOURCE = R"(struct SkyState {
     params: array<f32, 27>,
     skyRadiances: array<f32, 3>,
     solarRadiances: array<f32, 3>,
@@ -736,22 +717,8 @@ struct Uniforms {
     inverseViewReverseZProjectionMat: mat4x4f,
     cameraEye: vec4f,
     framebufferSize: vec2f,
-    exposure: f32,
     frameCount: u32,
 }
-
-@group(0) @binding(0) var<storage, read> skyState: SkyState;
-@group(1) @binding(0) var<uniform> uniforms: Uniforms;
-@group(2) @binding(0) var gbufferAlbedo: texture_2d<f32>;
-@group(2) @binding(1) var gbufferNormal: texture_2d<f32>;
-@group(2) @binding(2) var gbufferDepth: texture_depth_2d;
-
-@group(3) @binding(0) var<storage, read> bvhNodes: array<BvhNode>;
-@group(3) @binding(1) var<storage, read> positionAttributes: array<Positions>;
-@group(3) @binding(2) var<storage, read> vertexAttributes: array<VertexAttributes>;
-@group(3) @binding(3) var<storage, read> textureDescriptors: array<TextureDescriptor>;
-@group(3) @binding(4) var<storage, read> textures: array<u32>;
-@group(3) @binding(5) var<storage, read> blueNoise: BlueNoise;
 
 struct Aabb {
     min: vec3f,
@@ -818,12 +785,28 @@ const SOLAR_INV_PDF = 2f * PI * (1f - SOLAR_COS_THETA_MAX);
 const T_MIN = 0.001f;
 const T_MAX = 10000f;
 
-@fragment
-fn fsMain(in: VertexOutput) -> @location(0) vec4f {
-    var color = vec3f(0.0, 0.0, 0.0);
+@group(0) @binding(0) var<storage, read_write> sampleBuffer: array<array<f32, 3>>;
 
-    let uv = in.texCoord;
-    let textureIdx = vec2u(floor(uv * uniforms.framebufferSize));
+@group(1) @binding(0) var<uniform> uniforms: Uniforms;
+
+@group(2) @binding(0) var gbufferAlbedo: texture_2d<f32>;
+@group(2) @binding(1) var gbufferNormal: texture_2d<f32>;
+@group(2) @binding(2) var gbufferDepth: texture_depth_2d;
+
+@group(3) @binding(0) var<storage, read> skyState: SkyState;
+@group(3) @binding(1) var<storage, read> bvhNodes: array<BvhNode>;
+@group(3) @binding(2) var<storage, read> positionAttributes: array<Positions>;
+@group(3) @binding(3) var<storage, read> vertexAttributes: array<VertexAttributes>;
+@group(3) @binding(4) var<storage, read> textureDescriptors: array<TextureDescriptor>;
+@group(3) @binding(5) var<storage, read> textures: array<u32>;
+@group(3) @binding(6) var<storage, read> blueNoise: BlueNoise;
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) globalInvocationId: vec3<u32>) {
+    let textureIdx = globalInvocationId.xy;
+    let uv = (vec2f(globalInvocationId.xy) + vec2f(0.5)) / uniforms.framebufferSize;
+
+    var color = vec3f(0.0, 0.0, 0.0);
     let depthSample = textureLoad(gbufferDepth, textureIdx, 0);
     if depthSample == 0.0 {
         let world = worldFromUv(uv, depthSample);
@@ -846,9 +829,8 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
         color = surfaceColor(coord, offsetPosition(position, decodedNormal), decodedNormal, albedo);
     }
 
-    let rgb = acesFilmic(uniforms.exposure * color);
-    let srgb = pow(rgb, vec3(1f / 2.2f));
-    return vec4(srgb, 1f);
+    let sampleBufferIdx = textureIdx.y * u32(uniforms.framebufferSize.x) + textureIdx.x;
+    sampleBuffer[sampleBufferIdx] = array<f32, 3>(color.r, color.g, color.b);
 }
 
 @must_use
@@ -955,16 +937,6 @@ fn skyRadiance(theta: f32, gamma: f32, channel: u32) -> f32 {
     let solarRadiance = select(0f, skyState.solarRadiances[channel], solarDiskRadius <= 1f);
 
     return r * radianceDist + solarRadiance;
-}
-
-@must_use
-fn acesFilmic(x: vec3f) -> vec3f {
-    let a = 2.51f;
-    let b = 0.03f;
-    let c = 2.43f;
-    let d = 0.59f;
-    let e = 0.14f;
-    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 
 @must_use
@@ -1235,13 +1207,13 @@ const INT_SCALE = 1024;
 
 @must_use
 fn offsetPosition(p: vec3f, n: vec3f) -> vec3f {
-    // Source: A)"
-R"( Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
+    // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
     // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
     // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
     let po = vec3f(
-        bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
+        bitcast<f32>(bitcast<i32>(p.x) + select()"
+R"(offset.x, -offset.x, (p.x < 0))),
         bitcast<f32>(bitcast<i32>(p.y) + select(offset.y, -offset.y, (p.y < 0))),
         bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
     );
@@ -1294,6 +1266,61 @@ fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2
         a2 * f32(n)
     ));
     return fract(blueNoise + r2Seq);
+}
+)";
+
+const char* const DEFERRED_RENDERER_RESOLVE_PASS_SOURCE = R"(struct VertexInput {
+    @location(0) position: vec2f,
+}
+
+struct VertexOutput {
+    @builtin(position) position: vec4f,
+    @location(0) texCoord: vec2f,
+}
+
+@vertex
+fn vsMain(in: VertexInput) -> VertexOutput {
+    let uv = 0.5 * in.position + vec2f(0.5);
+    var out: VertexOutput;
+    out.position = vec4f(in.position, 0.0, 1.0);
+    out.texCoord = vec2f(uv.x, 1.0 - uv.y);
+
+    return out;
+}
+
+struct Uniforms {
+    framebufferSize: vec2f,
+    exposure: f32,
+}
+
+// TODO: consider merging these into one bind group
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+@group(1) @binding(0) var<storage, read_write> sampleBuffer: array<array<f32, 3>>;
+@group(1) @binding(1) var<storage, read_write> accumulationBuffer: array<array<f32, 3>>;
+
+@fragment
+fn fsMain(in: VertexOutput) -> @location(0) vec4f {
+    let uv = in.texCoord;
+    let textureIdx = vec2u(floor(uv * uniforms.framebufferSize));
+    let sampleBufferIdx = textureIdx.y * u32(uniforms.framebufferSize.x) + textureIdx.x;
+    let sample: array<f32, 3> = sampleBuffer[sampleBufferIdx];
+    let color = vec3f(sample[0], sample[1], sample[2]);
+
+    let rgb = acesFilmic(uniforms.exposure * color);
+    let srgb = pow(rgb, vec3(1f / 2.2f));
+    return vec4(srgb, 1f);
+}
+
+@must_use
+fn acesFilmic(x: vec3f) -> vec3f {
+    let a = 2.51f;
+    let b = 0.03f;
+    let c = 2.43f;
+    let d = 0.59f;
+    let e = 0.14f;
+    return saturate((x * (a * x + b)) / (x * (c * x + d) + e));
 }
 )";
 

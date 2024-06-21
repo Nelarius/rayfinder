@@ -28,8 +28,10 @@ struct TimestampsLayout
     std::uint64_t gbufferPassEnd;
     std::uint64_t lightingPassStart;
     std::uint64_t lightingPassEnd;
+    std::uint64_t resolvePassStart;
+    std::uint64_t resolvePassEnd;
 
-    static constexpr std::uint32_t QUERY_COUNT = 4;
+    static constexpr std::uint32_t QUERY_COUNT = 6;
     static constexpr std::size_t   MEMBER_SIZE = sizeof(std::uint64_t);
 };
 
@@ -84,8 +86,11 @@ DeferredRenderer::DeferredRenderer(
       mAlbedoTextureView(nullptr),
       mNormalTexture(nullptr),
       mNormalTextureView(nullptr),
-      mGbufferBindGroupLayout(),
-      mGbufferBindGroup(),
+      mSampleBuffer(
+          gpuContext.device,
+          "Deferred renderer :: sample buffer",
+          GpuBufferUsages{GpuBufferUsage::Storage},
+          3 * sizeof(float) * area(rendererDesc.maxFramebufferSize)),
       mQuerySet(nullptr),
       mQueryBuffer(
           gpuContext.device,
@@ -100,6 +105,7 @@ DeferredRenderer::DeferredRenderer(
       mGbufferPass(gpuContext, rendererDesc),
       mDebugPass(),
       mLightingPass(),
+      mResolvePass(),
       mGbufferPassDurationsNs(),
       mLightingPassDurationsNs()
 {
@@ -161,23 +167,6 @@ DeferredRenderer::DeferredRenderer(
         mNormalTexture, "Gbuffer normal texture view", NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTextureView != nullptr);
 
-    mGbufferBindGroupLayout = GpuBindGroupLayout{
-        gpuContext.device,
-        "Gbuffer bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 3>{
-            textureBindGroupLayoutEntry(0, WGPUTextureSampleType_UnfilterableFloat),
-            textureBindGroupLayoutEntry(1, WGPUTextureSampleType_UnfilterableFloat),
-            textureBindGroupLayoutEntry(2, WGPUTextureSampleType_Depth)}};
-
-    mGbufferBindGroup = GpuBindGroup{
-        gpuContext.device,
-        "Gbuffer bind group",
-        mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 3>{
-            textureBindGroupEntry(0, mAlbedoTextureView),
-            textureBindGroupEntry(1, mNormalTextureView),
-            textureBindGroupEntry(2, mDepthTextureView)}};
-
     {
         const WGPUQuerySetDescriptor querySetDesc{
             .nextInChain = nullptr,
@@ -187,14 +176,23 @@ DeferredRenderer::DeferredRenderer(
         mQuerySet = wgpuDeviceCreateQuerySet(gpuContext.device, &querySetDesc);
     }
 
-    mDebugPass = DebugPass{gpuContext, mGbufferBindGroupLayout, rendererDesc.framebufferSize};
+    mDebugPass = DebugPass{
+        gpuContext,
+        mAlbedoTextureView,
+        mNormalTextureView,
+        mDepthTextureView,
+        rendererDesc.framebufferSize};
     mLightingPass = LightingPass{
         gpuContext,
-        mGbufferBindGroupLayout,
+        mAlbedoTextureView,
+        mNormalTextureView,
+        mDepthTextureView,
+        mSampleBuffer,
         rendererDesc.sceneBvhNodes,
         rendererDesc.scenePositionAttributes,
         rendererDesc.sceneVertexAttributes,
         rendererDesc.sceneBaseColorTextures};
+    mResolvePass = ResolvePass{gpuContext, mSampleBuffer, rendererDesc};
 }
 
 DeferredRenderer::~DeferredRenderer()
@@ -231,8 +229,7 @@ DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
         other.mNormalTexture = nullptr;
         mNormalTextureView = other.mNormalTextureView;
         other.mNormalTextureView = nullptr;
-        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
-        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mSampleBuffer = std::move(other.mSampleBuffer);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
         mQueryBuffer = std::move(other.mQueryBuffer);
@@ -240,6 +237,7 @@ DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
         mGbufferPass = std::move(other.mGbufferPass);
         mDebugPass = std::move(other.mDebugPass);
         mLightingPass = std::move(other.mLightingPass);
+        mResolvePass = std::move(other.mResolvePass);
         mGbufferPassDurationsNs = std::move(other.mGbufferPassDurationsNs);
         mLightingPassDurationsNs = std::move(other.mLightingPassDurationsNs);
     }
@@ -261,8 +259,7 @@ DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
         other.mNormalTexture = nullptr;
         mNormalTextureView = other.mNormalTextureView;
         other.mNormalTextureView = nullptr;
-        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
-        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mSampleBuffer = std::move(other.mSampleBuffer);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
         mQueryBuffer = std::move(other.mQueryBuffer);
@@ -270,6 +267,7 @@ DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
         mGbufferPass = std::move(other.mGbufferPass);
         mDebugPass = std::move(other.mDebugPass);
         mLightingPass = std::move(other.mLightingPass);
+        mResolvePass = std::move(other.mResolvePass);
         mGbufferPassDurationsNs = std::move(other.mGbufferPassDurationsNs);
         mLightingPassDurationsNs = std::move(other.mLightingPassDurationsNs);
     }
@@ -315,26 +313,40 @@ void DeferredRenderer::render(
         encoder,
         mQuerySet,
         offsetof(TimestampsLayout, lightingPassStart) / TimestampsLayout::MEMBER_SIZE);
+    const Extent2f framebufferSize = Extent2f(renderDesc.framebufferSize);
     {
         const glm::mat4 inverseViewProjectionMat =
             glm::inverse(renderDesc.viewReverseZProjectionMatrix);
-        const Extent2f framebufferSize = Extent2f(renderDesc.framebufferSize);
         mLightingPass.render(
             gpuContext,
-            mGbufferBindGroup,
             encoder,
-            renderDesc.targetTextureView,
             inverseViewProjectionMat,
             renderDesc.cameraPosition,
             framebufferSize,
-            renderDesc.sky,
+            renderDesc.sky);
+    }
+    wgpuCommandEncoderWriteTimestamp(
+        encoder,
+        mQuerySet,
+        offsetof(TimestampsLayout, lightingPassEnd) / TimestampsLayout::MEMBER_SIZE);
+
+    wgpuCommandEncoderWriteTimestamp(
+        encoder,
+        mQuerySet,
+        offsetof(TimestampsLayout, resolvePassStart) / TimestampsLayout::MEMBER_SIZE);
+    {
+        mResolvePass.render(
+            gpuContext,
+            encoder,
+            renderDesc.targetTextureView,
+            framebufferSize,
             renderDesc.exposure,
             gui);
     }
     wgpuCommandEncoderWriteTimestamp(
         encoder,
         mQuerySet,
-        offsetof(TimestampsLayout, lightingPassEnd) / TimestampsLayout::MEMBER_SIZE);
+        offsetof(TimestampsLayout, resolvePassEnd) / TimestampsLayout::MEMBER_SIZE);
 
     wgpuCommandEncoderResolveQuerySet(
         encoder, mQuerySet, 0, TimestampsLayout::QUERY_COUNT, mQueryBuffer.ptr(), 0);
@@ -386,6 +398,15 @@ void DeferredRenderer::render(
                     lightingDurations.pop_front();
                 }
 
+                auto&      resolveDurations = renderer.mResolvePassDurationsNs;
+                const auto resolveDuration =
+                    timestamps.resolvePassEnd - timestamps.resolvePassStart;
+                resolveDurations.push_back(resolveDuration);
+                if (resolveDurations.size() > 30)
+                {
+                    resolveDurations.pop_front();
+                }
+
                 wgpuBufferUnmap(timestampBuffer.ptr());
             }
             else
@@ -421,7 +442,7 @@ void DeferredRenderer::renderDebug(
         mAlbedoTextureView,
         mNormalTextureView);
 
-    mDebugPass.render(gpuContext, mGbufferBindGroup, encoder, textureView, framebufferSize, gui);
+    mDebugPass.render(gpuContext, encoder, textureView, framebufferSize, gui);
 
     const WGPUCommandBuffer cmdBuffer = [encoder]() {
         const WGPUCommandBufferDescriptor cmdBufferDesc{
@@ -509,14 +530,8 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
         mNormalTexture, "Gbuffer normal texture view", NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTextureView != nullptr);
 
-    mGbufferBindGroup = GpuBindGroup{
-        gpuContext.device,
-        "Gbuffer bind group",
-        mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 3>{
-            textureBindGroupEntry(0, mAlbedoTextureView),
-            textureBindGroupEntry(1, mNormalTextureView),
-            textureBindGroupEntry(2, mDepthTextureView)}};
+    mDebugPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
+    mLightingPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
 }
 
 DeferredRenderer::GbufferPass::GbufferPass(
@@ -710,7 +725,7 @@ DeferredRenderer::GbufferPass::GbufferPass(
     const GpuBindGroupLayout textureBindGroupLayout{
         gpuContext.device,
         "Texture bind group layout",
-        textureBindGroupLayoutEntry(0, WGPUTextureSampleType_Float)};
+        textureBindGroupLayoutEntry(0, WGPUTextureSampleType_Float, WGPUShaderStage_Fragment)};
 
     std::transform(
         mBaseColorTextures.begin(),
@@ -923,7 +938,6 @@ DeferredRenderer::GbufferPass::~GbufferPass()
     mBaseColorTextures.clear();
 }
 
-
 DeferredRenderer::GbufferPass::GbufferPass(GbufferPass&& other) noexcept
 {
     if (this != &other)
@@ -1073,16 +1087,16 @@ void DeferredRenderer::GbufferPass::render(
 }
 
 DeferredRenderer::DebugPass::DebugPass(
-    const GpuContext&         gpuContext,
-    const GpuBindGroupLayout& gbufferBindGroupLayout,
-    const Extent2u&           framebufferSize)
-    : mVertexBuffer(
-          gpuContext.device,
-          "Vertex buffer",
-          {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst},
-          std::span<const float[2]>(quadVertexData)),
-      mUniformBuffer(),
-      mUniformBindGroup(),
+    const GpuContext&     gpuContext,
+    const WGPUTextureView gbufferAlbedoTextureView,
+    const WGPUTextureView gbufferNormalTextureView,
+    const WGPUTextureView gbufferDepthTextureView,
+    const Extent2u&       framebufferSize)
+    : mVertexBuffer{gpuContext.device, "Vertex buffer", {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst}, std::span<const float[2]>(quadVertexData)},
+      mUniformBuffer{},
+      mUniformBindGroup{},
+      mGbufferBindGroupLayout{},
+      mGbufferBindGroup{},
       mPipeline(nullptr)
 {
     {
@@ -1105,11 +1119,30 @@ DeferredRenderer::DebugPass::DebugPass(
         uniformBindGroupLayout.ptr(),
         mUniformBuffer.bindGroupEntry(0)};
 
+    mGbufferBindGroupLayout = GpuBindGroupLayout{
+        gpuContext.device,
+        "Debug pass gbuffer bind group layout",
+        std::array<WGPUBindGroupLayoutEntry, 3>{
+            textureBindGroupLayoutEntry(
+                0, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Fragment),
+            textureBindGroupLayoutEntry(
+                1, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Fragment),
+            textureBindGroupLayoutEntry(2, WGPUTextureSampleType_Depth, WGPUShaderStage_Fragment)}};
+
+    mGbufferBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Debug pass gbuffer bind group",
+        mGbufferBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            textureBindGroupEntry(0, gbufferAlbedoTextureView),
+            textureBindGroupEntry(1, gbufferNormalTextureView),
+            textureBindGroupEntry(2, gbufferDepthTextureView)}};
+
     {
         // Pipeline layout
 
         const std::array<WGPUBindGroupLayout, 2> bindGroupLayouts{
-            uniformBindGroupLayout.ptr(), gbufferBindGroupLayout.ptr()};
+            uniformBindGroupLayout.ptr(), mGbufferBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -1244,6 +1277,8 @@ DeferredRenderer::DebugPass::DebugPass(DebugPass&& other) noexcept
         mVertexBuffer = std::move(other.mVertexBuffer);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
+        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
@@ -1256,6 +1291,8 @@ DeferredRenderer::DebugPass& DeferredRenderer::DebugPass::operator=(DebugPass&& 
         mVertexBuffer = std::move(other.mVertexBuffer);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
+        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
@@ -1265,7 +1302,6 @@ DeferredRenderer::DebugPass& DeferredRenderer::DebugPass::operator=(DebugPass&& 
 
 void DeferredRenderer::DebugPass::render(
     const GpuContext&        gpuContext,
-    const GpuBindGroup&      gbufferBindGroup,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    textureView,
     const Extent2f&          framebufferSize,
@@ -1301,7 +1337,7 @@ void DeferredRenderer::DebugPass::render(
 
     wgpuRenderPassEncoderSetPipeline(renderPass, mPipeline);
     wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mUniformBindGroup.ptr(), 0, nullptr);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, gbufferBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mGbufferBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
@@ -1311,31 +1347,46 @@ void DeferredRenderer::DebugPass::render(
     wgpuRenderPassEncoderEnd(renderPass);
 }
 
+void DeferredRenderer::DebugPass::resize(
+    const GpuContext&     gpuContext,
+    const WGPUTextureView albedoTextureView,
+    const WGPUTextureView normalTextureView,
+    const WGPUTextureView depthTextureView)
+{
+    mGbufferBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Debug pass gbuffer bind group",
+        mGbufferBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            textureBindGroupEntry(0, albedoTextureView),
+            textureBindGroupEntry(1, normalTextureView),
+            textureBindGroupEntry(2, depthTextureView)}};
+}
+
 DeferredRenderer::LightingPass::LightingPass(
     const GpuContext&                  gpuContext,
-    const GpuBindGroupLayout&          gbufferBindGroupLayout,
+    const WGPUTextureView              albedoTextureView,
+    const WGPUTextureView              normalTextureView,
+    const WGPUTextureView              depthTextureView,
+    const GpuBuffer&                   sampleBuffer,
     std::span<const BvhNode>           sceneBvhNodes,
     std::span<const PositionAttribute> scenePositionAttributes,
     std::span<const VertexAttributes>  sceneVertexAttributes,
     std::span<const Texture>           sceneBaseColorTextures)
     : mCurrentSky{},
-      mVertexBuffer{
-          gpuContext.device,
-          "Sky vertex buffer",
-          {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst},
-          std::span<const float[2]>(quadVertexData)},
       mSkyStateBuffer{
           gpuContext.device,
           "Sky state buffer",
           {GpuBufferUsage::ReadOnlyStorage, GpuBufferUsage::CopyDst},
           sizeof(AlignedSkyState)},
-      mSkyStateBindGroup{},
       mUniformBuffer{
           gpuContext.device,
           "Sky uniform buffer",
           {GpuBufferUsage::Uniform, GpuBufferUsage::CopyDst},
           sizeof(Uniforms)},
       mUniformBindGroup{},
+      mGbufferBindGroupLayout{},
+      mGbufferBindGroup{},
       mBvhNodeBuffer{
           gpuContext.device,
           "BVH node buffer",
@@ -1371,6 +1422,7 @@ DeferredRenderer::LightingPass::LightingPass(
               std::span<const std::uint32_t>(bufferData)};
       }()},
       mBvhBindGroup{},
+      mSampleBindGroup{},
       mPipeline(nullptr)
 {
     {
@@ -1379,27 +1431,35 @@ DeferredRenderer::LightingPass::LightingPass(
             gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
     }
 
-    const GpuBindGroupLayout skyStateBindGroupLayout{
-        gpuContext.device,
-        "Lighting pass sky state bind group layout",
-        mSkyStateBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(AlignedSkyState))};
-
-    mSkyStateBindGroup = GpuBindGroup{
-        gpuContext.device,
-        "Lighting pass sky state bind group",
-        skyStateBindGroupLayout.ptr(),
-        mSkyStateBuffer.bindGroupEntry(0)};
-
     const GpuBindGroupLayout uniformBindGroupLayout{
         gpuContext.device,
         "Lighting passs uniform bind group layout",
-        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Uniforms))};
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Compute, sizeof(Uniforms))};
 
     mUniformBindGroup = GpuBindGroup{
         gpuContext.device,
         "Lighting pass uniform bind group",
         uniformBindGroupLayout.ptr(),
         mUniformBuffer.bindGroupEntry(0)};
+
+    mGbufferBindGroupLayout = GpuBindGroupLayout{
+        gpuContext.device,
+        "lighting pass gbuffer bind group layout",
+        std::array<WGPUBindGroupLayoutEntry, 3>{
+            textureBindGroupLayoutEntry(
+                0, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Compute),
+            textureBindGroupLayoutEntry(
+                1, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Compute),
+            textureBindGroupLayoutEntry(2, WGPUTextureSampleType_Depth, WGPUShaderStage_Compute)}};
+
+    mGbufferBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass gbuffer bind group",
+        mGbufferBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            textureBindGroupEntry(0, albedoTextureView),
+            textureBindGroupEntry(1, normalTextureView),
+            textureBindGroupEntry(2, depthTextureView)}};
 
     {
         struct TextureDescriptor
@@ -1463,40 +1523,277 @@ DeferredRenderer::LightingPass::LightingPass(
     const GpuBindGroupLayout bvhBindGroupLayout{
         gpuContext.device,
         "Scene bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 6>{
-            mBvhNodeBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            mPositionAttributesBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
-            mVertexAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Fragment),
-            mTextureDescriptorBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Fragment),
-            mTextureBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Fragment),
-            mBlueNoiseBuffer.bindGroupLayoutEntry(5, WGPUShaderStage_Fragment),
+        std::array<WGPUBindGroupLayoutEntry, 7>{
+            mSkyStateBuffer.bindGroupLayoutEntry(
+                0, WGPUShaderStage_Compute, sizeof(AlignedSkyState)),
+            mBvhNodeBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Compute),
+            mPositionAttributesBuffer.bindGroupLayoutEntry(2, WGPUShaderStage_Compute),
+            mVertexAttributesBuffer.bindGroupLayoutEntry(3, WGPUShaderStage_Compute),
+            mTextureDescriptorBuffer.bindGroupLayoutEntry(4, WGPUShaderStage_Compute),
+            mTextureBuffer.bindGroupLayoutEntry(5, WGPUShaderStage_Compute),
+            mBlueNoiseBuffer.bindGroupLayoutEntry(6, WGPUShaderStage_Compute),
         }};
 
     mBvhBindGroup = GpuBindGroup{
         gpuContext.device,
         "Lighting pass BVH bind group",
         bvhBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 6>{
-            mBvhNodeBuffer.bindGroupEntry(0),
-            mPositionAttributesBuffer.bindGroupEntry(1),
-            mVertexAttributesBuffer.bindGroupEntry(2),
-            mTextureDescriptorBuffer.bindGroupEntry(3),
-            mTextureBuffer.bindGroupEntry(4),
-            mBlueNoiseBuffer.bindGroupEntry(5),
+        std::array<WGPUBindGroupEntry, 7>{
+            mSkyStateBuffer.bindGroupEntry(0),
+            mBvhNodeBuffer.bindGroupEntry(1),
+            mPositionAttributesBuffer.bindGroupEntry(2),
+            mVertexAttributesBuffer.bindGroupEntry(3),
+            mTextureDescriptorBuffer.bindGroupEntry(4),
+            mTextureBuffer.bindGroupEntry(5),
+            mBlueNoiseBuffer.bindGroupEntry(6),
         }};
+
+    const GpuBindGroupLayout sampleBindGroupLayout{
+        gpuContext.device,
+        "Lighting pass accumulation bind group layout",
+        std::array<WGPUBindGroupLayoutEntry, 1>{
+            sampleBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Compute)}};
+
+    mSampleBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass accumulation bind group",
+        sampleBindGroupLayout.ptr(),
+        sampleBuffer.bindGroupEntry(0)};
 
     {
         // Pipeline layout
 
+        const WGPUShaderModule shaderModule = [&gpuContext]() -> WGPUShaderModule {
+            const WGPUShaderModuleWGSLDescriptor wgslDesc = {
+                .chain =
+                    WGPUChainedStruct{
+                        .next = nullptr,
+                        .sType = WGPUSType_ShaderModuleWGSLDescriptor,
+                    },
+                .code = DEFERRED_RENDERER_LIGHTING_PASS_SOURCE,
+            };
+
+            const WGPUShaderModuleDescriptor moduleDesc{
+                .nextInChain = &wgslDesc.chain,
+                .label = "Lighting pass shader",
+            };
+
+            return wgpuDeviceCreateShaderModule(gpuContext.device, &moduleDesc);
+        }();
+        NLRS_ASSERT(shaderModule != nullptr);
+
         const WGPUBindGroupLayout bindGroupLayouts[] = {
-            skyStateBindGroupLayout.ptr(),
+            sampleBindGroupLayout.ptr(),
             uniformBindGroupLayout.ptr(),
-            gbufferBindGroupLayout.ptr(),
+            mGbufferBindGroupLayout.ptr(),
             bvhBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
             .label = "Lighting pass pipeline layout",
+            .bindGroupLayoutCount = std::size(bindGroupLayouts),
+            .bindGroupLayouts = bindGroupLayouts,
+        };
+
+        const WGPUPipelineLayout pipelineLayout =
+            wgpuDeviceCreatePipelineLayout(gpuContext.device, &pipelineLayoutDesc);
+
+        const WGPUProgrammableStageDescriptor computeStageDesc{
+            .nextInChain = nullptr,
+            .module = shaderModule,
+            .entryPoint = "main",
+            .constantCount = 0,
+            .constants = nullptr,
+        };
+
+        const WGPUComputePipelineDescriptor pipelineDesc{
+            .nextInChain = nullptr,
+            .label = "Lighting pass compute pipeline",
+            .layout = pipelineLayout,
+            .compute = computeStageDesc,
+        };
+
+        mPipeline = wgpuDeviceCreateComputePipeline(gpuContext.device, &pipelineDesc);
+        wgpuPipelineLayoutRelease(pipelineLayout);
+    }
+}
+
+DeferredRenderer::LightingPass::~LightingPass()
+{
+    computePipelineSafeRelease(mPipeline);
+    mPipeline = nullptr;
+}
+
+DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
+{
+    if (this != &other)
+    {
+        mCurrentSky = other.mCurrentSky;
+        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
+        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
+        mBvhBindGroup = std::move(other.mBvhBindGroup);
+        mSampleBindGroup = std::move(other.mSampleBindGroup);
+        mPipeline = other.mPipeline;
+        other.mPipeline = nullptr;
+        mFrameCount = other.mFrameCount;
+    }
+}
+
+DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
+    LightingPass&& other) noexcept
+{
+    if (this != &other)
+    {
+        mCurrentSky = other.mCurrentSky;
+        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
+        mUniformBuffer = std::move(other.mUniformBuffer);
+        mUniformBindGroup = std::move(other.mUniformBindGroup);
+        mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
+        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
+        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
+        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
+        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
+        mTextureBuffer = std::move(other.mTextureBuffer);
+        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
+        mBvhBindGroup = std::move(other.mBvhBindGroup);
+        mSampleBindGroup = std::move(other.mSampleBindGroup);
+        computePipelineSafeRelease(mPipeline);
+        mPipeline = other.mPipeline;
+        other.mPipeline = nullptr;
+        mFrameCount = other.mFrameCount;
+    }
+    return *this;
+}
+
+void DeferredRenderer::LightingPass::render(
+    const GpuContext&        gpuContext,
+    const WGPUCommandEncoder cmdEncoder,
+    const glm::mat4&         inverseViewReverseZProjectionMatrix,
+    const glm::vec3&         cameraPosition,
+    const Extent2f&          fbsize,
+    const Sky&               sky)
+{
+    if (mCurrentSky != sky)
+    {
+        mCurrentSky = sky;
+        const AlignedSkyState skyState{sky};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
+    }
+
+    {
+        const Uniforms uniforms{
+            inverseViewReverseZProjectionMatrix,
+            glm::vec4(cameraPosition, 1.f),
+            glm::vec2(fbsize.x, fbsize.y),
+            mFrameCount++,
+            0};
+        wgpuQueueWriteBuffer(
+            gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
+    }
+
+    const WGPUComputePassEncoder computePass = [cmdEncoder]() -> WGPUComputePassEncoder {
+        const WGPUComputePassDescriptor computePassDesc{
+            .nextInChain = nullptr,
+            .label = "Lighting pass compute pass descriptor",
+            .timestampWrites = nullptr,
+        };
+        return wgpuCommandEncoderBeginComputePass(cmdEncoder, &computePassDesc);
+    }();
+    NLRS_ASSERT(computePass != nullptr);
+
+    wgpuComputePassEncoderSetPipeline(computePass, mPipeline);
+    wgpuComputePassEncoderSetBindGroup(computePass, 0, mSampleBindGroup.ptr(), 0, nullptr);
+    wgpuComputePassEncoderSetBindGroup(computePass, 1, mUniformBindGroup.ptr(), 0, nullptr);
+    wgpuComputePassEncoderSetBindGroup(computePass, 2, mGbufferBindGroup.ptr(), 0, nullptr);
+    wgpuComputePassEncoderSetBindGroup(computePass, 3, mBvhBindGroup.ptr(), 0, nullptr);
+
+    const std::uint32_t workgroupCountX = static_cast<std::uint32_t>(0.5f + fbsize.x / 8.f);
+    const std::uint32_t workgroupCountY = static_cast<std::uint32_t>(0.5f + fbsize.y / 8.f);
+    wgpuComputePassEncoderDispatchWorkgroups(computePass, workgroupCountX, workgroupCountY, 1);
+
+    wgpuComputePassEncoderEnd(computePass);
+}
+
+void DeferredRenderer::LightingPass::resize(
+    const GpuContext& gpuContext,
+    WGPUTextureView   albedoTextureView,
+    WGPUTextureView   normalTextureView,
+    WGPUTextureView   depthTextureView)
+{
+    mGbufferBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass gbuffer bind group",
+        mGbufferBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            textureBindGroupEntry(0, albedoTextureView),
+            textureBindGroupEntry(1, normalTextureView),
+            textureBindGroupEntry(2, depthTextureView)}};
+}
+
+DeferredRenderer::ResolvePass::ResolvePass(
+    const GpuContext&                 gpuContext,
+    const GpuBuffer&                  sampleBuffer,
+    const DeferredRendererDescriptor& rendererDesc)
+    : mVertexBuffer{gpuContext.device, "Resolve pass vertex buffer", {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst}, std::span<const float[2]>(quadVertexData)},
+      mUniformBuffer{
+          gpuContext.device,
+          "Sky uniform buffer",
+          {GpuBufferUsage::Uniform, GpuBufferUsage::CopyDst},
+          sizeof(Uniforms)},
+      mUniformBindGroup{},
+      mAccumulationBuffer{
+          gpuContext.device,
+          "Deferred renderer :: accumulation buffer",
+          GpuBufferUsages{GpuBufferUsage::Storage},
+          3 * sizeof(float) * area(rendererDesc.maxFramebufferSize)},
+      mTaaBindGroup{},
+      mPipeline(nullptr)
+{
+    const GpuBindGroupLayout uniformBindGroupLayout{
+        gpuContext.device,
+        "TAA uniform bind group layout",
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment, sizeof(Uniforms))};
+
+    mUniformBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "TAA uniform bind group",
+        uniformBindGroupLayout.ptr(),
+        mUniformBuffer.bindGroupEntry(0)};
+
+    const GpuBindGroupLayout taaBindGroupLayout{
+        gpuContext.device,
+        "TAA bind group layout",
+        std::array<WGPUBindGroupLayoutEntry, 2>{
+            sampleBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
+            mAccumulationBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment)}};
+
+    mTaaBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "TAA bind group",
+        taaBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 2>{
+            sampleBuffer.bindGroupEntry(0), mAccumulationBuffer.bindGroupEntry(1)}};
+
+    {
+        // Pipeline layout
+
+        const WGPUBindGroupLayout bindGroupLayouts[] = {
+            uniformBindGroupLayout.ptr(), taaBindGroupLayout.ptr()};
+
+        const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
+            .nextInChain = nullptr,
+            .label = "Resolve pass pipeline layout",
             .bindGroupLayoutCount = std::size(bindGroupLayouts),
             .bindGroupLayouts = bindGroupLayouts,
         };
@@ -1528,12 +1825,12 @@ DeferredRenderer::LightingPass::LightingPass(
                         .next = nullptr,
                         .sType = WGPUSType_ShaderModuleWGSLDescriptor,
                     },
-                .code = DEFERRED_RENDERER_LIGHTING_PASS_SOURCE,
+                .code = DEFERRED_RENDERER_RESOLVE_PASS_SOURCE,
             };
 
             const WGPUShaderModuleDescriptor moduleDesc{
                 .nextInChain = &wgslDesc.chain,
-                .label = "Lighting pass shader",
+                .label = "Resolve pass shader",
             };
 
             return wgpuDeviceCreateShaderModule(gpuContext.device, &moduleDesc);
@@ -1577,7 +1874,7 @@ DeferredRenderer::LightingPass::LightingPass(
 
         const WGPURenderPipelineDescriptor pipelineDesc{
             .nextInChain = nullptr,
-            .label = "Lighting pass render pipeline",
+            .label = "resolve pass render pipeline",
             .layout = pipelineLayout,
             .vertex =
                 WGPUVertexState{
@@ -1613,88 +1910,53 @@ DeferredRenderer::LightingPass::LightingPass(
     }
 }
 
-DeferredRenderer::LightingPass::~LightingPass()
+DeferredRenderer::ResolvePass::~ResolvePass()
 {
     renderPipelineSafeRelease(mPipeline);
     mPipeline = nullptr;
 }
 
-DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
+DeferredRenderer::ResolvePass::ResolvePass(ResolvePass&& other) noexcept
 {
     if (this != &other)
     {
-        mCurrentSky = other.mCurrentSky;
         mVertexBuffer = std::move(other.mVertexBuffer);
-        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
-        mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
-        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
-        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
-        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
-        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
-        mTextureBuffer = std::move(other.mTextureBuffer);
-        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
-        mBvhBindGroup = std::move(other.mBvhBindGroup);
+        mAccumulationBuffer = std::move(other.mAccumulationBuffer);
+        mTaaBindGroup = std::move(other.mTaaBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
-        mFrameCount = other.mFrameCount;
     }
 }
 
-DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
-    LightingPass&& other) noexcept
+DeferredRenderer::ResolvePass& DeferredRenderer::ResolvePass::operator=(
+    ResolvePass&& other) noexcept
 {
     if (this != &other)
     {
-        mCurrentSky = other.mCurrentSky;
         mVertexBuffer = std::move(other.mVertexBuffer);
-        mSkyStateBuffer = std::move(other.mSkyStateBuffer);
-        mSkyStateBindGroup = std::move(other.mSkyStateBindGroup);
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
-        mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
-        mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
-        mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
-        mTextureDescriptorBuffer = std::move(other.mTextureDescriptorBuffer);
-        mTextureBuffer = std::move(other.mTextureBuffer);
-        mBlueNoiseBuffer = std::move(other.mBlueNoiseBuffer);
-        mBvhBindGroup = std::move(other.mBvhBindGroup);
+        mAccumulationBuffer = std::move(other.mAccumulationBuffer);
+        mTaaBindGroup = std::move(other.mTaaBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
-        mFrameCount = other.mFrameCount;
     }
     return *this;
 }
 
-void DeferredRenderer::LightingPass::render(
+void DeferredRenderer::ResolvePass::render(
     const GpuContext&        gpuContext,
-    const GpuBindGroup&      gbufferBindGroup,
     const WGPUCommandEncoder cmdEncoder,
-    const WGPUTextureView    targetTextureView,
-    const glm::mat4&         inverseViewReverseZProjectionMatrix,
-    const glm::vec3&         cameraPosition,
+    WGPUTextureView          targetTextureView,
     const Extent2f&          fbsize,
-    const Sky&               sky,
     const float              exposure,
     Gui&                     gui)
 {
-    if (mCurrentSky != sky)
     {
-        mCurrentSky = sky;
-        const AlignedSkyState skyState{sky};
-        wgpuQueueWriteBuffer(
-            gpuContext.queue, mSkyStateBuffer.ptr(), 0, &skyState, sizeof(AlignedSkyState));
-    }
-
-    {
-        const Uniforms uniforms{
-            inverseViewReverseZProjectionMatrix,
-            glm::vec4(cameraPosition, 1.f),
-            glm::vec2(fbsize.x, fbsize.y),
-            exposure,
-            mFrameCount++};
+        const Uniforms uniforms{glm::vec2(fbsize.x, fbsize.y), exposure, 0.f};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
     }
@@ -1726,10 +1988,8 @@ void DeferredRenderer::LightingPass::render(
     NLRS_ASSERT(renderPass != nullptr);
 
     wgpuRenderPassEncoderSetPipeline(renderPass, mPipeline);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mSkyStateBindGroup.ptr(), 0, nullptr);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mUniformBindGroup.ptr(), 0, nullptr);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 2, gbufferBindGroup.ptr(), 0, nullptr);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 3, mBvhBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mUniformBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mTaaBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
@@ -1756,6 +2016,10 @@ DeferredRenderer::PerfStats DeferredRenderer::getPerfStats() const
         0.000001f *
             static_cast<float>(std::accumulate(
                 mLightingPassDurationsNs.begin(), mLightingPassDurationsNs.end(), 0ll)) /
-            mLightingPassDurationsNs.size()};
+            mLightingPassDurationsNs.size(),
+        0.000001f *
+            static_cast<float>(std::accumulate(
+                mResolvePassDurationsNs.begin(), mResolvePassDurationsNs.end(), 0ll)) /
+            mResolvePassDurationsNs.size()};
 }
 } // namespace nlrs

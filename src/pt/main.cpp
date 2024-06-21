@@ -135,6 +135,8 @@ try
             nlrs::deserialize(file, ptFormat);
         }
 
+        const nlrs::Extent2i largestResolution = largestMonitorResolution();
+
         const nlrs::RendererDescriptor rendererDesc{
             nlrs::RenderParameters{
                 nlrs::Extent2u(window.resolution()),
@@ -142,7 +144,7 @@ try
                 nlrs::SamplingParams(),
                 nlrs::Sky(),
                 1.0f},
-            largestMonitorResolution(),
+            largestResolution,
         };
 
         nlrs::Scene scene{
@@ -158,6 +160,7 @@ try
             gpuContext,
             nlrs::DeferredRendererDescriptor{
                 .framebufferSize = nlrs::Extent2u(window.resolution()),
+                .maxFramebufferSize = nlrs::Extent2u(largestResolution),
                 .modelPositions = ptFormat.modelVertexPositions,
                 .modelNormals = ptFormat.modelVertexNormals,
                 .modelTexCoords = ptFormat.modelVertexTexCoords,
@@ -265,6 +268,10 @@ try
                         "lighting pass: %.2f ms (%.1f FPS)",
                         perfStats.averageLightingPassDurationsMs,
                         1000.0f / perfStats.averageLightingPassDurationsMs);
+                    ImGui::Text(
+                        "resolve pass: %.2f ms (%.1f FPS)",
+                        perfStats.averageResolvePassDurationsMs,
+                        1000.0f / perfStats.averageResolvePassDurationsMs);
                     break;
                 }
                 default:

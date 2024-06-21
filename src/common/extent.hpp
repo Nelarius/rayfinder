@@ -39,6 +39,12 @@ constexpr float aspectRatio(const Extent2<T>& extent) noexcept
 }
 
 template<typename T>
+constexpr T area(const Extent2<T>& extent) noexcept
+{
+    return static_cast<T>(extent.x) * static_cast<T>(extent.y);
+}
+
+template<typename T>
 constexpr bool operator==(const Extent2<T>& lhs, const Extent2<T>& rhs) noexcept
 {
     return lhs.x == rhs.x && lhs.y == rhs.y;

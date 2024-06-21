@@ -28,6 +28,7 @@ class Gui;
 struct DeferredRendererDescriptor
 {
     Extent2u                                  framebufferSize;
+    Extent2u                                  maxFramebufferSize;
     std::span<std::span<const glm::vec4>>     modelPositions;
     std::span<std::span<const glm::vec4>>     modelNormals;
     std::span<std::span<const glm::vec2>>     modelTexCoords;
@@ -57,6 +58,7 @@ public:
     {
         float averageGbufferPassDurationsMs = 0.0f;
         float averageLightingPassDurationsMs = 0.0f;
+        float averageResolvePassDurationsMs = 0.0f;
     };
 
     DeferredRenderer(const GpuContext&, const DeferredRendererDescriptor&);
@@ -130,14 +132,18 @@ private:
         GpuBuffer          mVertexBuffer = GpuBuffer{};
         GpuBuffer          mUniformBuffer = GpuBuffer{};
         GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
+        GpuBindGroupLayout mGbufferBindGroupLayout = GpuBindGroupLayout{};
+        GpuBindGroup       mGbufferBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
 
     public:
         DebugPass() = default;
         DebugPass(
-            const GpuContext&         gpuContext,
-            const GpuBindGroupLayout& gbufferBindGroupLayout,
-            const Extent2u&           framebufferSize);
+            const GpuContext& gpuContext,
+            WGPUTextureView   albedoTextureView,
+            WGPUTextureView   normalTextureView,
+            WGPUTextureView   depthTextureView,
+            const Extent2u&   framebufferSize);
         ~DebugPass();
 
         DebugPass(const DebugPass&) = delete;
@@ -147,31 +153,36 @@ private:
         DebugPass& operator=(DebugPass&&) noexcept;
 
         void render(
-            const GpuContext&   gpuContext,
-            const GpuBindGroup& gbufferBindGroup,
-            WGPUCommandEncoder  encoder,
-            WGPUTextureView     textureView,
-            const Extent2f&     framebufferSize,
-            Gui&                gui);
+            const GpuContext&  gpuContext,
+            WGPUCommandEncoder encoder,
+            WGPUTextureView    textureView,
+            const Extent2f&    framebufferSize,
+            Gui&               gui);
+        void resize(
+            const GpuContext&,
+            WGPUTextureView albedoTextureView,
+            WGPUTextureView normalTextureView,
+            WGPUTextureView depthTextureView);
     };
 
     struct LightingPass
     {
     private:
-        Sky                mCurrentSky = Sky{};
-        GpuBuffer          mVertexBuffer = GpuBuffer{};
-        GpuBuffer          mSkyStateBuffer = GpuBuffer{};
-        GpuBindGroup       mSkyStateBindGroup = GpuBindGroup{};
-        GpuBuffer          mUniformBuffer = GpuBuffer{};
-        GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
-        GpuBuffer          mBvhNodeBuffer = GpuBuffer{};
-        GpuBuffer          mPositionAttributesBuffer = GpuBuffer{};
-        GpuBuffer          mVertexAttributesBuffer = GpuBuffer{};
-        GpuBuffer          mTextureDescriptorBuffer = GpuBuffer{};
-        GpuBuffer          mTextureBuffer = GpuBuffer{};
-        GpuBuffer          mBlueNoiseBuffer = GpuBuffer{};
-        GpuBindGroup       mBvhBindGroup = GpuBindGroup{};
-        WGPURenderPipeline mPipeline = nullptr;
+        Sky                 mCurrentSky = Sky{};
+        GpuBuffer           mSkyStateBuffer = GpuBuffer{};
+        GpuBuffer           mUniformBuffer = GpuBuffer{};
+        GpuBindGroup        mUniformBindGroup = GpuBindGroup{};
+        GpuBindGroupLayout  mGbufferBindGroupLayout = GpuBindGroupLayout{};
+        GpuBindGroup        mGbufferBindGroup = GpuBindGroup{};
+        GpuBuffer           mBvhNodeBuffer = GpuBuffer{};
+        GpuBuffer           mPositionAttributesBuffer = GpuBuffer{};
+        GpuBuffer           mVertexAttributesBuffer = GpuBuffer{};
+        GpuBuffer           mTextureDescriptorBuffer = GpuBuffer{};
+        GpuBuffer           mTextureBuffer = GpuBuffer{};
+        GpuBuffer           mBlueNoiseBuffer = GpuBuffer{};
+        GpuBindGroup        mBvhBindGroup = GpuBindGroup{};
+        GpuBindGroup        mSampleBindGroup = GpuBindGroup{};
+        WGPUComputePipeline mPipeline = nullptr;
 
         std::uint32_t mFrameCount = 0;
 
@@ -180,15 +191,18 @@ private:
             glm::mat4     inverseViewReverseZProjectionMat;
             glm::vec4     cameraPosition;
             glm::vec2     framebufferSize;
-            float         exposure;
             std::uint32_t frameCount;
+            std::uint32_t _padding;
         };
 
     public:
         LightingPass() = default;
         LightingPass(
             const GpuContext&                  gpuContext,
-            const GpuBindGroupLayout&          gbufferBindGroupLayout,
+            WGPUTextureView                    albedoTextureView,
+            WGPUTextureView                    normalTextureView,
+            WGPUTextureView                    depthTextureView,
+            const GpuBuffer&                   accumulationBuffer,
             std::span<const BvhNode>           bvhNodes,
             std::span<const PositionAttribute> positionAttributes,
             std::span<const VertexAttributes>  vertexAttributes,
@@ -202,16 +216,57 @@ private:
         LightingPass& operator=(LightingPass&&) noexcept;
 
         void render(
-            const GpuContext&   gpuContext,
-            const GpuBindGroup& gbufferBindGroup,
-            WGPUCommandEncoder  cmdEncoder,
-            WGPUTextureView     targetTextureView,
-            const glm::mat4&    inverseViewProjection,
-            const glm::vec3&    cameraPosition,
-            const Extent2f&     framebufferSize,
-            const Sky&          sky,
-            float               exposure,
-            Gui&                gui);
+            const GpuContext&  gpuContext,
+            WGPUCommandEncoder cmdEncoder,
+            const glm::mat4&   inverseViewProjection,
+            const glm::vec3&   cameraPosition,
+            const Extent2f&    framebufferSize,
+            const Sky&         sky);
+        void resize(
+            const GpuContext&,
+            WGPUTextureView albedoTextureView,
+            WGPUTextureView normalTextureView,
+            WGPUTextureView depthTextureView);
+    };
+
+    struct ResolvePass
+    {
+    private:
+        GpuBuffer          mVertexBuffer = GpuBuffer{};
+        GpuBuffer          mUniformBuffer = GpuBuffer{};
+        GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
+        GpuBuffer          mAccumulationBuffer = GpuBuffer{};
+        GpuBindGroup       mTaaBindGroup = GpuBindGroup{};
+        WGPURenderPipeline mPipeline = nullptr;
+
+        struct Uniforms
+        {
+            glm::vec2 framebufferSize;
+            float     exposure;
+            float     _padding;
+        };
+
+    public:
+        ResolvePass() = default;
+        ResolvePass(
+            const GpuContext&                 gpuContext,
+            const GpuBuffer&                  sampleBuffer,
+            const DeferredRendererDescriptor& desc);
+        ~ResolvePass();
+
+        ResolvePass(const ResolvePass&) = delete;
+        ResolvePass& operator=(const ResolvePass&) = delete;
+
+        ResolvePass(ResolvePass&&) noexcept;
+        ResolvePass& operator=(ResolvePass&&) noexcept;
+
+        void render(
+            const GpuContext&  gpuContext,
+            WGPUCommandEncoder cmdEncoder,
+            WGPUTextureView    targetTextureView,
+            const Extent2f&    framebufferSize,
+            float              exposure,
+            Gui&               gui);
     };
 
     WGPUTexture               mDepthTexture;
@@ -220,15 +275,16 @@ private:
     WGPUTextureView           mAlbedoTextureView;
     WGPUTexture               mNormalTexture;
     WGPUTextureView           mNormalTextureView;
-    GpuBindGroupLayout        mGbufferBindGroupLayout;
-    GpuBindGroup              mGbufferBindGroup;
+    GpuBuffer                 mSampleBuffer;
     WGPUQuerySet              mQuerySet;
     GpuBuffer                 mQueryBuffer;
     GpuBuffer                 mTimestampsBuffer;
     GbufferPass               mGbufferPass;
     DebugPass                 mDebugPass;
     LightingPass              mLightingPass;
+    ResolvePass               mResolvePass;
     std::deque<std::uint64_t> mGbufferPassDurationsNs;
     std::deque<std::uint64_t> mLightingPassDurationsNs;
+    std::deque<std::uint64_t> mResolvePassDurationsNs;
 };
 } // namespace nlrs
