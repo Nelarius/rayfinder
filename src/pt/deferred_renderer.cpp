@@ -8,6 +8,7 @@
 #include "window.hpp"
 
 #include <common/assert.hpp>
+#include <common/r_sequence.hpp>
 
 #include <algorithm>
 #include <array>
@@ -107,7 +108,8 @@ DeferredRenderer::DeferredRenderer(
       mLightingPass(),
       mResolvePass(),
       mGbufferPassDurationsNs(),
-      mLightingPassDurationsNs()
+      mLightingPassDurationsNs(),
+      mFrameCount(0)
 {
     {
         const std::array<WGPUTextureFormat, 1> depthFormats{
@@ -240,6 +242,7 @@ DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
         mResolvePass = std::move(other.mResolvePass);
         mGbufferPassDurationsNs = std::move(other.mGbufferPassDurationsNs);
         mLightingPassDurationsNs = std::move(other.mLightingPassDurationsNs);
+        mFrameCount = other.mFrameCount;
     }
 }
 
@@ -270,6 +273,7 @@ DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
         mResolvePass = std::move(other.mResolvePass);
         mGbufferPassDurationsNs = std::move(other.mGbufferPassDurationsNs);
         mLightingPassDurationsNs = std::move(other.mLightingPassDurationsNs);
+        mFrameCount = other.mFrameCount;
     }
     return *this;
 }
@@ -293,13 +297,25 @@ void DeferredRenderer::render(
         return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
     }();
 
+    const Extent2f      framebufferSize = Extent2f(renderDesc.framebufferSize);
+    const std::uint32_t frameCount = mFrameCount++;
+    const glm::mat4     jitterMat = [framebufferSize, frameCount]() -> glm::mat4 {
+        glm::mat4       jitterMat = glm::mat4(1.0f);
+        const glm::vec2 j = r2Sequence(frameCount, 1 << 20);
+        jitterMat[3][0] = (j.x - 0.5f) / framebufferSize.x;
+        jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
+        return jitterMat;
+    }();
+
+    // GBuffer pass
+
     wgpuCommandEncoderWriteTimestamp(
         encoder,
         mQuerySet,
         offsetof(TimestampsLayout, gbufferPassStart) / TimestampsLayout::MEMBER_SIZE);
     mGbufferPass.render(
         gpuContext,
-        renderDesc.viewReverseZProjectionMatrix,
+        jitterMat * renderDesc.viewReverseZProjectionMatrix,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
@@ -309,26 +325,30 @@ void DeferredRenderer::render(
         mQuerySet,
         offsetof(TimestampsLayout, gbufferPassEnd) / TimestampsLayout::MEMBER_SIZE);
 
+    // Lighting pass
+
     wgpuCommandEncoderWriteTimestamp(
         encoder,
         mQuerySet,
         offsetof(TimestampsLayout, lightingPassStart) / TimestampsLayout::MEMBER_SIZE);
-    const Extent2f framebufferSize = Extent2f(renderDesc.framebufferSize);
     {
         const glm::mat4 inverseViewProjectionMat =
-            glm::inverse(renderDesc.viewReverseZProjectionMatrix);
+            glm::inverse(jitterMat * renderDesc.viewReverseZProjectionMatrix);
         mLightingPass.render(
             gpuContext,
             encoder,
             inverseViewProjectionMat,
             renderDesc.cameraPosition,
             framebufferSize,
-            renderDesc.sky);
+            renderDesc.sky,
+            frameCount);
     }
     wgpuCommandEncoderWriteTimestamp(
         encoder,
         mQuerySet,
         offsetof(TimestampsLayout, lightingPassEnd) / TimestampsLayout::MEMBER_SIZE);
+
+    // Resolve pass
 
     wgpuCommandEncoderWriteTimestamp(
         encoder,
@@ -341,12 +361,15 @@ void DeferredRenderer::render(
             renderDesc.targetTextureView,
             framebufferSize,
             renderDesc.exposure,
+            frameCount,
             gui);
     }
     wgpuCommandEncoderWriteTimestamp(
         encoder,
         mQuerySet,
         offsetof(TimestampsLayout, resolvePassEnd) / TimestampsLayout::MEMBER_SIZE);
+
+    // Resolve timestamp queries
 
     wgpuCommandEncoderResolveQuerySet(
         encoder, mQuerySet, 0, TimestampsLayout::QUERY_COUNT, mQueryBuffer.ptr(), 0);
@@ -676,7 +699,7 @@ DeferredRenderer::GbufferPass::GbufferPass(
           gpuContext.device,
           "Uniform buffer",
           {GpuBufferUsage::Uniform, GpuBufferUsage::CopyDst},
-          sizeof(glm::mat4)),
+          sizeof(Uniforms)),
       mUniformBindGroup(),
       mSamplerBindGroup(),
       mPipeline(nullptr)
@@ -684,7 +707,7 @@ DeferredRenderer::GbufferPass::GbufferPass(
     const GpuBindGroupLayout uniformBindGroupLayout{
         gpuContext.device,
         "Uniform bind group layout",
-        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(glm::mat4))};
+        mUniformBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Vertex, sizeof(Uniforms))};
 
     mUniformBindGroup = GpuBindGroup{
         gpuContext.device,
@@ -990,12 +1013,8 @@ void DeferredRenderer::GbufferPass::render(
     const WGPUTextureView    albedoTextureView,
     const WGPUTextureView    normalTextureView)
 {
-    wgpuQueueWriteBuffer(
-        gpuContext.queue,
-        mUniformBuffer.ptr(),
-        0,
-        &viewReverseZProjectionMatrix[0][0],
-        sizeof(glm::mat4));
+    const Uniforms uniforms{viewReverseZProjectionMatrix};
+    wgpuQueueWriteBuffer(gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
 
     const WGPURenderPassEncoder renderPassEncoder = [cmdEncoder,
                                                      depthTextureView,
@@ -1644,7 +1663,6 @@ DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
         mSampleBindGroup = std::move(other.mSampleBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
-        mFrameCount = other.mFrameCount;
     }
 }
 
@@ -1670,7 +1688,6 @@ DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
         computePipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
-        mFrameCount = other.mFrameCount;
     }
     return *this;
 }
@@ -1681,7 +1698,8 @@ void DeferredRenderer::LightingPass::render(
     const glm::mat4&         inverseViewReverseZProjectionMatrix,
     const glm::vec3&         cameraPosition,
     const Extent2f&          fbsize,
-    const Sky&               sky)
+    const Sky&               sky,
+    const std::uint32_t      frameCount)
 {
     if (mCurrentSky != sky)
     {
@@ -1696,7 +1714,7 @@ void DeferredRenderer::LightingPass::render(
             inverseViewReverseZProjectionMatrix,
             glm::vec4(cameraPosition, 1.f),
             glm::vec2(fbsize.x, fbsize.y),
-            mFrameCount++,
+            frameCount,
             0};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
@@ -1953,10 +1971,11 @@ void DeferredRenderer::ResolvePass::render(
     WGPUTextureView          targetTextureView,
     const Extent2f&          fbsize,
     const float              exposure,
+    const std::uint32_t      frameCount,
     Gui&                     gui)
 {
     {
-        const Uniforms uniforms{glm::vec2(fbsize.x, fbsize.y), exposure, 0.f};
+        const Uniforms uniforms{glm::vec2(fbsize.x, fbsize.y), exposure, frameCount};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
     }

@@ -106,6 +106,11 @@ private:
         GpuBindGroup              mSamplerBindGroup{};
         WGPURenderPipeline        mPipeline = nullptr;
 
+        struct Uniforms
+        {
+            glm::mat4 viewProjectionMat;
+        };
+
     public:
         GbufferPass() = default;
         GbufferPass(const GpuContext&, const DeferredRendererDescriptor&);
@@ -184,8 +189,6 @@ private:
         GpuBindGroup        mSampleBindGroup = GpuBindGroup{};
         WGPUComputePipeline mPipeline = nullptr;
 
-        std::uint32_t mFrameCount = 0;
-
         struct Uniforms
         {
             glm::mat4     inverseViewReverseZProjectionMat;
@@ -221,7 +224,8 @@ private:
             const glm::mat4&   inverseViewProjection,
             const glm::vec3&   cameraPosition,
             const Extent2f&    framebufferSize,
-            const Sky&         sky);
+            const Sky&         sky,
+            std::uint32_t      frameCount);
         void resize(
             const GpuContext&,
             WGPUTextureView albedoTextureView,
@@ -241,9 +245,9 @@ private:
 
         struct Uniforms
         {
-            glm::vec2 framebufferSize;
-            float     exposure;
-            float     _padding;
+            glm::vec2     framebufferSize;
+            float         exposure;
+            std::uint32_t frameCount;
         };
 
     public:
@@ -266,6 +270,7 @@ private:
             WGPUTextureView    targetTextureView,
             const Extent2f&    framebufferSize,
             float              exposure,
+            std::uint32_t      frameCount,
             Gui&               gui);
     };
 
@@ -286,5 +291,6 @@ private:
     std::deque<std::uint64_t> mGbufferPassDurationsNs;
     std::deque<std::uint64_t> mLightingPassDurationsNs;
     std::deque<std::uint64_t> mResolvePassDurationsNs;
+    std::uint32_t             mFrameCount;
 };
 } // namespace nlrs

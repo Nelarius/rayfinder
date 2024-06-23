@@ -1,4 +1,8 @@
-@group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
+struct Uniforms {
+    viewReverseZProjectionMat: mat4x4f
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
 struct VertexInput {
     @location(0) position: vec4f,
@@ -15,7 +19,7 @@ struct VertexOutput {
 @vertex
 fn vsMain(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.position = viewProjectionMat * in.position;
+    out.position = uniforms.viewReverseZProjectionMat * in.position;
     out.normal = in.normal;
     out.texCoord = in.texCoord;
     return out;

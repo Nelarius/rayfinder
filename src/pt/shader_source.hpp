@@ -623,7 +623,11 @@ fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2
 }
 )";
 
-const char* const DEFERRED_RENDERER_GBUFFER_PASS_SOURCE = R"(@group(0) @binding(0) var<uniform> viewProjectionMat: mat4x4f;
+const char* const DEFERRED_RENDERER_GBUFFER_PASS_SOURCE = R"(struct Uniforms {
+    viewReverseZProjectionMat: mat4x4f
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
 struct VertexInput {
     @location(0) position: vec4f,
@@ -640,7 +644,7 @@ struct VertexOutput {
 @vertex
 fn vsMain(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.position = viewProjectionMat * in.position;
+    out.position = uniforms.viewReverseZProjectionMat * in.position;
     out.normal = in.normal;
     out.texCoord = in.texCoord;
     return out;
@@ -1291,6 +1295,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 struct Uniforms {
     framebufferSize: vec2f,
     exposure: f32,
+    frameCount: u32,
 }
 
 // TODO: consider merging these into one bind group
@@ -1306,7 +1311,17 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let textureIdx = vec2u(floor(uv * uniforms.framebufferSize));
     let sampleBufferIdx = textureIdx.y * u32(uniforms.framebufferSize.x) + textureIdx.x;
     let sample: array<f32, 3> = sampleBuffer[sampleBufferIdx];
-    let color = vec3f(sample[0], sample[1], sample[2]);
+    let currentColor = vec3f(sample[0], sample[1], sample[2]);
+    var color = vec3f(0f);
+    if uniforms.frameCount == 0u {
+        accumulationBuffer[sampleBufferIdx] = sample;
+        color = currentColor;
+    } else {
+        let previousSample: array<f32, 3> = accumulationBuffer[sampleBufferIdx];
+        let previousColor = vec3f(previousSample[0], previousSample[1], previousSample[2]);
+        color = 0.1 * currentColor + 0.9 * previousColor;
+        accumulationBuffer[sampleBufferIdx] = array<f32, 3>(color.r, color.g, color.b);
+    }
 
     let rgb = acesFilmic(uniforms.exposure * color);
     let srgb = pow(rgb, vec3(1f / 2.2f));

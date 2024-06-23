@@ -128,6 +128,7 @@ set(TESTS_SOURCE_FILES
     bvh.cpp
     gltf.cpp
     intersection.cpp
+    math.cpp
     pt_format.cpp
     stream.cpp
     vector_set.cpp)
