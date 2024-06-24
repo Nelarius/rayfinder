@@ -14,6 +14,7 @@
 #include <array>
 #include <bit>
 #include <numeric>
+#include <tuple>
 
 namespace nlrs
 {
@@ -306,6 +307,8 @@ void DeferredRenderer::render(
         jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
         return jitterMat;
     }();
+    const glm::mat4 jitterViewReverseZProjectionMat =
+        jitterMat * renderDesc.viewReverseZProjectionMatrix;
 
     // GBuffer pass
 
@@ -315,7 +318,7 @@ void DeferredRenderer::render(
         offsetof(TimestampsLayout, gbufferPassStart) / TimestampsLayout::MEMBER_SIZE);
     mGbufferPass.render(
         gpuContext,
-        jitterMat * renderDesc.viewReverseZProjectionMatrix,
+        jitterViewReverseZProjectionMat,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
@@ -332,8 +335,7 @@ void DeferredRenderer::render(
         mQuerySet,
         offsetof(TimestampsLayout, lightingPassStart) / TimestampsLayout::MEMBER_SIZE);
     {
-        const glm::mat4 inverseViewProjectionMat =
-            glm::inverse(jitterMat * renderDesc.viewReverseZProjectionMatrix);
+        const glm::mat4 inverseViewProjectionMat = glm::inverse(jitterViewReverseZProjectionMat);
         mLightingPass.render(
             gpuContext,
             encoder,
@@ -359,6 +361,7 @@ void DeferredRenderer::render(
             gpuContext,
             encoder,
             renderDesc.targetTextureView,
+            jitterViewReverseZProjectionMat,
             framebufferSize,
             renderDesc.exposure,
             frameCount,
@@ -1776,7 +1779,8 @@ DeferredRenderer::ResolvePass::ResolvePass(
           GpuBufferUsages{GpuBufferUsage::Storage},
           3 * sizeof(float) * area(rendererDesc.maxFramebufferSize)},
       mTaaBindGroup{},
-      mPipeline(nullptr)
+      mPipeline(nullptr),
+      mPreviousViewProjectionMat(1.f)
 {
     const GpuBindGroupLayout uniformBindGroupLayout{
         gpuContext.device,
@@ -1945,6 +1949,7 @@ DeferredRenderer::ResolvePass::ResolvePass(ResolvePass&& other) noexcept
         mTaaBindGroup = std::move(other.mTaaBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mPreviousViewProjectionMat = other.mPreviousViewProjectionMat;
     }
 }
 
@@ -1961,6 +1966,7 @@ DeferredRenderer::ResolvePass& DeferredRenderer::ResolvePass::operator=(
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mPreviousViewProjectionMat = other.mPreviousViewProjectionMat;
     }
     return *this;
 }
@@ -1969,13 +1975,27 @@ void DeferredRenderer::ResolvePass::render(
     const GpuContext&        gpuContext,
     const WGPUCommandEncoder cmdEncoder,
     WGPUTextureView          targetTextureView,
+    const glm::mat4&         viewProjectionMat,
     const Extent2f&          fbsize,
     const float              exposure,
     const std::uint32_t      frameCount,
     Gui&                     gui)
 {
     {
-        const Uniforms uniforms{glm::vec2(fbsize.x, fbsize.y), exposure, frameCount};
+        const auto [currentInverseViewProjectionMat, previousViewProjectionMat] =
+            [this, frameCount, &viewProjectionMat]() -> std::tuple<glm::mat4, glm::mat4> {
+            glm::mat4 previousViewProjectionMat =
+                frameCount == 0 ? viewProjectionMat : mPreviousViewProjectionMat;
+            mPreviousViewProjectionMat = viewProjectionMat;
+            return std::make_tuple(glm::inverse(viewProjectionMat), previousViewProjectionMat);
+        }();
+
+        const Uniforms uniforms{
+            currentInverseViewProjectionMat,
+            previousViewProjectionMat,
+            glm::vec2(fbsize.x, fbsize.y),
+            exposure,
+            frameCount};
         wgpuQueueWriteBuffer(
             gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
     }

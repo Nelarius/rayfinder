@@ -242,9 +242,12 @@ private:
         GpuBuffer          mAccumulationBuffer = GpuBuffer{};
         GpuBindGroup       mTaaBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
+        glm::mat4          mPreviousViewProjectionMat;
 
         struct Uniforms
         {
+            glm::mat4     currentInverseViewProjectionMat;
+            glm::mat4     previousViewProjectionMat;
             glm::vec2     framebufferSize;
             float         exposure;
             std::uint32_t frameCount;
@@ -268,6 +271,7 @@ private:
             const GpuContext&  gpuContext,
             WGPUCommandEncoder cmdEncoder,
             WGPUTextureView    targetTextureView,
+            const glm::mat4&   viewProjectionMatrix,
             const Extent2f&    framebufferSize,
             float              exposure,
             std::uint32_t      frameCount,
