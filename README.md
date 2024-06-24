@@ -44,6 +44,7 @@ An interactive experimental pathtracer, implemented using WebGPU via the [Dawn](
   - [Reverse Z (and why it's so awesome)](https://tomhultonharrop.com/mathematics/graphics/2023/08/06/reverse-z.html)
 - [Free blue noise textures](http://momentsingraphics.de/BlueNoise.html)
 - _Using Blue Noise for Ray Traced Soft Shadows_, _Ray Tracing Gems II_
+- [Temporal AA and the Quest for the Holy Trail](https://www.elopezr.com/temporal-aa-and-the-quest-for-the-holy-trail/)
 
 ## Build
 
