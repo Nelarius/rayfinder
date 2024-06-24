@@ -1301,6 +1301,8 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 }
 
 struct Uniforms {
+    currentInverseViewProjectionMat: mat4x4f,
+    previousViewProjectionMat: mat4x4f,
     framebufferSize: vec2f,
     exposure: f32,
     frameCount: u32,
