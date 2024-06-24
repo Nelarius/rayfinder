@@ -240,7 +240,9 @@ private:
         GpuBuffer          mUniformBuffer = GpuBuffer{};
         GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
         GpuBuffer          mAccumulationBuffer = GpuBuffer{};
-        GpuBindGroup       mTaaBindGroup = GpuBindGroup{};
+        GpuBindGroup       mSampleBufferBindGroup = GpuBindGroup{};
+        GpuBindGroupLayout mGbufferBindGroupLayout = GpuBindGroupLayout{};
+        GpuBindGroup       mGbufferBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
         glm::mat4          mPreviousViewProjectionMat;
 
@@ -258,6 +260,7 @@ private:
         ResolvePass(
             const GpuContext&                 gpuContext,
             const GpuBuffer&                  sampleBuffer,
+            WGPUTextureView                   depthTextureView,
             const DeferredRendererDescriptor& desc);
         ~ResolvePass();
 
@@ -276,6 +279,7 @@ private:
             float              exposure,
             std::uint32_t      frameCount,
             Gui&               gui);
+        void resize(const GpuContext&, WGPUTextureView depthTextureView);
     };
 
     void invalidateTemporalAccumulation();
