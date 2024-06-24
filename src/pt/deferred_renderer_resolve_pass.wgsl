@@ -32,6 +32,8 @@ struct Uniforms {
 @group(1) @binding(0) var<storage, read_write> sampleBuffer: array<array<f32, 3>>;
 @group(1) @binding(1) var<storage, read_write> accumulationBuffer: array<array<f32, 3>>;
 
+@group(2) @binding(0) var gbufferDepth: texture_depth_2d;
+
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let uv = in.texCoord;
