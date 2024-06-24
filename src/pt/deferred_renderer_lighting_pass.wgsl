@@ -142,7 +142,7 @@ fn surfaceColor(coord: vec2u, primaryPos: vec3f, primaryNormal: vec3f, primaryAl
     var albedo = primaryAlbedo;
     var radiance = vec3(0f);
     var throughput = vec3(1f);
-    let blueNoise = animatedBlueNoise(coord, uniforms.frameCount, 512u);
+    let blueNoise = animatedBlueNoise(coord, uniforms.frameCount, 1 << 20);
 
     radiance += throughput * lightSample(blueNoise, position, normal, albedo);
 
@@ -544,17 +544,21 @@ fn directionInCosineWeightedHemisphere(u: vec2f) -> vec3f {
 }
 
 @must_use
-fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2f {
+fn animatedBlueNoise(coord: vec2u, frameCount: u32, frameCountCycle: u32) -> vec2f {
+    // Spatial component
     let idx = (coord.y % blueNoise.height) * blueNoise.width + (coord.x % blueNoise.width);
     let blueNoise = blueNoise.data[idx];
+
+    // Temporal component
     // 2-dimensional golden ratio additive recurrence sequence
     // https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
-    let n = frameIdx % totalSampleCount;
+    let n = frameCount % frameCountCycle;
     let a1 = 0.7548776662466927f;
     let a2 = 0.5698402909980532f;
     let r2Seq = fract(vec2(
         a1 * f32(n),
         a2 * f32(n)
     ));
+
     return fract(blueNoise + r2Seq);
 }
