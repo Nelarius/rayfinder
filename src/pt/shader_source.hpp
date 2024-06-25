@@ -1324,20 +1324,36 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let sampleBufferIdx = textureIdx.y * u32(uniforms.framebufferSize.x) + textureIdx.x;
     let sample: array<f32, 3> = sampleBuffer[sampleBufferIdx];
     let currentColor = vec3f(sample[0], sample[1], sample[2]);
-    var color = vec3f(0f);
+
+    var outputColor = vec3f(0f);
     if uniforms.frameCount == 0u {
         accumulationBuffer[sampleBufferIdx] = sample;
-        color = currentColor;
+        outputColor = currentColor;
     } else {
-        let previousSample: array<f32, 3> = accumulationBuffer[sampleBufferIdx];
+        let depth = textureLoad(gbufferDepth, textureIdx, 0);
+        let previousUv = cameraReproject(uv, depth);
+        let previousTextureIdx = vec2u(floor(previousUv * uniforms.framebufferSize));
+        let previousSampleBufferIdx = previousTextureIdx.y * u32(uniforms.framebufferSize.x) + previousTextureIdx.x;
+        let previousSample: array<f32, 3> = accumulationBuffer[previousSampleBufferIdx];
         let previousColor = vec3f(previousSample[0], previousSample[1], previousSample[2]);
-        color = 0.1 * currentColor + 0.9 * previousColor;
-        accumulationBuffer[sampleBufferIdx] = array<f32, 3>(color.r, color.g, color.b);
+        outputColor = 0.1 * currentColor + 0.9 * previousColor;
+        accumulationBuffer[sampleBufferIdx] = array<f32, 3>(outputColor.r, outputColor.g, outputColor.b);
     }
 
-    let rgb = acesFilmic(uniforms.exposure * color);
+    let rgb = acesFilmic(uniforms.exposure * outputColor);
     let srgb = pow(rgb, vec3(1f / 2.2f));
     return vec4(srgb, 1f);
+}
+
+@must_use
+fn cameraReproject(uv: vec2f, depth: f32) -> vec2f {
+    let ndc = vec4f(2f * vec2(uv.x, 1f - uv.y) - vec2(1f), depth, 1f);
+    let worldInvW = uniforms.currentInverseViewProjectionMat * ndc;
+    let world = worldInvW / worldInvW.w;
+    let previousClip = uniforms.previousViewProjectionMat * world;
+    let previousNdc = previousClip / previousClip.w;
+    let flippedUv = 0.5 * previousNdc.xy + 0.5;
+    return vec2(flippedUv.x, 1.0 - flippedUv.y);
 }
 
 @must_use
