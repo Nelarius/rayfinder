@@ -1814,7 +1814,7 @@ DeferredRenderer::ResolvePass::ResolvePass(
     mGbufferBindGroupLayout = GpuBindGroupLayout{
         gpuContext.device,
         "Resolve pass gbuffer bind group layout",
-        textureBindGroupLayoutEntry(0, WGPUTextureSampleType_Depth, WGPUShaderStage_Compute)};
+        textureBindGroupLayoutEntry(0, WGPUTextureSampleType_Depth, WGPUShaderStage_Fragment)};
 
     mGbufferBindGroup = GpuBindGroup{
         gpuContext.device,
