@@ -624,7 +624,8 @@ fn animatedBlueNoise(coord: vec2u, frameIdx: u32, totalSampleCount: u32) -> vec2
 )";
 
 const char* const DEFERRED_RENDERER_GBUFFER_PASS_SOURCE = R"(struct Uniforms {
-    viewReverseZProjectionMat: mat4x4f
+    viewReverseZProjectionMat: mat4x4f,
+    jitterMat: mat4x4f
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -644,7 +645,7 @@ struct VertexOutput {
 @vertex
 fn vsMain(in: VertexInput) -> VertexOutput {
     var out: VertexOutput;
-    out.position = uniforms.viewReverseZProjectionMat * in.position;
+    out.position = uniforms.jitterMat * uniforms.viewReverseZProjectionMat * in.position;
     out.normal = in.normal;
     out.texCoord = in.texCoord;
     return out;

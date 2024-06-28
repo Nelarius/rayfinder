@@ -109,6 +109,7 @@ private:
         struct Uniforms
         {
             glm::mat4 viewProjectionMat;
+            glm::mat4 jitterMat;
         };
 
     public:
@@ -125,6 +126,7 @@ private:
         void render(
             const GpuContext&  gpuContext,
             const glm::mat4&   viewProjectionMat,
+            const glm::mat4&   jitterMat,
             WGPUCommandEncoder cmdEncoder,
             WGPUTextureView    depthTextureView,
             WGPUTextureView    albedoTextureView,
