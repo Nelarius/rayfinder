@@ -300,15 +300,14 @@ void DeferredRenderer::render(
 
     const Extent2f      framebufferSize = Extent2f(renderDesc.framebufferSize);
     const std::uint32_t frameCount = mFrameCount++;
-    const glm::mat4     jitterMat = [framebufferSize, frameCount]() -> glm::mat4 {
-        glm::mat4       jitterMat = glm::mat4(1.0f);
-        const glm::vec2 j = r2Sequence(frameCount, 1 << 20);
-        jitterMat[3][0] = (j.x - 0.5f) / framebufferSize.x;
-        jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
-        return jitterMat;
-    }();
-    const glm::mat4 jitterViewReverseZProjectionMat =
-        jitterMat * renderDesc.viewReverseZProjectionMatrix;
+    // const glm::mat4     jitterMat = [framebufferSize, frameCount]() -> glm::mat4 {
+    //     glm::mat4       jitterMat = glm::mat4(1.0f);
+    //     const glm::vec2 j = r2Sequence(frameCount, 1 << 20);
+    //     jitterMat[3][0] = (j.x - 0.5f) / framebufferSize.x;
+    //     jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
+    //     return jitterMat;
+    // }();
+    const glm::mat4 jitterViewReverseZProjectionMat = renderDesc.viewReverseZProjectionMatrix;
 
     // GBuffer pass
 
@@ -559,6 +558,9 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
     mDebugPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
     mLightingPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
     mResolvePass.resize(gpuContext, mDepthTextureView);
+
+    // Invalidate the accumulation buffer
+    mFrameCount = 0u;
 }
 
 DeferredRenderer::GbufferPass::GbufferPass(

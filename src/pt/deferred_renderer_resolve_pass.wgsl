@@ -48,7 +48,9 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
         outputColor = currentColor;
     } else {
         let depth = textureLoad(gbufferDepth, textureIdx, 0);
+        // let depth = bilinearDepth(uv);
         let previousUv = cameraReproject(uv, depth);
+        // let previousColor = bilinearSample(previousUv);
         let previousTextureIdx = vec2u(floor(previousUv * uniforms.framebufferSize));
         let previousSampleBufferIdx = previousTextureIdx.y * u32(uniforms.framebufferSize.x) + previousTextureIdx.x;
         let previousSample: array<f32, 3> = accumulationBuffer[previousSampleBufferIdx];
@@ -71,6 +73,43 @@ fn cameraReproject(uv: vec2f, depth: f32) -> vec2f {
     let previousNdc = previousClip / previousClip.w;
     let flippedUv = 0.5 * previousNdc.xy + 0.5;
     return vec2(flippedUv.x, 1.0 - flippedUv.y);
+}
+
+@must_use
+fn bilinearSample(uv: vec2f) -> vec3f {
+    let textureIdx = vec2u(floor(uv * uniforms.framebufferSize));
+    let stride = u32(uniforms.framebufferSize.x);
+    let tlIdx = textureIdx.y * stride + textureIdx.x;
+    let trIdx = tlIdx + 1u;
+    let blIdx = (textureIdx.y + 1u) * stride + textureIdx.x;
+    let brIdx = blIdx + 1u;
+    let tl: array<f32, 3> = accumulationBuffer[tlIdx];
+    let tr: array<f32, 3> = accumulationBuffer[trIdx];
+    let bl: array<f32, 3> = accumulationBuffer[blIdx];
+    let br: array<f32, 3> = accumulationBuffer[brIdx];
+    let ctl = vec3f(tl[0], tl[1], tl[2]);
+    let ctr = vec3f(tr[0], tr[1], tr[2]);
+    let cbl = vec3f(bl[0], bl[1], bl[2]);
+    let cbr = vec3f(br[0], br[1], br[2]);
+    let tx = fract(uv.x * uniforms.framebufferSize.x);
+    let top = mix(ctl, ctr, tx);
+    let bottom = mix(cbl, cbr, tx);
+    let ty = fract(uv.y * uniforms.framebufferSize.y);
+    return mix(top, bottom, ty);
+}
+
+@must_use
+fn bilinearDepth(uv: vec2f) -> f32 {
+    let textureIdx = vec2u(floor(uv * uniforms.framebufferSize));
+    let tl = textureLoad(gbufferDepth, textureIdx, 0);
+    let tr = textureLoad(gbufferDepth, textureIdx + vec2u(1u, 0u), 0);
+    let bl = textureLoad(gbufferDepth, textureIdx + vec2u(0u, 1u), 0);
+    let br = textureLoad(gbufferDepth, textureIdx + vec2u(1u, 1u), 0);
+    let tx = fract(uv.x * uniforms.framebufferSize.x);
+    let top = mix(tl, tr, tx);
+    let bottom = mix(bl, br, tx);
+    let ty = fract(uv.y * uniforms.framebufferSize.y);
+    return mix(top, bottom, ty);
 }
 
 @must_use

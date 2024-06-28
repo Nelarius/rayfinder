@@ -56,7 +56,7 @@ struct UiState
     float                skyTurbidity = 1.0f;
     std::array<float, 3> skyAlbedo = {1.0f, 1.0f, 1.0f};
     // tonemapping
-    int exposureStops = 2;
+    int exposureStops = 5;
 };
 
 struct AppState
