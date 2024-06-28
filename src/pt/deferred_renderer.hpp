@@ -282,6 +282,8 @@ private:
     WGPUTextureView           mAlbedoTextureView;
     WGPUTexture               mNormalTexture;
     WGPUTextureView           mNormalTextureView;
+    WGPUTexture               mVelocityTexture;
+    WGPUTextureView           mVelocityTextureView;
     GpuBuffer                 mSampleBuffer;
     WGPUQuerySet              mQuerySet;
     GpuBuffer                 mQueryBuffer;

@@ -22,6 +22,7 @@ namespace
 const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth32Float;
 const WGPUTextureFormat ALBEDO_TEXTURE_FORMAT = WGPUTextureFormat_BGRA8Unorm;
 const WGPUTextureFormat NORMAL_TEXTURE_FORMAT = WGPUTextureFormat_RGBA16Float;
+const WGPUTextureFormat VELOCITY_TEXTURE_FORMAT = WGPUTextureFormat_RG16Float;
 
 struct TimestampsLayout
 {
@@ -96,6 +97,8 @@ DeferredRenderer::DeferredRenderer(
       mAlbedoTextureView(nullptr),
       mNormalTexture(nullptr),
       mNormalTextureView(nullptr),
+      mVelocityTexture(nullptr),
+      mVelocityTextureView(nullptr),
       mSampleBuffer(
           gpuContext.device,
           "Deferred renderer :: sample buffer",
@@ -178,6 +181,18 @@ DeferredRenderer::DeferredRenderer(
         mNormalTexture, "Gbuffer normal texture view", NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTextureView != nullptr);
 
+    mVelocityTexture = createGbufferTexture(
+        gpuContext.device,
+        "Gbuffer velocity texture",
+        WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        rendererDesc.framebufferSize,
+        VELOCITY_TEXTURE_FORMAT);
+    NLRS_ASSERT(mVelocityTexture != nullptr);
+
+    mVelocityTextureView = createGbufferTextureView(
+        mVelocityTexture, "Gbuffer velocity texture view", VELOCITY_TEXTURE_FORMAT);
+    NLRS_ASSERT(mVelocityTextureView != nullptr);
+
     {
         const WGPUQuerySetDescriptor querySetDesc{
             .nextInChain = nullptr,
@@ -210,6 +225,10 @@ DeferredRenderer::~DeferredRenderer()
 {
     querySetSafeRelease(mQuerySet);
     mQuerySet = nullptr;
+    textureViewSafeRelease(mVelocityTextureView);
+    mVelocityTextureView = nullptr;
+    textureSafeRelease(mVelocityTexture);
+    mVelocityTexture = nullptr;
     textureViewSafeRelease(mNormalTextureView);
     mNormalTextureView = nullptr;
     textureSafeRelease(mNormalTexture);
@@ -240,6 +259,10 @@ DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
         other.mNormalTexture = nullptr;
         mNormalTextureView = other.mNormalTextureView;
         other.mNormalTextureView = nullptr;
+        mVelocityTexture = other.mVelocityTexture;
+        other.mVelocityTexture = nullptr;
+        mVelocityTextureView = other.mVelocityTextureView;
+        other.mVelocityTextureView = nullptr;
         mSampleBuffer = std::move(other.mSampleBuffer);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
@@ -271,6 +294,10 @@ DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
         other.mNormalTexture = nullptr;
         mNormalTextureView = other.mNormalTextureView;
         other.mNormalTextureView = nullptr;
+        mVelocityTexture = other.mVelocityTexture;
+        other.mVelocityTexture = nullptr;
+        mVelocityTextureView = other.mVelocityTextureView;
+        other.mVelocityTextureView = nullptr;
         mSampleBuffer = std::move(other.mSampleBuffer);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
@@ -1045,8 +1072,8 @@ void DeferredRenderer::GbufferPass::render(
                 .resolveTarget = nullptr,
                 .loadOp = WGPULoadOp_Clear,
                 .storeOp = WGPUStoreOp_Store,
-                .clearValue = WGPUColor{0.0, 0.0, 0.0, 1.0},
-            }};
+                .clearValue = WGPUColor{0.0, 0.0, 0.0, 1.0}},
+            WGPURenderPassColorAttachment{}};
 
         const WGPURenderPassDepthStencilAttachment depthStencilAttachment{
             .view = depthTextureView,

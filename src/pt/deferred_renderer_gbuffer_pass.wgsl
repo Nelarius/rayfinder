@@ -1,6 +1,6 @@
 struct Uniforms {
     viewReverseZProjectionMat: mat4x4f,
-    jitterMat: mat4x4f
+    jitterMat: mat4x4f,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -32,6 +32,7 @@ fn vsMain(in: VertexInput) -> VertexOutput {
 struct GbufferOutput {
     @location(0) albedo: vec4<f32>,
     @location(1) normal: vec4<f32>,
+    @location(2) velocity: vec2<f32>,
 }
 
 @fragment
