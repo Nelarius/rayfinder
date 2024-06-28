@@ -76,6 +76,15 @@ WGPUTextureView createGbufferTextureView(
     };
     return wgpuTextureCreateView(texture, &desc);
 }
+
+glm::mat4 jitterMatrix(const Extent2f& framebufferSize, const std::uint32_t frameCount)
+{
+    glm::mat4       jitterMat = glm::mat4(1.0f);
+    const glm::vec2 j = r2Sequence(frameCount, 1 << 20);
+    jitterMat[3][0] = (j.x - 0.5f) / framebufferSize.x;
+    jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
+    return jitterMat;
+}
 } // namespace
 
 DeferredRenderer::DeferredRenderer(
@@ -299,13 +308,7 @@ void DeferredRenderer::render(
 
     const Extent2f      framebufferSize = Extent2f(renderDesc.framebufferSize);
     const std::uint32_t frameCount = mFrameCount++;
-    const glm::mat4     jitterMat = [framebufferSize, frameCount]() -> glm::mat4 {
-        glm::mat4       jitterMat = glm::mat4(1.0f);
-        const glm::vec2 j = r2Sequence(frameCount, 1 << 20);
-        jitterMat[3][0] = (j.x - 0.5f) / framebufferSize.x;
-        jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
-        return jitterMat;
-    }();
+    const glm::mat4     jitterMat = jitterMatrix(framebufferSize, frameCount);
 
     // GBuffer pass
 
@@ -315,7 +318,8 @@ void DeferredRenderer::render(
         offsetof(TimestampsLayout, gbufferPassStart) / TimestampsLayout::MEMBER_SIZE);
     mGbufferPass.render(
         gpuContext,
-        jitterMat * renderDesc.viewReverseZProjectionMatrix,
+        renderDesc.viewReverseZProjectionMatrix,
+        jitterMat,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
@@ -457,9 +461,12 @@ void DeferredRenderer::renderDebug(
         return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
     }();
 
+    const glm::mat4 jitterMat = jitterMatrix(framebufferSize, mFrameCount);
+
     mGbufferPass.render(
         gpuContext,
         viewProjectionMat,
+        jitterMat,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
@@ -1010,12 +1017,13 @@ DeferredRenderer::GbufferPass& DeferredRenderer::GbufferPass::operator=(
 void DeferredRenderer::GbufferPass::render(
     const GpuContext&        gpuContext,
     const glm::mat4&         viewReverseZProjectionMatrix,
+    const glm::mat4&         jitterMat,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    depthTextureView,
     const WGPUTextureView    albedoTextureView,
     const WGPUTextureView    normalTextureView)
 {
-    const Uniforms uniforms{viewReverseZProjectionMatrix};
+    const Uniforms uniforms{viewReverseZProjectionMatrix, jitterMat};
     wgpuQueueWriteBuffer(gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
 
     const WGPURenderPassEncoder renderPassEncoder = [cmdEncoder,
