@@ -274,6 +274,8 @@ private:
             Gui&               gui);
     };
 
+    void invalidateTemporalAccumulation();
+
     WGPUTexture               mDepthTexture;
     WGPUTextureView           mDepthTextureView;
     WGPUTexture               mAlbedoTexture;

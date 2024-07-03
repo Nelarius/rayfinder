@@ -555,6 +555,8 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
 
     mDebugPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
     mLightingPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
+
+    invalidateTemporalAccumulation();
 }
 
 DeferredRenderer::GbufferPass::GbufferPass(
@@ -2040,5 +2042,12 @@ DeferredRenderer::PerfStats DeferredRenderer::getPerfStats() const
             static_cast<float>(std::accumulate(
                 mResolvePassDurationsNs.begin(), mResolvePassDurationsNs.end(), 0ll)) /
             mResolvePassDurationsNs.size()};
+}
+
+void DeferredRenderer::invalidateTemporalAccumulation()
+{
+    // In the first frame of the accumulation sequence, we are forced to write the lighting pass
+    // sample straight to the accumulation buffer. This effectively resets the accumulation.
+    mFrameCount = 0;
 }
 } // namespace nlrs
