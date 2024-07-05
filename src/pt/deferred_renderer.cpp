@@ -78,6 +78,7 @@ WGPUTextureView createGbufferTextureView(
     return wgpuTextureCreateView(texture, &desc);
 }
 
+// TODO: re-enable jitter
 // glm::mat4 jitterMatrix(const Extent2f& framebufferSize, const std::uint32_t frameCount)
 // {
 //     glm::mat4       jitterMat = glm::mat4(1.0f);
@@ -219,7 +220,7 @@ DeferredRenderer::DeferredRenderer(
         rendererDesc.scenePositionAttributes,
         rendererDesc.sceneVertexAttributes,
         rendererDesc.sceneBaseColorTextures};
-    mResolvePass = ResolvePass{gpuContext, mSampleBuffer, rendererDesc};
+    mResolvePass = ResolvePass{gpuContext, mSampleBuffer, mVelocityTextureView, rendererDesc};
 }
 
 DeferredRenderer::~DeferredRenderer()
@@ -611,6 +612,7 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
         mDepthTextureView,
         mVelocityTextureView);
     mLightingPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
+    mResolvePass.resize(gpuContext, mSampleBuffer, mVelocityTextureView);
 
     invalidateTemporalAccumulation();
 }
@@ -1848,6 +1850,7 @@ void DeferredRenderer::LightingPass::resize(
 DeferredRenderer::ResolvePass::ResolvePass(
     const GpuContext&                 gpuContext,
     const GpuBuffer&                  sampleBuffer,
+    const WGPUTextureView             velocityTextureView,
     const DeferredRendererDescriptor& rendererDesc)
     : mVertexBuffer{gpuContext.device, "Resolve pass vertex buffer", {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst}, std::span<const float[2]>(quadVertexData)},
       mUniformBuffer{
@@ -1861,6 +1864,7 @@ DeferredRenderer::ResolvePass::ResolvePass(
           "Deferred renderer :: accumulation buffer",
           GpuBufferUsages{GpuBufferUsage::Storage},
           3 * sizeof(float) * area(rendererDesc.maxFramebufferSize)},
+      mTaaBindGroupLayout{},
       mTaaBindGroup{},
       mPipeline(nullptr)
 {
@@ -1875,25 +1879,29 @@ DeferredRenderer::ResolvePass::ResolvePass(
         uniformBindGroupLayout.ptr(),
         mUniformBuffer.bindGroupEntry(0)};
 
-    const GpuBindGroupLayout taaBindGroupLayout{
+    mTaaBindGroupLayout = GpuBindGroupLayout{
         gpuContext.device,
         "TAA bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 2>{
+        std::array<WGPUBindGroupLayoutEntry, 3>{
             sampleBuffer.bindGroupLayoutEntry(0, WGPUShaderStage_Fragment),
-            mAccumulationBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment)}};
+            mAccumulationBuffer.bindGroupLayoutEntry(1, WGPUShaderStage_Fragment),
+            textureBindGroupLayoutEntry(
+                2, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Fragment)}};
 
     mTaaBindGroup = GpuBindGroup{
         gpuContext.device,
         "TAA bind group",
-        taaBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 2>{
-            sampleBuffer.bindGroupEntry(0), mAccumulationBuffer.bindGroupEntry(1)}};
+        mTaaBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            sampleBuffer.bindGroupEntry(0),
+            mAccumulationBuffer.bindGroupEntry(1),
+            textureBindGroupEntry(2, velocityTextureView)}};
 
     {
         // Pipeline layout
 
         const WGPUBindGroupLayout bindGroupLayouts[] = {
-            uniformBindGroupLayout.ptr(), taaBindGroupLayout.ptr()};
+            uniformBindGroupLayout.ptr(), mTaaBindGroupLayout.ptr()};
 
         const WGPUPipelineLayoutDescriptor pipelineLayoutDesc{
             .nextInChain = nullptr,
@@ -2028,6 +2036,7 @@ DeferredRenderer::ResolvePass::ResolvePass(ResolvePass&& other) noexcept
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
         mAccumulationBuffer = std::move(other.mAccumulationBuffer);
+        mTaaBindGroupLayout = std::move(other.mTaaBindGroupLayout);
         mTaaBindGroup = std::move(other.mTaaBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
@@ -2043,6 +2052,7 @@ DeferredRenderer::ResolvePass& DeferredRenderer::ResolvePass::operator=(
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
         mAccumulationBuffer = std::move(other.mAccumulationBuffer);
+        mTaaBindGroupLayout = std::move(other.mTaaBindGroupLayout);
         mTaaBindGroup = std::move(other.mTaaBindGroup);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
@@ -2102,6 +2112,21 @@ void DeferredRenderer::ResolvePass::render(
     gui.render(renderPass);
 
     wgpuRenderPassEncoderEnd(renderPass);
+}
+
+void DeferredRenderer::ResolvePass::resize(
+    const GpuContext&     gpuContext,
+    const GpuBuffer&      sampleBuffer,
+    const WGPUTextureView velocityTextureView)
+{
+    mTaaBindGroup = GpuBindGroup{
+        gpuContext.device,
+        "TAA bind group",
+        mTaaBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            sampleBuffer.bindGroupEntry(0),
+            mAccumulationBuffer.bindGroupEntry(1),
+            textureBindGroupEntry(2, velocityTextureView)}};
 }
 
 DeferredRenderer::PerfStats DeferredRenderer::getPerfStats() const

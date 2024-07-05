@@ -13,6 +13,7 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
+    // TODO: is there a better way? perhaps use position in fragment shader?
     @location(0) currentClip: vec4f,
     @location(1) previousClip: vec4f,
     @location(2) normal: vec4f,

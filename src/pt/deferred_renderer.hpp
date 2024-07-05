@@ -246,6 +246,7 @@ private:
         GpuBuffer          mUniformBuffer = GpuBuffer{};
         GpuBindGroup       mUniformBindGroup = GpuBindGroup{};
         GpuBuffer          mAccumulationBuffer = GpuBuffer{};
+        GpuBindGroupLayout mTaaBindGroupLayout = GpuBindGroupLayout{};
         GpuBindGroup       mTaaBindGroup = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
 
@@ -261,6 +262,7 @@ private:
         ResolvePass(
             const GpuContext&                 gpuContext,
             const GpuBuffer&                  sampleBuffer,
+            WGPUTextureView                   gbufferVelocityTextureView,
             const DeferredRendererDescriptor& desc);
         ~ResolvePass();
 
@@ -278,6 +280,10 @@ private:
             float              exposure,
             std::uint32_t      frameCount,
             Gui&               gui);
+        void resize(
+            const GpuContext& gpuContext,
+            const GpuBuffer&  sampleBuffer,
+            WGPUTextureView   gbufferVelocityTextureView);
     };
 
     void invalidateTemporalAccumulation();

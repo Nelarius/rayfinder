@@ -638,6 +638,7 @@ struct VertexInput {
 
 struct VertexOutput {
     @builtin(position) position: vec4f,
+    // TODO: is there a better way? perhaps use position in fragment shader?
     @location(0) currentClip: vec4f,
     @location(1) previousClip: vec4f,
     @location(2) normal: vec4f,
@@ -1328,6 +1329,7 @@ struct Uniforms {
 
 @group(1) @binding(0) var<storage, read_write> sampleBuffer: array<array<f32, 3>>;
 @group(1) @binding(1) var<storage, read_write> accumulationBuffer: array<array<f32, 3>>;
+@group(1) @binding(2) var gbufferVelocity: texture_2d<f32>;
 
 @fragment
 fn fsMain(in: VertexOutput) -> @location(0) vec4f {
@@ -1341,10 +1343,19 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
         accumulationBuffer[sampleBufferIdx] = sample;
         color = currentColor;
     } else {
-        let previousSample: array<f32, 3> = accumulationBuffer[sampleBufferIdx];
-        let previousColor = vec3f(previousSample[0], previousSample[1], previousSample[2]);
-        color = 0.1 * currentColor + 0.9 * previousColor;
-        accumulationBuffer[sampleBufferIdx] = array<f32, 3>(color.r, color.g, color.b);
+        let uvVelocity = textureLoad(gbufferVelocity, textureIdx, 0).rg;
+        let previousUv = uv + uvVelocity;
+        if previousUv.x >= 0f && previousUv.x < 1f && previousUv.y >= 0f && previousUv.y < 1f {
+            let previousTextureIdx = vec2u(floor(previousUv * uniforms.framebufferSize));
+            let previousSampleBufferIdx = previousTextureIdx.y * u32(uniforms.framebufferSize.x) + previousTextureIdx.x;
+            let previousSample = accumulationBuffer[previousSampleBufferIdx];
+            let previousColor = vec3f(previousSample[0], previousSample[1], previousSample[2]);
+            color = 0.1 * currentColor + 0.9 * previousColor;
+            accumulationBuffer[sampleBufferIdx] = array<f32, 3>(color.r, color.g, color.b);
+        } else {
+            accumulationBuffer[sampleBufferIdx] = sample;
+            color = currentColor;
+        }
     }
 
     let rgb = acesFilmic(uniforms.exposure * color);
