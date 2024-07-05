@@ -42,22 +42,27 @@ fn fsMain(in: VertexOutput) -> @location(0) vec4f {
     let sample: array<f32, 3> = sampleBuffer[sampleBufferIdx];
     let currentColor = vec3f(sample[0], sample[1], sample[2]);
 
-    var outputColor = vec3f(0f);
+    var color = vec3f(0f);
     if uniforms.frameCount == 0u {
         accumulationBuffer[sampleBufferIdx] = sample;
-        outputColor = currentColor;
+        color = currentColor;
     } else {
         let depth = textureLoad(gbufferDepth, textureIdx, 0);
         let previousUv = cameraReproject(uv, depth);
-        let previousTextureIdx = vec2u(floor(previousUv * uniforms.framebufferSize));
-        let previousSampleBufferIdx = previousTextureIdx.y * u32(uniforms.framebufferSize.x) + previousTextureIdx.x;
-        let previousSample: array<f32, 3> = accumulationBuffer[previousSampleBufferIdx];
-        let previousColor = vec3f(previousSample[0], previousSample[1], previousSample[2]);
-        outputColor = 0.1 * currentColor + 0.9 * previousColor;
-        accumulationBuffer[sampleBufferIdx] = array<f32, 3>(outputColor.r, outputColor.g, outputColor.b);
+        if previousUv.x >= 0f && previousUv.x < 1f && previousUv.y >= 0f && previousUv.y < 1f {
+            let previousTextureIdx = vec2u(floor(previousUv * uniforms.framebufferSize));
+            let previousSampleBufferIdx = previousTextureIdx.y * u32(uniforms.framebufferSize.x) + previousTextureIdx.x;
+            let previousSample: array<f32, 3> = accumulationBuffer[previousSampleBufferIdx];
+            let previousColor = vec3f(previousSample[0], previousSample[1], previousSample[2]);
+            color = 0.1 * currentColor + 0.9 * previousColor;
+            accumulationBuffer[sampleBufferIdx] = array<f32, 3>(color.r, color.g, color.b);
+        } else {
+            accumulationBuffer[sampleBufferIdx] = sample;
+            color = currentColor;
+        }
     }
 
-    let rgb = acesFilmic(uniforms.exposure * outputColor);
+    let rgb = acesFilmic(uniforms.exposure * color);
     let srgb = pow(rgb, vec3(1f / 2.2f));
     return vec4(srgb, 1f);
 }
