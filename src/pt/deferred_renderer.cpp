@@ -249,6 +249,7 @@ DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
 {
     if (this != &other)
     {
+        // TODO: release existing resources
         mDepthTexture = other.mDepthTexture;
         other.mDepthTexture = nullptr;
         mDepthTextureView = other.mDepthTextureView;
