@@ -22,7 +22,7 @@ namespace
 const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth32Float;
 const WGPUTextureFormat ALBEDO_TEXTURE_FORMAT = WGPUTextureFormat_BGRA8Unorm;
 const WGPUTextureFormat NORMAL_TEXTURE_FORMAT = WGPUTextureFormat_RGBA16Float;
-const WGPUTextureFormat VELOCITY_TEXTURE_FORMAT = WGPUTextureFormat_RG16Float;
+const WGPUTextureFormat VELOCITY_TEXTURE_FORMAT = WGPUTextureFormat_RG32Float;
 
 struct TimestampsLayout
 {
@@ -956,7 +956,7 @@ DeferredRenderer::GbufferPass::GbufferPass(
             {
                 .nextInChain = nullptr,
                 .format = VELOCITY_TEXTURE_FORMAT,
-                .blend = &blendState,
+                .blend = nullptr,
                 .writeMask = WGPUColorWriteMask_All,
             }};
 
