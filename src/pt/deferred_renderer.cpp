@@ -250,19 +250,26 @@ DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
 {
     if (this != &other)
     {
+        textureSafeRelease(mDepthTexture);
         mDepthTexture = other.mDepthTexture;
         other.mDepthTexture = nullptr;
+        textureViewSafeRelease(mDepthTextureView);
         mDepthTextureView = other.mDepthTextureView;
         other.mDepthTextureView = nullptr;
+        textureSafeRelease(mAlbedoTexture);
         mAlbedoTexture = other.mAlbedoTexture;
         other.mAlbedoTexture = nullptr;
+        textureViewSafeRelease(mAlbedoTextureView);
         mAlbedoTextureView = other.mAlbedoTextureView;
         other.mAlbedoTextureView = nullptr;
+        textureSafeRelease(mNormalTexture);
         mNormalTexture = other.mNormalTexture;
         other.mNormalTexture = nullptr;
+        textureViewSafeRelease(mNormalTextureView);
         mNormalTextureView = other.mNormalTextureView;
         other.mNormalTextureView = nullptr;
         mSampleBuffer = std::move(other.mSampleBuffer);
+        querySetSafeRelease(mQuerySet);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
         mQueryBuffer = std::move(other.mQueryBuffer);
@@ -1001,6 +1008,7 @@ DeferredRenderer::GbufferPass& DeferredRenderer::GbufferPass::operator=(
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
         mSamplerBindGroup = std::move(other.mSamplerBindGroup);
+        renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
     }
