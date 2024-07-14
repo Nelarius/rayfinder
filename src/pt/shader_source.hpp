@@ -807,6 +807,10 @@ const T_MAX = 10000f;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) globalInvocationId: vec3<u32>) {
+    if globalInvocationId.x >= u32(uniforms.framebufferSize.x) || globalInvocationId.y >= u32(uniforms.framebufferSize.y) {
+        return;
+    }
+
     let textureIdx = globalInvocationId.xy;
     let uv = (vec2f(globalInvocationId.xy) + vec2f(0.5)) / uniforms.framebufferSize;
 
@@ -1214,10 +1218,10 @@ fn offsetPosition(p: vec3f, n: vec3f) -> vec3f {
     // Source: A Fast and Robust Method for Avoiding Self-Intersection, Ray Tracing Gems
     let offset = vec3i(i32(INT_SCALE * n.x), i32(INT_SCALE * n.y), i32(INT_SCALE * n.z));
     // Offset added straight into the mantissa bits to ensure the offset is scale-invariant,
-    // except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
+    // )"
+R"(except for when close to the origin, where we use FLOAT_SCALE as a small epsilon.
     let po = vec3f(
-        bitcast<f32>(bitcast<i32>(p.x) + sele)"
-R"(ct(offset.x, -offset.x, (p.x < 0))),
+        bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
         bitcast<f32>(bitcast<i32>(p.y) + select(offset.y, -offset.y, (p.y < 0))),
         bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
     );

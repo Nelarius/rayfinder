@@ -95,6 +95,10 @@ const T_MAX = 10000f;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) globalInvocationId: vec3<u32>) {
+    if globalInvocationId.x >= u32(uniforms.framebufferSize.x) || globalInvocationId.y >= u32(uniforms.framebufferSize.y) {
+        return;
+    }
+
     let textureIdx = globalInvocationId.xy;
     let uv = (vec2f(globalInvocationId.xy) + vec2f(0.5)) / uniforms.framebufferSize;
 
