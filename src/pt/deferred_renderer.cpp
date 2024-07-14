@@ -22,6 +22,7 @@ namespace
 const WGPUTextureFormat DEPTH_TEXTURE_FORMAT = WGPUTextureFormat_Depth32Float;
 const WGPUTextureFormat ALBEDO_TEXTURE_FORMAT = WGPUTextureFormat_BGRA8Unorm;
 const WGPUTextureFormat NORMAL_TEXTURE_FORMAT = WGPUTextureFormat_RGBA16Float;
+const WGPUTextureFormat VELOCITY_TEXTURE_FORMAT = WGPUTextureFormat_RG16Float;
 
 struct TimestampsLayout
 {
@@ -77,14 +78,14 @@ WGPUTextureView createGbufferTextureView(
     return wgpuTextureCreateView(texture, &desc);
 }
 
-glm::mat4 jitterMatrix(const Extent2f& framebufferSize, const std::uint32_t frameCount)
-{
-    glm::mat4       jitterMat = glm::mat4(1.0f);
-    const glm::vec2 j = r2Sequence(frameCount, 1 << 20);
-    jitterMat[3][0] = (j.x - 0.5f) / framebufferSize.x;
-    jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
-    return jitterMat;
-}
+// glm::mat4 jitterMatrix(const Extent2f& framebufferSize, const std::uint32_t frameCount)
+// {
+//     glm::mat4       jitterMat = glm::mat4(1.0f);
+//     const glm::vec2 j = r2Sequence(frameCount, 1 << 20);
+//     jitterMat[3][0] = (j.x - 0.5f) / framebufferSize.x;
+//     jitterMat[3][1] = (j.y - 0.5f) / framebufferSize.y;
+//     return jitterMat;
+// }
 } // namespace
 
 DeferredRenderer::DeferredRenderer(
@@ -96,6 +97,8 @@ DeferredRenderer::DeferredRenderer(
       mAlbedoTextureView(nullptr),
       mNormalTexture(nullptr),
       mNormalTextureView(nullptr),
+      mVelocityTexture(nullptr),
+      mVelocityTextureView(nullptr),
       mSampleBuffer(
           gpuContext.device,
           "Deferred renderer :: sample buffer",
@@ -178,6 +181,18 @@ DeferredRenderer::DeferredRenderer(
         mNormalTexture, "Gbuffer normal texture view", NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTextureView != nullptr);
 
+    mVelocityTexture = createGbufferTexture(
+        gpuContext.device,
+        "Gbuffer velocity texture",
+        WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        rendererDesc.framebufferSize,
+        VELOCITY_TEXTURE_FORMAT);
+    NLRS_ASSERT(mVelocityTexture != nullptr);
+
+    mVelocityTextureView = createGbufferTextureView(
+        mVelocityTexture, "Gbuffer velocity texture view", VELOCITY_TEXTURE_FORMAT);
+    NLRS_ASSERT(mVelocityTextureView != nullptr);
+
     {
         const WGPUQuerySetDescriptor querySetDesc{
             .nextInChain = nullptr,
@@ -192,6 +207,7 @@ DeferredRenderer::DeferredRenderer(
         mAlbedoTextureView,
         mNormalTextureView,
         mDepthTextureView,
+        mVelocityTextureView,
         rendererDesc.framebufferSize};
     mLightingPass = LightingPass{
         gpuContext,
@@ -210,6 +226,10 @@ DeferredRenderer::~DeferredRenderer()
 {
     querySetSafeRelease(mQuerySet);
     mQuerySet = nullptr;
+    textureViewSafeRelease(mVelocityTextureView);
+    mVelocityTextureView = nullptr;
+    textureSafeRelease(mVelocityTexture);
+    mVelocityTexture = nullptr;
     textureViewSafeRelease(mNormalTextureView);
     mNormalTextureView = nullptr;
     textureSafeRelease(mNormalTexture);
@@ -240,6 +260,10 @@ DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
         other.mNormalTexture = nullptr;
         mNormalTextureView = other.mNormalTextureView;
         other.mNormalTextureView = nullptr;
+        mVelocityTexture = other.mVelocityTexture;
+        other.mVelocityTexture = nullptr;
+        mVelocityTextureView = other.mVelocityTextureView;
+        other.mVelocityTextureView = nullptr;
         mSampleBuffer = std::move(other.mSampleBuffer);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
@@ -271,6 +295,10 @@ DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
         other.mNormalTexture = nullptr;
         mNormalTextureView = other.mNormalTextureView;
         other.mNormalTextureView = nullptr;
+        mVelocityTexture = other.mVelocityTexture;
+        other.mVelocityTexture = nullptr;
+        mVelocityTextureView = other.mVelocityTextureView;
+        other.mVelocityTextureView = nullptr;
         mSampleBuffer = std::move(other.mSampleBuffer);
         mQuerySet = other.mQuerySet;
         other.mQuerySet = nullptr;
@@ -308,7 +336,7 @@ void DeferredRenderer::render(
 
     const Extent2f      framebufferSize = Extent2f(renderDesc.framebufferSize);
     const std::uint32_t frameCount = mFrameCount++;
-    const glm::mat4     jitterMat = jitterMatrix(framebufferSize, frameCount);
+    // const glm::mat4     jitterMat = jitterMatrix(framebufferSize, frameCount);
 
     // GBuffer pass
 
@@ -318,12 +346,13 @@ void DeferredRenderer::render(
         offsetof(TimestampsLayout, gbufferPassStart) / TimestampsLayout::MEMBER_SIZE);
     mGbufferPass.render(
         gpuContext,
-        renderDesc.viewReverseZProjectionMatrix,
-        jitterMat,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
-        mNormalTextureView);
+        mNormalTextureView,
+        mVelocityTextureView,
+        renderDesc.viewReverseZProjectionMatrix,
+        frameCount);
     wgpuCommandEncoderWriteTimestamp(
         encoder,
         mQuerySet,
@@ -337,7 +366,7 @@ void DeferredRenderer::render(
         offsetof(TimestampsLayout, lightingPassStart) / TimestampsLayout::MEMBER_SIZE);
     {
         const glm::mat4 inverseViewProjectionMat =
-            glm::inverse(jitterMat * renderDesc.viewReverseZProjectionMatrix);
+            glm::inverse(renderDesc.viewReverseZProjectionMatrix);
         mLightingPass.render(
             gpuContext,
             encoder,
@@ -461,16 +490,18 @@ void DeferredRenderer::renderDebug(
         return wgpuDeviceCreateCommandEncoder(gpuContext.device, &cmdEncoderDesc);
     }();
 
-    const glm::mat4 jitterMat = jitterMatrix(framebufferSize, mFrameCount);
+    const std::uint32_t frameCount = mFrameCount++;
+    // const glm::mat4 jitterMat = jitterMatrix(framebufferSize, mFrameCount);
 
     mGbufferPass.render(
         gpuContext,
-        viewProjectionMat,
-        jitterMat,
         encoder,
         mDepthTextureView,
         mAlbedoTextureView,
-        mNormalTextureView);
+        mNormalTextureView,
+        mVelocityTextureView,
+        viewProjectionMat,
+        frameCount);
 
     mDebugPass.render(gpuContext, encoder, textureView, framebufferSize, gui);
 
@@ -494,6 +525,8 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
     textureSafeRelease(mAlbedoTexture);
     textureViewSafeRelease(mDepthTextureView);
     textureSafeRelease(mDepthTexture);
+    textureViewSafeRelease(mVelocityTextureView);
+    textureSafeRelease(mVelocityTexture);
 
     mNormalTextureView = nullptr;
     mNormalTexture = nullptr;
@@ -501,6 +534,8 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
     mAlbedoTexture = nullptr;
     mDepthTextureView = nullptr;
     mDepthTexture = nullptr;
+    mVelocityTextureView = nullptr;
+    mVelocityTexture = nullptr;
 
     {
         const std::array<WGPUTextureFormat, 1> depthFormats{
@@ -543,7 +578,6 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
         newSize,
         ALBEDO_TEXTURE_FORMAT);
     NLRS_ASSERT(mAlbedoTexture != nullptr);
-
     mAlbedoTextureView = createGbufferTextureView(
         mAlbedoTexture, "Gbuffer albedo texture view", ALBEDO_TEXTURE_FORMAT);
     NLRS_ASSERT(mAlbedoTextureView != nullptr);
@@ -555,12 +589,27 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
         newSize,
         NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTexture != nullptr);
-
     mNormalTextureView = createGbufferTextureView(
         mNormalTexture, "Gbuffer normal texture view", NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTextureView != nullptr);
 
-    mDebugPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
+    mVelocityTexture = createGbufferTexture(
+        gpuContext.device,
+        "Gbuffer velocity texture",
+        WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_TextureBinding,
+        newSize,
+        VELOCITY_TEXTURE_FORMAT);
+    NLRS_ASSERT(mVelocityTexture != nullptr);
+    mVelocityTextureView = createGbufferTextureView(
+        mVelocityTexture, "Gbuffer velocity texture view", VELOCITY_TEXTURE_FORMAT);
+    NLRS_ASSERT(mVelocityTextureView != nullptr);
+
+    mDebugPass.resize(
+        gpuContext,
+        mAlbedoTextureView,
+        mNormalTextureView,
+        mDepthTextureView,
+        mVelocityTextureView);
     mLightingPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
 
     invalidateTemporalAccumulation();
@@ -711,7 +760,8 @@ DeferredRenderer::GbufferPass::GbufferPass(
           sizeof(Uniforms)),
       mUniformBindGroup(),
       mSamplerBindGroup(),
-      mPipeline(nullptr)
+      mPipeline(nullptr),
+      mPreviousViewReverseZProjectionMat{glm::mat4(1.0f)}
 {
     const GpuBindGroupLayout uniformBindGroupLayout{
         gpuContext.device,
@@ -878,28 +928,35 @@ DeferredRenderer::GbufferPass::GbufferPass(
                 WGPUBlendComponent{
                     .operation = WGPUBlendOperation_Add,
                     .srcFactor = WGPUBlendFactor_One,
-                    .dstFactor = WGPUBlendFactor_OneMinusSrcAlpha,
+                    .dstFactor = WGPUBlendFactor_Zero,
                 },
             .alpha =
                 WGPUBlendComponent{
                     .operation = WGPUBlendOperation_Add,
-                    .srcFactor = WGPUBlendFactor_Zero,
-                    .dstFactor = WGPUBlendFactor_One,
+                    .srcFactor = WGPUBlendFactor_One,
+                    .dstFactor = WGPUBlendFactor_Zero,
                 },
         };
 
-        const std::array<WGPUColorTargetState, 2> colorTargets{
-            WGPUColorTargetState{
+        const WGPUColorTargetState colorTargets[] = {
+            {
                 .nextInChain = nullptr,
                 .format = ALBEDO_TEXTURE_FORMAT,
                 .blend = &blendState,
                 .writeMask = WGPUColorWriteMask_All,
             },
-            WGPUColorTargetState{
+            {
                 .nextInChain = nullptr,
                 .format = NORMAL_TEXTURE_FORMAT,
                 .blend = &blendState,
-                .writeMask = WGPUColorWriteMask_All}};
+                .writeMask = WGPUColorWriteMask_All,
+            },
+            {
+                .nextInChain = nullptr,
+                .format = VELOCITY_TEXTURE_FORMAT,
+                .blend = &blendState,
+                .writeMask = WGPUColorWriteMask_All,
+            }};
 
         const WGPUFragmentState fragmentState{
             .nextInChain = nullptr,
@@ -907,8 +964,8 @@ DeferredRenderer::GbufferPass::GbufferPass(
             .entryPoint = "fsMain",
             .constantCount = 0,
             .constants = nullptr,
-            .targetCount = colorTargets.size(),
-            .targets = colorTargets.data(),
+            .targetCount = std::size(colorTargets),
+            .targets = colorTargets,
         };
 
         // Pipeline
@@ -988,6 +1045,7 @@ DeferredRenderer::GbufferPass::GbufferPass(GbufferPass&& other) noexcept
         mSamplerBindGroup = std::move(other.mSamplerBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mPreviousViewReverseZProjectionMat = other.mPreviousViewReverseZProjectionMat;
     }
 }
 
@@ -1010,27 +1068,32 @@ DeferredRenderer::GbufferPass& DeferredRenderer::GbufferPass::operator=(
         mSamplerBindGroup = std::move(other.mSamplerBindGroup);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
+        mPreviousViewReverseZProjectionMat = other.mPreviousViewReverseZProjectionMat;
     }
     return *this;
 }
 
 void DeferredRenderer::GbufferPass::render(
     const GpuContext&        gpuContext,
-    const glm::mat4&         viewReverseZProjectionMatrix,
-    const glm::mat4&         jitterMat,
     const WGPUCommandEncoder cmdEncoder,
     const WGPUTextureView    depthTextureView,
     const WGPUTextureView    albedoTextureView,
-    const WGPUTextureView    normalTextureView)
+    const WGPUTextureView    normalTextureView,
+    const WGPUTextureView    velocityTextureView,
+    const glm::mat4&         viewReverseZProjectionMatrix,
+    const std::uint32_t      frameCount)
 {
-    const Uniforms uniforms{viewReverseZProjectionMatrix, jitterMat};
+    const glm::mat4& previousViewReverseZProjectionMat =
+        frameCount == 0 ? viewReverseZProjectionMatrix : mPreviousViewReverseZProjectionMat;
+    const Uniforms uniforms{viewReverseZProjectionMatrix, previousViewReverseZProjectionMat};
     wgpuQueueWriteBuffer(gpuContext.queue, mUniformBuffer.ptr(), 0, &uniforms, sizeof(Uniforms));
 
-    const WGPURenderPassEncoder renderPassEncoder = [cmdEncoder,
-                                                     depthTextureView,
-                                                     albedoTextureView,
-                                                     normalTextureView]() -> WGPURenderPassEncoder {
-        const std::array<WGPURenderPassColorAttachment, 2> colorAttachments{
+    mPreviousViewReverseZProjectionMat = viewReverseZProjectionMatrix;
+
+    const WGPURenderPassEncoder renderPassEncoder =
+        [cmdEncoder, depthTextureView, albedoTextureView, normalTextureView, velocityTextureView]()
+        -> WGPURenderPassEncoder {
+        const WGPURenderPassColorAttachment colorAttachments[] = {
             WGPURenderPassColorAttachment{
                 .nextInChain = nullptr,
                 .view = albedoTextureView,
@@ -1047,8 +1110,15 @@ void DeferredRenderer::GbufferPass::render(
                 .resolveTarget = nullptr,
                 .loadOp = WGPULoadOp_Clear,
                 .storeOp = WGPUStoreOp_Store,
-                .clearValue = WGPUColor{0.0, 0.0, 0.0, 1.0},
-            }};
+                .clearValue = WGPUColor{0.0, 0.0, 0.0, 1.0}},
+            WGPURenderPassColorAttachment{
+                .nextInChain = nullptr,
+                .view = velocityTextureView,
+                .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
+                .resolveTarget = nullptr,
+                .loadOp = WGPULoadOp_Clear,
+                .storeOp = WGPUStoreOp_Store,
+                .clearValue = WGPUColor{0.0, 0.0, 0.0, 0.0}}};
 
         const WGPURenderPassDepthStencilAttachment depthStencilAttachment{
             .view = depthTextureView,
@@ -1065,8 +1135,8 @@ void DeferredRenderer::GbufferPass::render(
         const WGPURenderPassDescriptor renderPassDesc = {
             .nextInChain = nullptr,
             .label = "Render pass encoder",
-            .colorAttachmentCount = colorAttachments.size(),
-            .colorAttachments = colorAttachments.data(),
+            .colorAttachmentCount = std::size(colorAttachments),
+            .colorAttachments = colorAttachments,
             .depthStencilAttachment = &depthStencilAttachment,
             .occlusionQuerySet = nullptr,
             .timestampWrites = nullptr,
@@ -1120,6 +1190,7 @@ DeferredRenderer::DebugPass::DebugPass(
     const WGPUTextureView gbufferAlbedoTextureView,
     const WGPUTextureView gbufferNormalTextureView,
     const WGPUTextureView gbufferDepthTextureView,
+    const WGPUTextureView gbufferVelocityTextureView,
     const Extent2u&       framebufferSize)
     : mVertexBuffer{gpuContext.device, "Vertex buffer", {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst}, std::span<const float[2]>(quadVertexData)},
       mUniformBuffer{},
@@ -1151,21 +1222,24 @@ DeferredRenderer::DebugPass::DebugPass(
     mGbufferBindGroupLayout = GpuBindGroupLayout{
         gpuContext.device,
         "Debug pass gbuffer bind group layout",
-        std::array<WGPUBindGroupLayoutEntry, 3>{
+        std::array<WGPUBindGroupLayoutEntry, 4>{
             textureBindGroupLayoutEntry(
                 0, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Fragment),
             textureBindGroupLayoutEntry(
                 1, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Fragment),
-            textureBindGroupLayoutEntry(2, WGPUTextureSampleType_Depth, WGPUShaderStage_Fragment)}};
+            textureBindGroupLayoutEntry(2, WGPUTextureSampleType_Depth, WGPUShaderStage_Fragment),
+            textureBindGroupLayoutEntry(
+                3, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Fragment)}};
 
     mGbufferBindGroup = GpuBindGroup{
         gpuContext.device,
         "Debug pass gbuffer bind group",
         mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 3>{
+        std::array<WGPUBindGroupEntry, 4>{
             textureBindGroupEntry(0, gbufferAlbedoTextureView),
             textureBindGroupEntry(1, gbufferNormalTextureView),
-            textureBindGroupEntry(2, gbufferDepthTextureView)}};
+            textureBindGroupEntry(2, gbufferDepthTextureView),
+            textureBindGroupEntry(3, gbufferVelocityTextureView)}};
 
     {
         // Pipeline layout
@@ -1380,16 +1454,18 @@ void DeferredRenderer::DebugPass::resize(
     const GpuContext&     gpuContext,
     const WGPUTextureView albedoTextureView,
     const WGPUTextureView normalTextureView,
-    const WGPUTextureView depthTextureView)
+    const WGPUTextureView depthTextureView,
+    const WGPUTextureView velocityTextureView)
 {
     mGbufferBindGroup = GpuBindGroup{
         gpuContext.device,
         "Debug pass gbuffer bind group",
         mGbufferBindGroupLayout.ptr(),
-        std::array<WGPUBindGroupEntry, 3>{
+        std::array<WGPUBindGroupEntry, 4>{
             textureBindGroupEntry(0, albedoTextureView),
             textureBindGroupEntry(1, normalTextureView),
-            textureBindGroupEntry(2, depthTextureView)}};
+            textureBindGroupEntry(2, depthTextureView),
+            textureBindGroupEntry(3, velocityTextureView)}};
 }
 
 DeferredRenderer::LightingPass::LightingPass(
@@ -1503,8 +1579,8 @@ DeferredRenderer::LightingPass::LightingPass(
         textureData.reserve((2 << 28) / sizeof(Texture::BgraPixel));
 
         // Texture descriptors and texture data need to appended in the order of
-        // sceneBaseColorTextures. The vertex attribute's `textureIdx` indexes into that array, and
-        // we want to use the same indices to index into the texture descriptor array.
+        // sceneBaseColorTextures. The vertex attribute's `textureIdx` indexes into that array,
+        // and we want to use the same indices to index into the texture descriptor array.
 
         for (const Texture& baseColorTexture : sceneBaseColorTextures)
         {

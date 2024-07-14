@@ -105,11 +105,12 @@ private:
         GpuBindGroup              mUniformBindGroup{};
         GpuBindGroup              mSamplerBindGroup{};
         WGPURenderPipeline        mPipeline = nullptr;
+        glm::mat4                 mPreviousViewReverseZProjectionMat{};
 
         struct Uniforms
         {
-            glm::mat4 viewProjectionMat;
-            glm::mat4 jitterMat;
+            glm::mat4 currentViewReverseZProjectionMat;
+            glm::mat4 previousViewReverseZProjectionMat;
         };
 
     public:
@@ -125,12 +126,13 @@ private:
 
         void render(
             const GpuContext&  gpuContext,
-            const glm::mat4&   viewProjectionMat,
-            const glm::mat4&   jitterMat,
             WGPUCommandEncoder cmdEncoder,
             WGPUTextureView    depthTextureView,
             WGPUTextureView    albedoTextureView,
-            WGPUTextureView    normalTextureView);
+            WGPUTextureView    normalTextureView,
+            WGPUTextureView    velocityTextureView,
+            const glm::mat4&   viewProjectionMat,
+            std::uint32_t      frameCount);
     };
 
     struct DebugPass
@@ -150,6 +152,7 @@ private:
             WGPUTextureView   albedoTextureView,
             WGPUTextureView   normalTextureView,
             WGPUTextureView   depthTextureView,
+            WGPUTextureView   velocityTextureView,
             const Extent2u&   framebufferSize);
         ~DebugPass();
 
@@ -169,7 +172,8 @@ private:
             const GpuContext&,
             WGPUTextureView albedoTextureView,
             WGPUTextureView normalTextureView,
-            WGPUTextureView depthTextureView);
+            WGPUTextureView depthTextureView,
+            WGPUTextureView velocityTextureView);
     };
 
     struct LightingPass
@@ -284,6 +288,8 @@ private:
     WGPUTextureView           mAlbedoTextureView;
     WGPUTexture               mNormalTexture;
     WGPUTextureView           mNormalTextureView;
+    WGPUTexture               mVelocityTexture;
+    WGPUTextureView           mVelocityTextureView;
     GpuBuffer                 mSampleBuffer;
     WGPUQuerySet              mQuerySet;
     GpuBuffer                 mQueryBuffer;
