@@ -82,8 +82,10 @@ WGPUTextureView createGbufferTextureView(
 DeferredRenderer::DeferredRenderer(
     const GpuContext&                 gpuContext,
     const DeferredRendererDescriptor& rendererDesc)
-    : mDepthTexture(nullptr),
-      mDepthTextureView(nullptr),
+    : mDepthTexture0(nullptr),
+      mDepthTextureView0(nullptr),
+      mDepthTexture1(nullptr),
+      mDepthTextureView1(nullptr),
       mAlbedoTexture(nullptr),
       mAlbedoTextureView(nullptr),
       mNormalTexture(nullptr),
@@ -128,8 +130,10 @@ DeferredRenderer::DeferredRenderer(
             .viewFormatCount = depthFormats.size(),
             .viewFormats = depthFormats.data(),
         };
-        mDepthTexture = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
-        NLRS_ASSERT(mDepthTexture != nullptr);
+        mDepthTexture0 = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
+        NLRS_ASSERT(mDepthTexture0 != nullptr);
+        mDepthTexture1 = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
+        NLRS_ASSERT(mDepthTexture1 != nullptr);
 
         const WGPUTextureViewDescriptor depthTextureViewDesc{
             .nextInChain = nullptr,
@@ -142,8 +146,10 @@ DeferredRenderer::DeferredRenderer(
             .arrayLayerCount = 1,
             .aspect = WGPUTextureAspect_DepthOnly,
         };
-        mDepthTextureView = wgpuTextureCreateView(mDepthTexture, &depthTextureViewDesc);
-        NLRS_ASSERT(mDepthTextureView != nullptr);
+        mDepthTextureView0 = wgpuTextureCreateView(mDepthTexture0, &depthTextureViewDesc);
+        NLRS_ASSERT(mDepthTextureView0 != nullptr);
+        mDepthTextureView1 = wgpuTextureCreateView(mDepthTexture1, &depthTextureViewDesc);
+        NLRS_ASSERT(mDepthTextureView1 != nullptr);
     }
 
     mAlbedoTexture = createGbufferTexture(
@@ -183,19 +189,21 @@ DeferredRenderer::DeferredRenderer(
         gpuContext,
         mAlbedoTextureView,
         mNormalTextureView,
-        mDepthTextureView,
+        mDepthTextureView0,
         rendererDesc.framebufferSize};
     mLightingPass = LightingPass{
         gpuContext,
         mAlbedoTextureView,
         mNormalTextureView,
-        mDepthTextureView,
+        mDepthTextureView0,
+        mDepthTextureView1,
         mSampleBuffer,
         rendererDesc.sceneBvhNodes,
         rendererDesc.scenePositionAttributes,
         rendererDesc.sceneVertexAttributes,
         rendererDesc.sceneBaseColorTextures};
-    mResolvePass = ResolvePass{gpuContext, mSampleBuffer, mDepthTextureView, rendererDesc};
+    mResolvePass = ResolvePass{
+        gpuContext, mSampleBuffer, mDepthTextureView0, mDepthTextureView1, rendererDesc};
 }
 
 DeferredRenderer::~DeferredRenderer()
@@ -210,20 +218,28 @@ DeferredRenderer::~DeferredRenderer()
     mAlbedoTextureView = nullptr;
     textureSafeRelease(mAlbedoTexture);
     mAlbedoTexture = nullptr;
-    textureViewSafeRelease(mDepthTextureView);
-    mDepthTextureView = nullptr;
-    textureSafeRelease(mDepthTexture);
-    mDepthTexture = nullptr;
+    textureViewSafeRelease(mDepthTextureView1);
+    mDepthTextureView1 = nullptr;
+    textureSafeRelease(mDepthTexture1);
+    mDepthTexture1 = nullptr;
+    textureViewSafeRelease(mDepthTextureView0);
+    mDepthTextureView0 = nullptr;
+    textureSafeRelease(mDepthTexture0);
+    mDepthTexture0 = nullptr;
 }
 
 DeferredRenderer::DeferredRenderer(DeferredRenderer&& other)
 {
     if (this != &other)
     {
-        mDepthTexture = other.mDepthTexture;
-        other.mDepthTexture = nullptr;
-        mDepthTextureView = other.mDepthTextureView;
-        other.mDepthTextureView = nullptr;
+        mDepthTexture0 = other.mDepthTexture0;
+        other.mDepthTexture0 = nullptr;
+        mDepthTextureView0 = other.mDepthTextureView0;
+        other.mDepthTextureView0 = nullptr;
+        mDepthTexture1 = other.mDepthTexture1;
+        other.mDepthTexture1 = nullptr;
+        mDepthTextureView1 = other.mDepthTextureView1;
+        other.mDepthTextureView1 = nullptr;
         mAlbedoTexture = other.mAlbedoTexture;
         other.mAlbedoTexture = nullptr;
         mAlbedoTextureView = other.mAlbedoTextureView;
@@ -251,10 +267,14 @@ DeferredRenderer& DeferredRenderer::operator=(DeferredRenderer&& other)
 {
     if (this != &other)
     {
-        mDepthTexture = other.mDepthTexture;
-        other.mDepthTexture = nullptr;
-        mDepthTextureView = other.mDepthTextureView;
-        other.mDepthTextureView = nullptr;
+        mDepthTexture0 = other.mDepthTexture0;
+        other.mDepthTexture0 = nullptr;
+        mDepthTextureView0 = other.mDepthTextureView0;
+        other.mDepthTextureView0 = nullptr;
+        mDepthTexture1 = other.mDepthTexture1;
+        other.mDepthTexture1 = nullptr;
+        mDepthTextureView1 = other.mDepthTextureView1;
+        other.mDepthTextureView1 = nullptr;
         mAlbedoTexture = other.mAlbedoTexture;
         other.mAlbedoTexture = nullptr;
         mAlbedoTextureView = other.mAlbedoTextureView;
@@ -320,7 +340,7 @@ void DeferredRenderer::render(
         gpuContext,
         jitterViewReverseZProjectionMat,
         encoder,
-        mDepthTextureView,
+        mDepthTextureView0,
         mAlbedoTextureView,
         mNormalTextureView);
     wgpuCommandEncoderWriteTimestamp(
@@ -464,7 +484,7 @@ void DeferredRenderer::renderDebug(
         gpuContext,
         viewProjectionMat,
         encoder,
-        mDepthTextureView,
+        mDepthTextureView0,
         mAlbedoTextureView,
         mNormalTextureView);
 
@@ -488,15 +508,19 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
     textureSafeRelease(mNormalTexture);
     textureViewSafeRelease(mAlbedoTextureView);
     textureSafeRelease(mAlbedoTexture);
-    textureViewSafeRelease(mDepthTextureView);
-    textureSafeRelease(mDepthTexture);
+    textureViewSafeRelease(mDepthTextureView0);
+    textureSafeRelease(mDepthTexture0);
+    textureViewSafeRelease(mDepthTextureView1);
+    textureSafeRelease(mDepthTexture1);
 
     mNormalTextureView = nullptr;
     mNormalTexture = nullptr;
     mAlbedoTextureView = nullptr;
     mAlbedoTexture = nullptr;
-    mDepthTextureView = nullptr;
-    mDepthTexture = nullptr;
+    mDepthTextureView0 = nullptr;
+    mDepthTexture0 = nullptr;
+    mDepthTextureView1 = nullptr;
+    mDepthTexture1 = nullptr;
 
     {
         const std::array<WGPUTextureFormat, 1> depthFormats{
@@ -514,8 +538,10 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
             .viewFormatCount = depthFormats.size(),
             .viewFormats = depthFormats.data(),
         };
-        mDepthTexture = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
-        NLRS_ASSERT(mDepthTexture != nullptr);
+        mDepthTexture0 = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
+        NLRS_ASSERT(mDepthTexture0 != nullptr);
+        mDepthTexture1 = wgpuDeviceCreateTexture(gpuContext.device, &depthTextureDesc);
+        NLRS_ASSERT(mDepthTexture1 != nullptr);
 
         const WGPUTextureViewDescriptor depthTextureViewDesc{
             .nextInChain = nullptr,
@@ -528,8 +554,10 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
             .arrayLayerCount = 1,
             .aspect = WGPUTextureAspect_DepthOnly,
         };
-        mDepthTextureView = wgpuTextureCreateView(mDepthTexture, &depthTextureViewDesc);
-        NLRS_ASSERT(mDepthTextureView != nullptr);
+        mDepthTextureView0 = wgpuTextureCreateView(mDepthTexture0, &depthTextureViewDesc);
+        NLRS_ASSERT(mDepthTextureView0 != nullptr);
+        mDepthTextureView1 = wgpuTextureCreateView(mDepthTexture1, &depthTextureViewDesc);
+        NLRS_ASSERT(mDepthTextureView1 != nullptr);
     }
 
     mAlbedoTexture = createGbufferTexture(
@@ -556,9 +584,10 @@ void DeferredRenderer::resize(const GpuContext& gpuContext, const Extent2u& newS
         mNormalTexture, "Gbuffer normal texture view", NORMAL_TEXTURE_FORMAT);
     NLRS_ASSERT(mNormalTextureView != nullptr);
 
-    mDebugPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
-    mLightingPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView);
-    mResolvePass.resize(gpuContext, mDepthTextureView);
+    mDebugPass.resize(gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView0);
+    mLightingPass.resize(
+        gpuContext, mAlbedoTextureView, mNormalTextureView, mDepthTextureView0, mDepthTextureView1);
+    mResolvePass.resize(gpuContext, mDepthTextureView0, mDepthTextureView1);
 
     invalidateTemporalAccumulation();
 }
@@ -1392,7 +1421,8 @@ DeferredRenderer::LightingPass::LightingPass(
     const GpuContext&                  gpuContext,
     const WGPUTextureView              albedoTextureView,
     const WGPUTextureView              normalTextureView,
-    const WGPUTextureView              depthTextureView,
+    const WGPUTextureView              depthTextureView0,
+    const WGPUTextureView              depthTextureView1,
     const GpuBuffer&                   sampleBuffer,
     std::span<const BvhNode>           sceneBvhNodes,
     std::span<const PositionAttribute> scenePositionAttributes,
@@ -1411,7 +1441,8 @@ DeferredRenderer::LightingPass::LightingPass(
           sizeof(Uniforms)},
       mUniformBindGroup{},
       mGbufferBindGroupLayout{},
-      mGbufferBindGroup{},
+      mGbufferBindGroup0{},
+      mGbufferBindGroup1{},
       mBvhNodeBuffer{
           gpuContext.device,
           "BVH node buffer",
@@ -1477,14 +1508,22 @@ DeferredRenderer::LightingPass::LightingPass(
                 1, WGPUTextureSampleType_UnfilterableFloat, WGPUShaderStage_Compute),
             textureBindGroupLayoutEntry(2, WGPUTextureSampleType_Depth, WGPUShaderStage_Compute)}};
 
-    mGbufferBindGroup = GpuBindGroup{
+    mGbufferBindGroup0 = GpuBindGroup{
         gpuContext.device,
-        "Lighting pass gbuffer bind group",
+        "Lighting pass gbuffer bind group 0",
         mGbufferBindGroupLayout.ptr(),
         std::array<WGPUBindGroupEntry, 3>{
             textureBindGroupEntry(0, albedoTextureView),
             textureBindGroupEntry(1, normalTextureView),
-            textureBindGroupEntry(2, depthTextureView)}};
+            textureBindGroupEntry(2, depthTextureView0)}};
+    mGbufferBindGroup1 = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass gbuffer bind group 1",
+        mGbufferBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            textureBindGroupEntry(0, albedoTextureView),
+            textureBindGroupEntry(1, normalTextureView),
+            textureBindGroupEntry(2, depthTextureView1)}};
 
     {
         struct TextureDescriptor
@@ -1658,7 +1697,8 @@ DeferredRenderer::LightingPass::LightingPass(LightingPass&& other) noexcept
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
         mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
-        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mGbufferBindGroup0 = std::move(other.mGbufferBindGroup0);
+        mGbufferBindGroup1 = std::move(other.mGbufferBindGroup1);
         mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
         mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
@@ -1682,7 +1722,8 @@ DeferredRenderer::LightingPass& DeferredRenderer::LightingPass::operator=(
         mUniformBuffer = std::move(other.mUniformBuffer);
         mUniformBindGroup = std::move(other.mUniformBindGroup);
         mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
-        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mGbufferBindGroup0 = std::move(other.mGbufferBindGroup0);
+        mGbufferBindGroup1 = std::move(other.mGbufferBindGroup1);
         mBvhNodeBuffer = std::move(other.mBvhNodeBuffer);
         mPositionAttributesBuffer = std::move(other.mPositionAttributesBuffer);
         mVertexAttributesBuffer = std::move(other.mVertexAttributesBuffer);
@@ -1739,7 +1780,7 @@ void DeferredRenderer::LightingPass::render(
     wgpuComputePassEncoderSetPipeline(computePass, mPipeline);
     wgpuComputePassEncoderSetBindGroup(computePass, 0, mSampleBindGroup.ptr(), 0, nullptr);
     wgpuComputePassEncoderSetBindGroup(computePass, 1, mUniformBindGroup.ptr(), 0, nullptr);
-    wgpuComputePassEncoderSetBindGroup(computePass, 2, mGbufferBindGroup.ptr(), 0, nullptr);
+    wgpuComputePassEncoderSetBindGroup(computePass, 2, mGbufferBindGroup0.ptr(), 0, nullptr);
     wgpuComputePassEncoderSetBindGroup(computePass, 3, mBvhBindGroup.ptr(), 0, nullptr);
 
     const std::uint32_t workgroupCountX = static_cast<std::uint32_t>(0.5f + fbsize.x / 8.f);
@@ -1750,25 +1791,35 @@ void DeferredRenderer::LightingPass::render(
 }
 
 void DeferredRenderer::LightingPass::resize(
-    const GpuContext& gpuContext,
-    WGPUTextureView   albedoTextureView,
-    WGPUTextureView   normalTextureView,
-    WGPUTextureView   depthTextureView)
+    const GpuContext&     gpuContext,
+    const WGPUTextureView albedoTextureView,
+    const WGPUTextureView normalTextureView,
+    const WGPUTextureView depthTextureView0,
+    const WGPUTextureView depthTextureView1)
 {
-    mGbufferBindGroup = GpuBindGroup{
+    mGbufferBindGroup0 = GpuBindGroup{
         gpuContext.device,
-        "Lighting pass gbuffer bind group",
+        "Lighting pass gbuffer bind group 0",
         mGbufferBindGroupLayout.ptr(),
         std::array<WGPUBindGroupEntry, 3>{
             textureBindGroupEntry(0, albedoTextureView),
             textureBindGroupEntry(1, normalTextureView),
-            textureBindGroupEntry(2, depthTextureView)}};
+            textureBindGroupEntry(2, depthTextureView0)}};
+    mGbufferBindGroup1 = GpuBindGroup{
+        gpuContext.device,
+        "Lighting pass gbuffer bind group 1",
+        mGbufferBindGroupLayout.ptr(),
+        std::array<WGPUBindGroupEntry, 3>{
+            textureBindGroupEntry(0, albedoTextureView),
+            textureBindGroupEntry(1, normalTextureView),
+            textureBindGroupEntry(2, depthTextureView1)}};
 }
 
 DeferredRenderer::ResolvePass::ResolvePass(
     const GpuContext&                 gpuContext,
     const GpuBuffer&                  sampleBuffer,
-    WGPUTextureView                   depthTextureView,
+    const WGPUTextureView             depthTextureView0,
+    const WGPUTextureView             depthTextureView1,
     const DeferredRendererDescriptor& rendererDesc)
     : mVertexBuffer{gpuContext.device, "Resolve pass vertex buffer", {GpuBufferUsage::Vertex, GpuBufferUsage::CopyDst}, std::span<const float[2]>(quadVertexData)},
       mUniformBuffer{
@@ -1784,7 +1835,8 @@ DeferredRenderer::ResolvePass::ResolvePass(
           3 * sizeof(float) * area(rendererDesc.maxFramebufferSize)},
       mSampleBufferBindGroup{},
       mGbufferBindGroupLayout{},
-      mGbufferBindGroup{},
+      mGbufferBindGroup0{},
+      mGbufferBindGroup1{},
       mPipeline(nullptr),
       mPreviousViewProjectionMat(1.f)
 {
@@ -1818,11 +1870,16 @@ DeferredRenderer::ResolvePass::ResolvePass(
         "Resolve pass gbuffer bind group layout",
         textureBindGroupLayoutEntry(0, WGPUTextureSampleType_Depth, WGPUShaderStage_Fragment)};
 
-    mGbufferBindGroup = GpuBindGroup{
+    mGbufferBindGroup0 = GpuBindGroup{
         gpuContext.device,
-        "Resolve pass gbuffer bind group",
+        "Resolve pass gbuffer bind group 0",
         mGbufferBindGroupLayout.ptr(),
-        textureBindGroupEntry(0, depthTextureView)};
+        textureBindGroupEntry(0, depthTextureView0)};
+    mGbufferBindGroup1 = GpuBindGroup{
+        gpuContext.device,
+        "Resolve pass gbuffer bind group 1",
+        mGbufferBindGroupLayout.ptr(),
+        textureBindGroupEntry(0, depthTextureView1)};
 
     {
         // Pipeline layout
@@ -1967,7 +2024,8 @@ DeferredRenderer::ResolvePass::ResolvePass(ResolvePass&& other) noexcept
         mAccumulationBuffer = std::move(other.mAccumulationBuffer);
         mSampleBufferBindGroup = std::move(other.mSampleBufferBindGroup);
         mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
-        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mGbufferBindGroup0 = std::move(other.mGbufferBindGroup0);
+        mGbufferBindGroup1 = std::move(other.mGbufferBindGroup1);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
         mPreviousViewProjectionMat = other.mPreviousViewProjectionMat;
@@ -1985,7 +2043,8 @@ DeferredRenderer::ResolvePass& DeferredRenderer::ResolvePass::operator=(
         mAccumulationBuffer = std::move(other.mAccumulationBuffer);
         mSampleBufferBindGroup = std::move(other.mSampleBufferBindGroup);
         mGbufferBindGroupLayout = std::move(other.mGbufferBindGroupLayout);
-        mGbufferBindGroup = std::move(other.mGbufferBindGroup);
+        mGbufferBindGroup0 = std::move(other.mGbufferBindGroup0);
+        mGbufferBindGroup1 = std::move(other.mGbufferBindGroup1);
         renderPipelineSafeRelease(mPipeline);
         mPipeline = other.mPipeline;
         other.mPipeline = nullptr;
@@ -2052,7 +2111,7 @@ void DeferredRenderer::ResolvePass::render(
     wgpuRenderPassEncoderSetPipeline(renderPass, mPipeline);
     wgpuRenderPassEncoderSetBindGroup(renderPass, 0, mUniformBindGroup.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetBindGroup(renderPass, 1, mSampleBufferBindGroup.ptr(), 0, nullptr);
-    wgpuRenderPassEncoderSetBindGroup(renderPass, 2, mGbufferBindGroup.ptr(), 0, nullptr);
+    wgpuRenderPassEncoderSetBindGroup(renderPass, 2, mGbufferBindGroup0.ptr(), 0, nullptr);
     wgpuRenderPassEncoderSetVertexBuffer(
         renderPass, 0, mVertexBuffer.ptr(), 0, mVertexBuffer.byteSize());
     wgpuRenderPassEncoderDraw(renderPass, 6, 1, 0, 0);
@@ -2064,13 +2123,19 @@ void DeferredRenderer::ResolvePass::render(
 
 void DeferredRenderer::ResolvePass::resize(
     const GpuContext&     gpuContext,
-    const WGPUTextureView depthTextureView)
+    const WGPUTextureView depthTextureView0,
+    const WGPUTextureView depthTextureView1)
 {
-    mGbufferBindGroup = GpuBindGroup{
+    mGbufferBindGroup0 = GpuBindGroup{
         gpuContext.device,
-        "Resolve pass gbuffer bind group",
+        "Resolve pass gbuffer bind group 0",
         mGbufferBindGroupLayout.ptr(),
-        textureBindGroupEntry(0, depthTextureView)};
+        textureBindGroupEntry(0, depthTextureView0)};
+    mGbufferBindGroup1 = GpuBindGroup{
+        gpuContext.device,
+        "Resolve pass gbuffer bind group 1",
+        mGbufferBindGroupLayout.ptr(),
+        textureBindGroupEntry(0, depthTextureView1)};
 }
 
 DeferredRenderer::PerfStats DeferredRenderer::getPerfStats() const

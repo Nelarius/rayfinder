@@ -178,7 +178,8 @@ private:
         GpuBuffer           mUniformBuffer = GpuBuffer{};
         GpuBindGroup        mUniformBindGroup = GpuBindGroup{};
         GpuBindGroupLayout  mGbufferBindGroupLayout = GpuBindGroupLayout{};
-        GpuBindGroup        mGbufferBindGroup = GpuBindGroup{};
+        GpuBindGroup        mGbufferBindGroup0 = GpuBindGroup{};
+        GpuBindGroup        mGbufferBindGroup1 = GpuBindGroup{};
         GpuBuffer           mBvhNodeBuffer = GpuBuffer{};
         GpuBuffer           mPositionAttributesBuffer = GpuBuffer{};
         GpuBuffer           mVertexAttributesBuffer = GpuBuffer{};
@@ -204,7 +205,8 @@ private:
             const GpuContext&                  gpuContext,
             WGPUTextureView                    albedoTextureView,
             WGPUTextureView                    normalTextureView,
-            WGPUTextureView                    depthTextureView,
+            WGPUTextureView                    depthTextureView0,
+            WGPUTextureView                    depthTextureView1,
             const GpuBuffer&                   accumulationBuffer,
             std::span<const BvhNode>           bvhNodes,
             std::span<const PositionAttribute> positionAttributes,
@@ -230,7 +232,8 @@ private:
             const GpuContext&,
             WGPUTextureView albedoTextureView,
             WGPUTextureView normalTextureView,
-            WGPUTextureView depthTextureView);
+            WGPUTextureView depthTextureView0,
+            WGPUTextureView depthTextureView1);
     };
 
     struct ResolvePass
@@ -242,7 +245,8 @@ private:
         GpuBuffer          mAccumulationBuffer = GpuBuffer{};
         GpuBindGroup       mSampleBufferBindGroup = GpuBindGroup{};
         GpuBindGroupLayout mGbufferBindGroupLayout = GpuBindGroupLayout{};
-        GpuBindGroup       mGbufferBindGroup = GpuBindGroup{};
+        GpuBindGroup       mGbufferBindGroup0 = GpuBindGroup{};
+        GpuBindGroup       mGbufferBindGroup1 = GpuBindGroup{};
         WGPURenderPipeline mPipeline = nullptr;
         glm::mat4          mPreviousViewProjectionMat;
 
@@ -260,7 +264,8 @@ private:
         ResolvePass(
             const GpuContext&                 gpuContext,
             const GpuBuffer&                  sampleBuffer,
-            WGPUTextureView                   depthTextureView,
+            WGPUTextureView                   depthTextureView0,
+            WGPUTextureView                   depthTextureView1,
             const DeferredRendererDescriptor& desc);
         ~ResolvePass();
 
@@ -279,13 +284,15 @@ private:
             float              exposure,
             std::uint32_t      frameCount,
             Gui&               gui);
-        void resize(const GpuContext&, WGPUTextureView depthTextureView);
+        void resize(const GpuContext&, WGPUTextureView depthTextureView0, WGPUTextureView depthTextureView1);
     };
 
     void invalidateTemporalAccumulation();
 
-    WGPUTexture               mDepthTexture;
-    WGPUTextureView           mDepthTextureView;
+    WGPUTexture               mDepthTexture0;
+    WGPUTextureView           mDepthTextureView0;
+    WGPUTexture               mDepthTexture1;
+    WGPUTextureView           mDepthTextureView1;
     WGPUTexture               mAlbedoTexture;
     WGPUTextureView           mAlbedoTextureView;
     WGPUTexture               mNormalTexture;
