@@ -86,7 +86,7 @@ const DEGREES_TO_RADIANS = PI / 180f;
 const TERRESTRIAL_SOLAR_RADIUS = 0.255f * DEGREES_TO_RADIANS;
 
 const SOLAR_COS_THETA_MAX = cos(TERRESTRIAL_SOLAR_RADIUS);
-const SOLAR_INV_PDF = 2f * PI * (1f - SOLAR_COS_THETA_MAX);
+const SOLAR_PDF = 1f / (2f * PI * (1f - SOLAR_COS_THETA_MAX));
 
 struct RenderParams {
   frameData: FrameData,
@@ -197,24 +197,51 @@ fn rayColor(blueNoise: vec2f, primaryRay: Ray, coord: vec2u) -> vec3f {
             let albedo = evalTexture(hit.textureDescriptorIdx, hit.uv);
             let p = hit.p;
 
-            let lightDirection = sampleSolarDiskDirection(blueNoise, SOLAR_COS_THETA_MAX, skyState.sunDirection);
-            let lightIntensity = vec3(
-                skyState.solarRadiances[CHANNEL_R],
-                skyState.solarRadiances[CHANNEL_G],
-                skyState.solarRadiances[CHANNEL_B]
-            );
-            let brdf = albedo * FRAC_1_PI;
-            let reflectance = brdf * dot(hit.n, lightDirection);
-            let lightVisibility = shadowRay(Ray(p, lightDirection), T_MAX);
-            radiance += throughput * lightIntensity * reflectance * lightVisibility * SOLAR_INV_PDF;
+            // Evaluate light
+
+            {
+                let lightDir = sampleSolarDiskDirection(blueNoise, SOLAR_COS_THETA_MAX, skyState.sunDirection);
+                let ndotl = dot(hit.n, lightDir);
+                if ndotl > 0f {
+                    let brdf = albedo * FRAC_1_PI;
+                    let reflectance = brdf * ndotl;
+
+                    let lightVisibility = shadowRay(Ray(p, lightDir), T_MAX);
+
+                    let theta = acos(lightDir.y);
+                    let gamma = acos(clamp(dot(lightDir, skyState.sunDirection), -1f, 1f));
+                    let lightRadiance = vec3f(
+                        skyRadiance(theta, gamma, CHANNEL_R),
+                        skyRadiance(theta, gamma, CHANNEL_G),
+                        skyRadiance(theta, gamma, CHANNEL_B)
+                    );
+
+                    let sdotl = dot(skyState.sunDirection, lightDir);
+                    let pdf = max(pdfSolarDiskDirection(sdotl, SOLAR_COS_THETA_MAX) + pdfCosineWeightedHemisphere(ndotl), 0.001f);
+
+                    radiance += throughput * reflectance * lightVisibility * lightRadiance / pdf;
+                }
+            }
 
             if bounce == numBounces {
                 break;
             }
 
-            let scatter = evalImplicitLambertian(blueNoise, hit.n, albedo);
-            ray = Ray(p, scatter.wi);
-            throughput *= scatter.throughput;
+            // Evaluate material
+
+            {
+                let lambertDir = sampleCosineWeightedHemisphere(blueNoise, hit.n);
+                
+                let brdf = albedo * FRAC_1_PI;
+                let ndotl = dot(hit.n, lambertDir);
+                let reflectance = brdf * ndotl;
+
+                let sdotl = dot(skyState.sunDirection, lambertDir);
+                let pdf = max(pdfSolarDiskDirection(sdotl, SOLAR_COS_THETA_MAX) + pdfCosineWeightedHemisphere(ndotl), 0.001f);
+                
+                ray = Ray(p, lambertDir);
+                throughput *= reflectance / pdf;
+            }
         } else {
             let v = ray.direction;
             let s = skyState.sunDirection;
@@ -252,6 +279,7 @@ fn generateCameraRay(noise: vec2f, camera: Camera, u: f32, v: f32) -> Ray {
 
 @must_use
 fn skyRadiance(theta: f32, gamma: f32, channel: u32) -> f32 {
+    // Sky dome radiance
     let r = skyState.skyRadiances[channel];
     let idx = 9u * channel;
     let p0 = skyState.params[idx + 0u];
@@ -277,7 +305,14 @@ fn skyRadiance(theta: f32, gamma: f32, channel: u32) -> f32 {
     let radianceLhs = 1.0 + p0 * exp(p1 / (cosTheta + 0.01));
     let radianceRhs = p2 + p3 * expM + p5 * rayM + p6 * mieM + p7 * zenith;
     let radianceDist = radianceLhs * radianceRhs;
-    return r * radianceDist;
+
+    // Solar radiance
+    var solarRadiance = 0f;
+    if gamma < TERRESTRIAL_SOLAR_RADIUS {
+        solarRadiance = skyState.solarRadiances[channel];
+    }
+
+    return r * radianceDist + solarRadiance;
 }
 
 @must_use
@@ -298,12 +333,26 @@ fn sampleSolarDiskDirection(u: vec2f, cosThetaMax: f32, sunDirection: vec3f) -> 
 }
 
 @must_use
-fn evalImplicitLambertian(blueNoise: vec2f, n: vec3f, albedo: vec3f) -> Scatter {
-    let v = directionInCosineWeightedHemisphere(blueNoise);
-    let onb = pixarOnb(n);
-    let wi = onb * v;
+fn pdfSolarDiskDirection(cosine: f32, cosThetaMax: f32) -> f32 {
+    if cosine <= cosThetaMax {
+        return 0f;
+    }
+    return SOLAR_PDF;
+}
 
-    return Scatter(wi, albedo);
+@must_use
+fn sampleCosineWeightedHemisphere(u: vec2f, n: vec3f) -> vec3f {
+    let v = directionInCosineWeightedHemisphere(u);
+    let onb = pixarOnb(n);
+    return onb * v;
+}
+
+@must_use
+fn pdfCosineWeightedHemisphere(cosTheta: f32) -> f32 {
+    if cosTheta < 0f {
+        return 0f;
+    }
+    return cosTheta * FRAC_1_PI;
 }
 
 @must_use
@@ -496,7 +545,8 @@ fn rayIntersectTriangle(ray: Ray, tri: Positions, tmax: f32, hit: ptr<function, 
 
     let invDet = 1.0f / det;
     let s = ray.origin - tri.p0;
-    let u = invDet * dot(s, h);
+    let)"
+R"( u = invDet * dot(s, h);
 
     if u < 0.0f || u > 1.0f {
         return false;
@@ -539,8 +589,7 @@ fn offsetRay(p: vec3f, n: vec3f) -> vec3f {
     let po = vec3f(
         bitcast<f32>(bitcast<i32>(p.x) + select(offset.x, -offset.x, (p.x < 0))),
         bitcast<f32>(bitcast<i32>(p.y) + select(offset.y, -offset.y, (p.y < 0))),
-)"
-R"(        bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
+        bitcast<f32>(bitcast<i32>(p.z) + select(offset.z, -offset.z, (p.z < 0)))
     );
 
     return vec3f(
